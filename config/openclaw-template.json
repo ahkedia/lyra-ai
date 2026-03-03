@@ -1,17 +1,7 @@
 {
-  "auth": {
-    "profiles": {
-      "anthropic:default": {
-        "provider": "anthropic",
-        "mode": "api_key"
-      }
-    }
-  },
   "agents": {
     "defaults": {
-      "model": {
-        "primary": "anthropic/claude-sonnet-4-6"
-      },
+      "model": "anthropic/claude-haiku-3-5",
       "workspace": "~/.openclaw/workspace",
       "compaction": {
         "mode": "safeguard",
@@ -41,15 +31,9 @@
     "internal": {
       "enabled": true,
       "entries": {
-        "session-memory": {
-          "enabled": true
-        },
-        "boot-md": {
-          "enabled": true
-        },
-        "command-logger": {
-          "enabled": true
-        }
+        "session-memory": { "enabled": true },
+        "boot-md": { "enabled": true },
+        "command-logger": { "enabled": true }
       }
     }
   },
@@ -57,16 +41,10 @@
     "telegram": {
       "enabled": true,
       "dmPolicy": "allowlist",
-      "botToken": "YOUR_TELEGRAM_BOT_TOKEN",
+      "botToken": "${TELEGRAM_BOT_TOKEN}",
       "groupPolicy": "allowlist",
-      "groupAllowFrom": [
-        1234567890,
-        9876543210
-      ],
-      "allowFrom": [
-        1234567890,
-        9876543210
-      ],
+      "groupAllowFrom": ["YOUR_TELEGRAM_NUMERIC_ID", "PARTNER_TELEGRAM_NUMERIC_ID"],
+      "allowFrom": ["YOUR_TELEGRAM_NUMERIC_ID", "PARTNER_TELEGRAM_NUMERIC_ID"],
       "streaming": "off"
     }
   },
@@ -76,7 +54,7 @@
     "bind": "loopback",
     "auth": {
       "mode": "token",
-      "token": "YOUR_GATEWAY_TOKEN"
+      "token": "GENERATE_WITH: openssl rand -hex 24"
     },
     "nodes": {
       "denyCommands": [
@@ -85,6 +63,35 @@
         "screen.record",
         "contacts.add"
       ]
+    }
+  },
+  "plugins": {
+    "allow": ["openclaw-supermemory", "telegram"],
+    "slots": {
+      "memory": "openclaw-supermemory"
+    },
+    "entries": {
+      "telegram": { "enabled": true },
+      "openclaw-supermemory": {
+        "enabled": true,
+        "config": {
+          "apiKey": "${SUPERMEMORY_API_KEY}",
+          "containerTag": "lyra_[YOUR_NAME_LOWERCASE]",
+          "autoRecall": true,
+          "autoCapture": true,
+          "maxRecallResults": 5,
+          "profileFrequency": 50,
+          "captureMode": "all",
+          "debug": false,
+          "enableCustomContainerTags": true,
+          "customContainers": [
+            { "tag": "work", "description": "Work memories: professional role, competitors, content strategy, job-related decisions" },
+            { "tag": "household", "description": "Shared household memories: trips, meals, health, shopping, joint decisions with partner" },
+            { "tag": "second-brain", "description": "Ideas, insights, decisions, patterns captured from voice and conversation" }
+          ],
+          "customContainerInstructions": "When the message is from the primary user about work topics — use 'work'. For household/shared topics — use 'household'. For insights/ideas/decisions — use 'second-brain'. When the message is from the partner — use 'household' only. Never mix containers."
+        }
+      }
     }
   }
 }

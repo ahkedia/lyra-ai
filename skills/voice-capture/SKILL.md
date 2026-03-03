@@ -1,54 +1,65 @@
 ---
 name: voice-capture
-description: Process incoming voice messages from Telegram. Transcribe them, classify the content, and save to the Second Brain Notion database. Use this whenever a voice note arrives from Akash or Abhigna.
+description: Process incoming voice messages from Telegram. Transcribe them using mlx-whisper, classify the content, and save to the Second Brain Notion database. Use this whenever a voice note arrives from Akash or Abhigna.
 ---
 
 # Voice Capture — Think Out Loud, Lyra Captures It
 
-When Akash or Abhigna sends a voice message on Telegram, this is the full pipeline to follow.
+## Step 1: Transcribe with mlx-whisper
 
-## Step 1: Transcribe
+When a voice message arrives, OpenClaw saves it as a file (usually `/tmp/voice_XXXX.ogg` or `.oga`).
 
-The voice message will arrive as a file attachment. Transcribe it using the built-in transcription capability, or acknowledge the audio and ask Lyra to process it.
-
-If you received an audio file path (e.g. `/tmp/voice_xxx.ogg`), transcribe it:
 ```bash
-# OpenClaw has built-in transcription via the media tool
-# The transcribed text will be in the message context
+# Convert to wav first (mlx-whisper works best with wav)
+/opt/homebrew/bin/ffmpeg -i /tmp/VOICE_FILE.ogg /tmp/voice_transcript.wav -y -loglevel quiet
+
+# Transcribe (tiny model is fast; use small for better accuracy on Hinglish)
+/Users/akashkedia/Library/Python/3.9/bin/mlx_whisper \
+  --model mlx-community/whisper-small-mlx \
+  --output-format txt \
+  --output-dir /tmp \
+  /tmp/voice_transcript.wav
+
+# Read result
+cat /tmp/voice_transcript.txt
 ```
 
-If the transcription is already in the message context (OpenClaw auto-transcribes voice on Telegram), proceed directly to Step 2.
+If the file path isn't known, check recent temp files:
+```bash
+ls -t /tmp/*.ogg /tmp/*.oga /tmp/*.m4a /tmp/*.wav 2>/dev/null | head -3
+```
+
+Hinglish note: mlx-whisper handles Hindi-English code-switching well with `--language hi` if needed.
 
 ## Step 2: Classify
 
-Read the transcribed text and classify it into ONE of:
-- **Insight** — a realization, lesson, or understanding ("I just realized that...")
-- **Decision** — something decided or being considered ("I've decided to...", "I'm thinking about whether to...")
-- **Idea** — a new concept, product idea, feature, or creative thought ("What if we...", "I had an idea for...")
-- **Question** — an open question to investigate ("I keep wondering why...", "Should I...")
-- **Pattern** — a recurring observation across time ("Every time I...", "I've noticed that...")
+Classify transcribed text into ONE of:
+- **Insight** — a realization or lesson ("I just realized...")
+- **Decision** — something decided ("I've decided to...", "Going with option B")
+- **Idea** — a new concept or feature ("What if we...", "I had an idea for...")
+- **Question** — an open question ("I keep wondering why...", "Should I...")
+- **Pattern** — a recurring observation ("Every time I...", "I've noticed that...")
 
-Also extract:
+Extract:
+- **Title**: 5-10 word summary
 - **Tags** from: job-hunt, relocation, content, n26, sme-lending, ai, personal, abhigna
-- **Title** — a short 5-10 word summary of the thought
 
 ## Step 3: Save to Second Brain
 
 ```bash
 NOTION_KEY=$(cat ~/.config/notion/api_key)
-# Second Brain database_id: YOUR_SECOND_BRAIN_DATABASE_ID
 curl -s -X POST "https://api.notion.com/v1/pages" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
   -H "Content-Type: application/json" \
   -d '{
-    "parent": {"database_id": "YOUR_SECOND_BRAIN_DATABASE_ID"},
+    "parent": {"database_id": "e4027aaf-d2ff-49e1-babf-7487725e2ef4"},
     "properties": {
       "Name": {"title": [{"text": {"content": "TITLE_HERE"}}]},
       "Type": {"select": {"name": "TYPE_HERE"}},
       "Source": {"select": {"name": "Voice"}},
       "Date": {"date": {"start": "DATE_HERE"}},
-      "Tags": {"multi_select": [{"name": "TAG1"}, {"name": "TAG2"}]},
+      "Tags": {"multi_select": [{"name": "TAG1"}]},
       "Notes": {"rich_text": [{"text": {"content": "FULL_TRANSCRIPTION_HERE"}}]}
     }
   }'
@@ -56,26 +67,12 @@ curl -s -X POST "https://api.notion.com/v1/pages" \
 
 ## Step 4: Confirm
 
-Reply to the Telegram message with:
-> "Captured. [Type]: [Title] → Second Brain ✓"
+Reply: `"Captured. [Type]: [Title] → Second Brain ✓"`
 
-Example:
-> "Captured. Idea: Build a status page for Lyra's daily digests → Second Brain ✓"
-
-## Example Classifications
-
-Voice: "I keep thinking that the reason SME lending in India is broken is because credit scoring is backwards — it penalises the informal economy instead of understanding it"
-→ Type: Insight | Tags: sme-lending, ai | Title: "SME credit scoring penalises informal economy"
-
-Voice: "I've decided I'm not going to apply to any role that doesn't have an explicit L-1A pipeline. Non-negotiable."
-→ Type: Decision | Tags: job-hunt, relocation | Title: "Only apply to roles with explicit L-1A pipeline"
-
-Voice: "What if Lyra could automatically draft my weekly Substack from the content I've been posting on X?"
-→ Type: Idea | Tags: content, ai | Title: "Auto-draft Substack from X posts via Lyra"
+Example: `"Captured. Idea: Auto-draft Substack from X posts via Lyra → Second Brain ✓"`
 
 ## Notes
-
-- Always save the full verbatim transcription in Notes, not just the summary
-- If the voice message is in Hindi or mixed Hindi-English (Hinglish), transcribe as-is and classify normally
-- If unclear which type it is, default to Insight
-- If Abhigna sends a voice note, tag it "abhigna" and save to Second Brain (she has access to shared databases but voice capture goes to Second Brain which is Akash's)
+- Always save full verbatim transcription in Notes, not just the summary
+- Abhigna voice notes: tag "abhigna", still save to Second Brain (Akash's database)
+- If transcription fails (file not found, ffmpeg error), ask Akash to resend and explain why
+- Clean up temp files after: `rm -f /tmp/voice_transcript.wav /tmp/voice_transcript.txt`
