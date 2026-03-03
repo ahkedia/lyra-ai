@@ -1,0 +1,16 @@
+# Never commit real credentials or personal config
+*.env
+.env.*
+secrets.json
+api_key
+config.toml
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.cursor/
+.vscode/
+*.swp
