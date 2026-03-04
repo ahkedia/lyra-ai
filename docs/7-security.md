@@ -120,12 +120,63 @@ By design and by lack of setup:
 
 ---
 
-## Credential storage
+## Credential storage and hardening
 
-API keys are stored in:
-- `~/.zshrc` as environment variables (loaded by OpenClaw's LaunchAgent)
-- `~/.config/notion/api_key` for the notion skill
-- `~/.config/himalaya/config.toml` for email (with app password, not main password)
+### Gmail App Password — macOS Keychain
+
+The Gmail App Password (used by himalaya for IMAP/SMTP) should never live in plaintext. Store it in macOS Keychain and have himalaya fetch it at runtime:
+
+```bash
+# One-time: add password to Keychain
+security add-generic-password -a "you@example.com" -s "himalaya" -w "YOUR_16_CHAR_APP_PASSWORD"
+
+# In ~/.config/himalaya/config.toml, use auth.cmd instead of auth.raw:
+backend.auth.type = "password"
+backend.auth.cmd = "security find-generic-password -a 'you@example.com' -s 'himalaya' -w"
+
+message.send.backend.auth.type = "password"
+message.send.backend.auth.cmd = "security find-generic-password -a 'you@example.com' -s 'himalaya' -w"
+```
+
+The password is never written to disk. Lyra never sees it — himalaya fetches it when needed and discards it. If leaked, revoke the App Password in Google Account → Security → App passwords and create a new one.
+
+### API keys — LaunchAgent plist
+
+OpenClaw's daemon does not inherit `~/.zshrc`. Add API keys (Anthropic, Notion, Telegram, Tavily, SuperMemory) to the LaunchAgent plist under `<EnvironmentVariables>`. See `docs/1-setup.md` for the exact keys.
+
+### File permissions (chmod 600)
+
+Restrict all credential files to owner-only read/write so other users and services cannot read them:
+
+```bash
+chmod 600 ~/.config/notion/api_key
+chmod 600 ~/.config/himalaya/config.toml
+chmod 600 ~/Library/LaunchAgents/ai.openclaw.gateway.plist
+chmod 600 ~/.openclaw/agents/main/agent/auth-profiles.json
+chmod 600 ~/.openclaw/agents/main/agent/models.json
+chmod 600 ~/.openclaw/identity/device-auth.json
+chmod 600 ~/.openclaw/devices/paired.json
+```
+
+### Time Machine exclusions
+
+Exclude credential paths from backups so they never sync to external drives or cloud:
+
+```bash
+tmutil addexclusion ~/.config/notion ~/.config/himalaya \
+  ~/Library/LaunchAgents/ai.openclaw.gateway.plist \
+  ~/.openclaw/agents/main/agent/auth-profiles.json \
+  ~/.openclaw/agents/main/agent/models.json \
+  ~/.openclaw/identity ~/.openclaw/devices
+```
+
+### SOUL rule — never expose credentials
+
+Add to Lyra's hard boundaries in SOUL.md:
+
+```
+- NEVER read, display, or repeat contents of credential files (himalaya config, .env, api_key). Never cat/grep config.toml or similar
+```
 
 **Do not** put API keys in `openclaw.json`, `SOUL.md`, `MEMORY.md`, or any workspace file that might be shared or committed to version control. The templates in this repo use placeholder values only.
 

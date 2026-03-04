@@ -168,6 +168,29 @@ Almost.
 
 The real fix was SuperMemory containers. Abhigna's messages route to the `household` container by configuration. The `work` container is simply never queried when Abhigna is the sender. The boundary is enforced by retrieval, not by trusting the model to refuse.
 
+### 9. Credentials were sitting in plaintext
+
+The Gmail App Password lived in `~/.config/himalaya/config.toml`. API keys lived in the LaunchAgent plist. All of it readable by any process running as my user. A backup to iCloud or Time Machine would copy them too.
+
+The fix had four parts:
+
+**Keychain for the App Password.** Himalaya supports `backend.auth.cmd` — a shell command that returns the password at runtime. Store the password in macOS Keychain once, then point himalaya at it:
+
+```bash
+security add-generic-password -a "ahkedia@gmail.com" -s "himalaya" -w "APP_PASSWORD"
+# In config.toml: backend.auth.cmd = "security find-generic-password -a 'ahkedia@gmail.com' -s 'himalaya' -w"
+```
+
+The password never touches disk. Lyra never sees it — himalaya fetches it when needed and discards it. If it leaks, revoke it in Google and create a new one.
+
+**chmod 600 on everything.** Restrict all credential files to owner-only: `~/.config/notion/api_key`, `~/.config/himalaya/config.toml`, the LaunchAgent plist, `auth-profiles.json`, `models.json`, device auth files. Other users and services on the Mac can't read them.
+
+**Time Machine exclusions.** Run `tmutil addexclusion` on those paths so they never get backed up to external drives or cloud.
+
+**SOUL rule.** Add to Lyra's hard boundaries: "NEVER read, display, or repeat contents of credential files. Never cat/grep config.toml or similar." The model is instructed never to expose them, even if asked.
+
+The API keys in the LaunchAgent plist stay there — LaunchAgents don't natively read from Keychain, and a wrapper script adds complexity. But the plist is now chmod 600 and excluded from backups. The App Password was the highest-risk credential (full Gmail access); that one is fully Keychain-protected.
+
 ---
 
 ## The Memory Architecture

@@ -208,6 +208,10 @@ Make Lyra start automatically on boot:
 openclaw onboard --install-daemon
 ```
 
+**Important:** The daemon does not inherit `~/.zshrc`. Add all API keys (Anthropic, Notion, Telegram, Tavily, SuperMemory) to the LaunchAgent plist at `~/Library/LaunchAgents/ai.openclaw.gateway.plist` under `<EnvironmentVariables>`. Edit the plist and add each key as a `<key>`/`<string>` pair.
+
+After setup, run the credential hardening steps in [`docs/7-security.md`](7-security.md#credential-storage-and-hardening): Keychain for Gmail App Password, chmod 600 on credential files, Time Machine exclusions.
+
 Verify:
 ```bash
 openclaw doctor
