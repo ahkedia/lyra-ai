@@ -1,4 +1,4 @@
-# I Built a Personal AI That Actually Remembers Me
+# Building Lyra: A $5/Month Personal AI Assistnat That Actually Works
 
 *The journey from "I need something different" to a working second brain — and what I learned along the way.*
 
@@ -6,9 +6,7 @@
 
 I lead ~100 PMs & UXers at N26. I have a wife, a household, a content strategy running across three platforms, and a lot of context that lives in my head. My head is full.
 
-I've used ChatGPT for two years. I have a massive context file I paste into every new chat. Every conversation resets. Every session starts with me re-explaining who I am and what I'm doing. It's a memory problem dressed up as an AI product.
-
-I wanted something different: an agent that runs in the background, knows my context, takes action on Telegram messages, and genuinely reduces my cognitive load. Not a chatbot I visit — an operator that works for me.
+I've used ChatGPT for three years.I wanted something different: an agent that runs in the background, knows my context, takes action on Telegram messages, and genuinely reduces my cognitive load. Not a chatbot I visit — an operator that works for me.
 
 This is the journey of how I built it.
 
