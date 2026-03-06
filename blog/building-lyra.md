@@ -142,6 +142,102 @@ The insight that unlocked the whole thing: an AI agent is only as good as its ab
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph users["Users"]
+        direction LR
+        A[Akash]
+        B[Abhigna]
+    end
+
+    subgraph interface["Interface"]
+        TG[Telegram Bot]
+    end
+
+    subgraph lyra["Lyra (OpenClaw Agent)"]
+        direction TB
+        GW[Gateway · Mac LaunchAgent]
+        CL[Claude Haiku 4.5]
+        SN[Claude Sonnet 4.6]
+        GW --> CL
+        GW --> SN
+    end
+
+    subgraph memory["Memory"]
+        direction TB
+        LB[(LanceDB)]
+        OL[Ollama · nomic-embed-text]
+        OL -->|embeddings| LB
+    end
+
+    subgraph notion["Notion Cockpit"]
+        direction TB
+        N1[Content Ideas]
+        N2[Second Brain]
+        N3[Shopping List]
+        N4[Health & Meds]
+        N5[Meal Planning]
+        N6[Upcoming Trips]
+        N7[+ 4 more DBs]
+    end
+
+    subgraph crons["Scheduled Jobs"]
+        direction TB
+        C1[7am · Morning digest]
+        C2[Noon · Content reminder]
+        C3[Sun · Competitor digest]
+        C4[Sun · Brain brief]
+        C5[Mon · Health check]
+    end
+
+    subgraph external["External Integrations"]
+        direction TB
+        EM[himalaya · Email]
+        CAL[Calendar.app → Google]
+        REM[Apple Reminders → iCloud]
+        RSS[blogwatcher · RSS]
+        TAV[Tavily · Web search]
+    end
+
+    subgraph local["Local"]
+        WH[mlx-whisper · Voice]
+    end
+
+    A -->|messages| TG
+    B -->|messages| TG
+    TG -->|inbound| GW
+    GW -->|outbound| TG
+
+    GW -->|recall · capture| memory
+    GW -->|read · write| notion
+    GW -->|triggers| crons
+    crons -->|runs| GW
+
+    GW -->|email| EM
+    GW -->|events| CAL
+    GW -->|tasks| REM
+    GW -->|feeds| RSS
+    GW -->|search| TAV
+    TG -->|voice| WH
+    WH -->|transcript| GW
+
+    style lyra fill:#e8f4f8
+    style memory fill:#f0f8e8
+    style notion fill:#f8f0e8
+```
+
+**Flow:**
+- **Inbound:** Akash and Abhigna message the Telegram bot. Voice notes go through mlx-whisper for transcription before reaching Lyra.
+- **Lyra:** OpenClaw gateway runs on Mac. Haiku handles most tasks; Sonnet runs for synthesis crons and complex one-shots.
+- **Memory:** LanceDB stores semantic embeddings. Ollama (nomic-embed-text) generates them locally. Auto-recall injects relevant memories before each turn; auto-capture stores new context after.
+- **Notion:** All structured data lives in 10 databases. Lyra reads and writes via API. Shared DBs (Shopping, Health, Meals, Trips) visible to both; professional DBs (Content, Second Brain, etc.) restricted by sender.
+- **Crons:** Fire on schedule. Morning digest, content reminder, weekly competitor digest, Sunday brain brief, Monday health check.
+- **External:** Email (himalaya), calendar (osascript → Calendar.app), reminders (osascript → Reminders), RSS (blogwatcher), web search (Tavily).
+
+---
+
 ## Stack summary
 
 | Layer | Tool |
