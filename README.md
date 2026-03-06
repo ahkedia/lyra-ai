@@ -1,6 +1,6 @@
 # Lyra — A Personal AI Agent for Work, Life, and a Household
 
-> Built on [OpenClaw](https://openclaw.ai) · Powered by Claude · Lives in Telegram · Thinks in Notion · Remembers with SuperMemory
+> Built on [OpenClaw](https://openclaw.ai) · Powered by Claude · Lives in Telegram · Thinks in Notion · Remembers with LanceDB + Ollama (local)
 
 ---
 
@@ -42,10 +42,10 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 | Layer | Tool |
 |-------|------|
 | Agent framework | [OpenClaw](https://openclaw.ai) |
-| AI model | Claude Haiku 3.5 (default) + Claude Sonnet 4.6 (synthesis tasks) |
+| AI model | Claude Haiku 4.5 (default) + Claude Sonnet 4.6 (synthesis tasks) |
 | Messaging interface | Telegram Bot |
 | Memory & databases | Notion (10 databases) |
-| Persistent memory | [SuperMemory](https://supermemory.ai) (semantic, cross-session) |
+| Persistent memory | LanceDB + Ollama (local, free, semantic embeddings) |
 | News & RSS | [blogwatcher](https://github.com/openclaw-ai/blogwatcher) CLI |
 | Transcription | mlx-whisper (local, Apple Silicon) |
 | Email | [himalaya](https://himalaya.cli.rs) CLI |
@@ -53,6 +53,8 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 | Calendar | `osascript` → Calendar.app → Google Calendar |
 | Web search | Tavily API |
 | Scheduled tasks | OpenClaw cron |
+| Secrets | `~/.openclaw/.env` (excluded from backup) |
+| Backup & monitoring | Daily backup to ~/Documents/lyra-backups; health check every 15 min with Telegram alerts |
 | Runs on | Mac (LaunchAgent daemon, auto-starts on boot) |
 
 ---
@@ -75,13 +77,13 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
     ┌───────────────┼────────────────┐
     │               │                │
 ┌───▼────┐   ┌──────▼──────┐  ┌────▼──────────┐
-│SUPERMEM│   │   NOTION    │  │   CRONS        │
-│Semantic│   │  Cockpit    │  │ 7am digest     │
-│memory  │   │             │  │ noon content   │
-│3 namsp.│   │ 10 DBs +    │  │ Sun reviews    │
-│work /  │   │ Second Brain│  │ brain brief    │
-│househ /│   │             │  │ Mon health chk │
-│2nd-brn │   └─────────────┘  └───────────────┘
+│LANCEDB │   │   NOTION    │  │   CRONS        │
+│+Ollama │   │  Cockpit    │  │ 7am digest     │
+│local   │   │             │  │ noon content   │
+│memory  │   │ 10 DBs +    │  │ Sun reviews    │
+│auto    │   │ Second Brain│  │ brain brief    │
+│capture │   │             │  │ Mon health chk │
+│recall  │   └─────────────┘  └───────────────┘
 └────────┘
          ┌──────────────────────────┐
          │       WORKSPACE          │
@@ -98,11 +100,11 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 
 ## What makes this different
 
-**1. SuperMemory, not a static file**
+**1. Local memory, not a static file**
 
 Most agent setups put a massive `MEMORY.md` file in the workspace and load it on every message. This is expensive (every "add milk" loads your full professional biography) and static (it only knows what you explicitly told it to remember).
 
-SuperMemory changes this: after every exchange, relevant context is extracted and stored as semantic embeddings. Before every message, only the 5 most relevant memories are retrieved. "Add milk" fetches household context. "Help with interview prep" fetches professional context. The agent learns from every conversation automatically.
+LanceDB + Ollama changes this: after every exchange, relevant context is extracted and stored as semantic embeddings. Before every message, only the most relevant memories are retrieved. "Add milk" fetches household context. "Help with interview prep" fetches professional context. The agent learns from every conversation automatically.
 
 **2. Dual-model routing**
 
@@ -114,15 +116,15 @@ Every domain has a Notion database. Lyra reads and writes all of them. The datab
 
 **4. Two people, one agent, isolated memory**
 
-Lyra has two access tiers on the same bot. My wife has her own conversation with Lyra, access to shared databases, and can assign tasks to me. Access control is enforced at the SuperMemory container level — she cannot retrieve professional context because it lives in a container her sessions never touch.
+Lyra has two access tiers on the same bot. My wife has her own conversation with Lyra, access to shared databases, and can assign tasks to me. Access control is enforced at the memory layer — she cannot retrieve professional context because it lives in a container her sessions never touch.
 
 **5. Voice → structured knowledge, automatically**
 
 Every voice message sent to Lyra on Telegram is transcribed locally (mlx-whisper, no data sent off-device), classified (Insight / Decision / Idea / Question / Pattern), titled, tagged, and saved to the Second Brain Notion database. The Sunday brain brief surfaces patterns across the week's captures.
 
-**6. Self-monitoring**
+**6. Self-monitoring and backup**
 
-A Monday 9am cron checks the status of all other cron jobs. If any has failed consecutively, Lyra sends a Telegram alert. Without this, a broken morning digest would silently stop working and go unnoticed for weeks.
+A Monday 9am cron checks the status of all other cron jobs. If any has failed consecutively, Lyra sends a Telegram alert. A separate health check runs every 15 minutes and alerts if the gateway or Ollama is down. Daily backups of memory, workspace, and config keep everything safe.
 
 ---
 
@@ -142,7 +144,7 @@ lyra-ai/
 │   ├── 6-heartbeats.md            ← all scheduled tasks + rationale
 │   ├── 7-security.md              ← access control + safety model
 │   ├── 8-performance.md           ← token optimisation (74% reduction)
-│   └── 9-supermemory.md           ← persistent semantic memory setup
+│   └── 9-supermemory.md           ← persistent semantic memory (LanceDB + Ollama)
 ├── config/
 │   ├── openclaw-template.json     ← OpenClaw config (secrets removed)
 │   ├── SOUL-template.md           ← personality + rules template
@@ -165,12 +167,14 @@ See [`docs/1-setup.md`](docs/1-setup.md) for the full walkthrough. The short ver
 1. Install [OpenClaw](https://openclaw.ai) and run `openclaw onboard`
 2. Create a Telegram bot via [@BotFather](https://t.me/BotFather)
 3. Set up a [Notion integration](https://notion.so/my-integrations) and create your databases
-4. Get an [Anthropic API key](https://console.anthropic.com), a [Tavily API key](https://tavily.com), and a [SuperMemory API key](https://supermemory.ai)
-5. Copy the config template, fill in your keys, deploy `SOUL.md` and `MEMORY.md`
-6. Install the SuperMemory plugin and seed your identity memories
-7. Install skills: `apple-reminders`, `apple-calendar`, `voice-capture`, `self-edit`
-8. Set up your cron jobs (news digest, content reminder, weekly reviews)
-9. Done — message your bot on Telegram
+4. Get an [Anthropic API key](https://console.anthropic.com) and a [Tavily API key](https://tavily.com)
+5. Install [Ollama](https://ollama.ai) and run `ollama pull nomic-embed-text` for local memory
+6. Copy the config template, add secrets to `~/.openclaw/.env`, deploy `SOUL.md` and `MEMORY.md`
+7. Install memory-lancedb-ollama (or use built-in memory-lancedb with Ollama baseUrl)
+8. Install skills: `apple-reminders`, `apple-calendar`, `voice-capture`, `self-edit`
+9. Set up your cron jobs (news digest, content reminder, weekly reviews)
+10. Optional: enable backup and health-check LaunchAgents
+11. Done — message your bot on Telegram
 
 ---
 
@@ -180,9 +184,9 @@ This repo is designed to be forked. All personal information has been replaced w
 
 1. Fork the repo
 2. Fill in your values in `config/SOUL-template.md` and `config/MEMORY-template.md`
-3. Copy `config/openclaw-template.json` to `~/.openclaw/openclaw.json` and add your API keys
+3. Copy `config/openclaw-template.json` to `~/.openclaw/openclaw.json` and add your API keys to `~/.openclaw/.env`
 4. Create your Notion databases using the schemas in `notion/database-schemas.md`
-5. Seed your identity memories in SuperMemory
+5. Set up LanceDB + Ollama for memory
 6. Follow `docs/1-setup.md`
 
 ---
@@ -199,6 +203,7 @@ The design principles:
 - **Two people, one agent** — a household has shared context; the agent should reflect that
 - **Proactive, not just reactive** — crons fire whether or not you message it
 - **Performance first** — every addition must justify its token cost
+- **Local-first where possible** — memory and embeddings run on-device when feasible
 
 ---
 
