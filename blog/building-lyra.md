@@ -122,9 +122,9 @@ Every self-edit is a git commit. The audit trail is the commit history. If somet
 
 Here's what's actually running:
 
-![Lyra Architecture](https://s3-alpha.figma.com/thumbnails/c1a2aa42-30cf-4606-9358-ccc3cb7399a5?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAQ4GOSFWCVLWKB6UZ%2F20260315%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260315T200352Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=e1c67b279b9d395fa9108761c2dcbb103b857e25d3bfda2e9ff48917c055239a)
+![Lyra Architecture](https://s3-alpha.figma.com/thumbnails/55b446b8-eb0a-469f-9aca-6b6ed4161e34?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAQ4GOSFWCVLWKB6UZ%2F20260315%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260315T202127Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=59ddb6134dce13e0c5616465f674f4085377f53455ef502123c31d9ab63c1d1e)
 
-*[Open in FigJam](https://www.figma.com/online-whiteboard/create-diagram/8fde2d63-0dbe-47b7-9f10-76e1464a25ff?utm_source=claude&utm_content=edit_in_figjam)*
+*[Open in FigJam](https://www.figma.com/online-whiteboard/create-diagram/d8abfc41-1606-4936-b60c-7343a18b5257?utm_source=claude&utm_content=edit_in_figjam)*
 
 **The flow:**
 
