@@ -6,7 +6,7 @@
 
 For two years, I pasted the same giant context file into ChatGPT at the start of every conversation. Here's who I am. Here's what I do. Here's what I'm working on. Every session, from scratch. Every thread, forgotten.
 
-I lead product at a European neobank. I manage a hundred people. I have a wife, a household that needs coordinating, a content strategy across three platforms, a job search in the background, and a head that's full. Genuinely, constantly full.
+I lead product at a European neobank. I manage a hundred people. I have a wife, a household that needs coordinating, a content strategy across three platforms, and a head that's full. Genuinely, constantly full.
 
 And I kept thinking: isn't this exactly what AI is supposed to fix?
 
@@ -24,7 +24,7 @@ Let me show you instead of telling you.
 
 **Monday, 7:03am.** I wake up to a Telegram message:
 
-> *"Morning, Akash. 4 unread emails — 1 from a recruiter at Stripe (follow up by Wednesday). EU news: ECB digital euro pilot expands to 5 new countries. AI: Anthropic launches tool-use improvements. 2 tasks due today: renew health insurance, reply to content collaboration request. Yesterday's usage: 28 API calls, 91% MiniMax, 9% Haiku, 0 errors."*
+> *"Morning, Akash. 3 unread emails flagged. EU news: ECB digital euro pilot expands to 5 new countries. AI: Anthropic launches tool-use improvements. 2 tasks due today: renew health insurance, reply to content collaboration request. Yesterday's usage: 28 API calls, 91% MiniMax, 9% Haiku, 0 errors."*
 
 I didn't ask for this. It just fires. Every day.
 
@@ -42,7 +42,7 @@ When I reply "Done, booked for Saturday 10am," Lyra marks it complete and tells 
 
 **Wednesday evening.** I'm walking home and have an idea about a blog post. I send a voice note to Lyra on Telegram. She transcribes it, classifies it as an "Idea," tags it with "content," and saves it to my Second Brain database in Notion. On Sunday evening, my weekly brain brief surfaces it alongside the three other ideas I captured that week, and asks: "Pattern: you've had four content ideas about personal AI this week. Worth a series?"
 
-**Thursday.** Abhigna asks: "What supplements am I taking again?" Lyra pulls from the Health & Meds database — the one Abhigna has access to — and replies in 3 seconds. She doesn't see my recruiter tracker, my competitor analysis, or my content pipeline. She doesn't even know they exist.
+**Thursday.** Abhigna asks: "What supplements am I taking again?" Lyra pulls from the Health & Meds database — the one Abhigna has access to — and replies in 3 seconds. She doesn't see my competitor analysis, my content pipeline, or my strategy notes. She doesn't even know they exist.
 
 This is what I mean by operator, not chatbot. Lyra doesn't wait for me to visit an app. She lives in my messaging. She watches for things. She coordinates between two people. She fires on schedule. She remembers.
 
@@ -62,7 +62,7 @@ That's exactly what I did.
 
 **The access levels** are explicit. Akash: full access to all 13 databases. Abhigna: household databases only — health, meals, trips, shopping, shared reminders. The boundary isn't a suggestion in a prompt. It's a rule that the agent follows because the architecture enforces it.
 
-**The escalation policy** is: handle it yourself unless it needs real judgment. Lyra's default model is MiniMax M2.5 — fast, cheap, handles 90% of requests. When she detects something that needs synthesis or nuance (competitor analysis, email drafting, strategic thinking), she fires a one-shot task on Claude Sonnet. She doesn't try and fail first. She routes correctly from the start.
+**The escalation policy** is: handle it yourself unless it needs real judgement. Lyra's default model is MiniMax M2.5 — fast, cheap, handles 90% of requests. When she detects something that needs synthesis or nuance (competitor analysis, email drafting, strategic thinking), she fires a one-shot task on Claude Sonnet. She doesn't try and fail first. She routes correctly from the start.
 
 ---
 
@@ -84,7 +84,7 @@ This was probably the most important decision. It means I'm never locked in to t
 
 Under €20/month. That was the constraint.
 
-The breakthrough was model routing. MiniMax M2.5 costs a fraction of Claude and handles simple tasks (add a reminder, check the weather, query a database) perfectly well. Claude only runs when it's actually needed — synthesis, analysis, drafting. The result: 87% of requests go through MiniMax. Monthly API cost sits around €8-12.
+The breakthrough was model routing. MiniMax M2.5 costs a fraction of Claude and handles simple tasks (add a reminder, check the weather, query a database) perfectly well. Claude only runs when it's actually needed — synthesis, analysis, drafting. The result: 87% of requests go through MiniMax. Monthly API cost sits around €8–12.
 
 The VPS is €6. Telegram is free. Notion is free for personal use. Total: roughly €18/month for a 24/7 personal AI that manages my household and professional life.
 
@@ -163,7 +163,7 @@ The hardest part wasn't the technical migration. It was ensuring my wife didn't 
 
 ### The AI will hallucinate confirmations
 
-My first voice capture pipeline existed only as an instruction in SOUL.md: "transcribe → classify → save to Second Brain." When I sent a voice note, Lyra would reply: "Captured. → Second Brain ✓."
+My first voice capture pipeline existed only as an instruction in SOUL.md: "transcribe → classify → save to Second Brain." When I sent a voice note, Lyra would reply: "Captured → Second Brain ✓."
 
 She was lying. She had no transcription capability. She just said what sounded right.
 
@@ -190,7 +190,7 @@ Environment variables go in `.env`, not in your shell. Always.
 ## The honest numbers
 
 - **Uptime since migration:** 99.7% (one config crash loop, auto-recovered)
-- **Daily API calls:** ~30-50 (mostly MiniMax)
+- **Daily API calls:** ~30–50 (mostly MiniMax)
 - **Monthly cost:** ~€18 (VPS + APIs)
 - **Notion databases:** 13 (professional + household + reminders)
 - **Cron jobs:** 7 (daily + weekly)
@@ -214,5 +214,3 @@ Lyra is infrastructure. And she's running right now, waiting for my 7am digest t
 ---
 
 *The full setup guide, config templates, and all skill files are at [github.com/ahkedia/lyra-ai](https://github.com/ahkedia/lyra-ai). Fork it and make it yours.*
-
-*Inspired by Omar's [Lobster](https://www.omarknows.ai/p/meet-lobster-my-personal-ai-assistant) — who proved that a personal AI assistant isn't science fiction, it's a weekend decision away from being your reality.*
