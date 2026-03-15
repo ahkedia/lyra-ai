@@ -1,19 +1,19 @@
 ---
 name: self-edit
-description: Edit Lyra's own configuration, memory, and personality files directly from Telegram. Use when Akash asks you to update your memory, change your behavior, add a rule, update a skill, or modify any part of your own setup.
+description: Edit Lyra's own configuration, memory, and personality files directly from Telegram. Use when [Your Name] asks you to update your memory, change your behavior, add a rule, update a skill, or modify any part of your own setup.
 ---
 
 # Self-Edit — Lyra Editing Her Own Files
 
-You have permission to modify your own workspace files when Akash instructs you to. This is how you stay up to date and improve without needing Cursor every time.
+You have permission to modify your own workspace files when [Your Name] instructs you to. This is how you stay up to date and improve without needing Cursor every time.
 
 ## Your Files and What They Control
 
 | File | Purpose | When to edit |
 |------|---------|--------------|
 | `~/.openclaw/workspace/SOUL.md` | Your personality, rules, communication style, hard limits | "Change how you respond", "add a rule", "update your behavior" |
-| `~/.openclaw/workspace/MEMORY.md` | Permanent facts about Akash, Abhigna, context | "Remember that...", "update my job status", "add this to your memory" |
-| `~/.openclaw/references/notion.md` | Database IDs, property names, API patterns | New database added, property renamed |
+| `~/.openclaw/workspace/MEMORY.md` | Permanent facts about [Your Name], Abhigna, context | "Remember that...", "update my job status", "add this to your memory" |
+| `~/.openclaw/workspace/NOTION-CONTEXT.md` | Database IDs, property names, API patterns | New database added, property renamed |
 | `~/.openclaw/workspace/HEARTBEAT.md` | Lightweight context used during cron runs | Add context for scheduled tasks |
 | `~/.openclaw/workspace/skills/*/SKILL.md` | Individual skill instructions | Skill needs updating or fixing |
 
@@ -35,11 +35,11 @@ echo "\n- New rule or memory item" >> ~/.openclaw/workspace/MEMORY.md
 Use Python to read the full file, make the change, and write it back:
 ```bash
 python3 << 'EOF'
-with open('/Users/akashkedia/.openclaw/workspace/MEMORY.md', 'r') as f:
+with open('~/.openclaw/workspace/MEMORY.md', 'r') as f:
     content = f.read()
 # make your change
 content = content.replace('old text', 'new text')
-with open('/Users/akashkedia/.openclaw/workspace/MEMORY.md', 'w') as f:
+with open('~/.openclaw/workspace/MEMORY.md', 'w') as f:
     f.write(content)
 print("Done")
 EOF
@@ -49,7 +49,7 @@ EOF
 Read the file, find the section boundary, rewrite:
 ```bash
 python3 << 'EOF'
-with open('/Users/akashkedia/.openclaw/workspace/SOUL.md', 'r') as f:
+with open('~/.openclaw/workspace/SOUL.md', 'r') as f:
     content = f.read()
 # Show current content
 print(content[:500])
@@ -62,7 +62,7 @@ EOF
 - Adding new rules to SOUL.md (e.g., "never suggest Notion for X")
 - Updating your own context about databases, people, or events
 
-## What Requires Akash's Explicit Confirmation
+## What Requires [Your Name]'s Explicit Confirmation
 
 - Removing or weakening any hard boundary in SOUL.md
 - Changing your core identity or access levels
@@ -78,7 +78,7 @@ openclaw cron add \
   --tz "Europe/Berlin" \
   --message "What to do at this time" \
   --announce \
-  --to 7057922182 \
+  --to YOUR_TELEGRAM_ID \
   --channel telegram \
   --agent main \
   --timeout-seconds 120
@@ -101,14 +101,14 @@ After any self-edit, confirm with:
 
 ## Example Conversations
 
-**Akash:** "Remember that I started at Stripe on March 15"
+**[Your Name]:** "Remember that I started at Stripe on March 15"
 → Append to MEMORY.md under Current Status
 
-**Akash:** "Add a rule that you should never recommend I apply to banks"
+**[Your Name]:** "Add a rule that you should never recommend I apply to banks"
 → Append to SOUL.md Boundaries section
 
-**Akash:** "Update your morning digest cron to also include LinkedIn job alerts"
+**[Your Name]:** "Update your morning digest cron to also include LinkedIn job alerts"
 → Run `openclaw cron edit` with updated message
 
-**Akash:** "Add a reminder every Monday at 8am to review my recruiter tracker"
+**[Your Name]:** "Add a reminder every Monday at 8am to review my recruiter tracker"
 → Run `openclaw cron add` with the right schedule

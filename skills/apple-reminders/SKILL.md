@@ -1,6 +1,6 @@
 ---
 name: apple-reminders
-description: Manage Apple Reminders via osascript. Use to add, list, and complete reminders on macOS. Works for personal lists and the shared "Shared - [Your Names]" list.
+description: Manage Apple Reminders via osascript. Use to add, list, and complete reminders on macOS. Works for personal lists and the shared "Shared - Akash & Abhigna" list.
 ---
 
 # Apple Reminders via osascript
@@ -11,7 +11,7 @@ Use `osascript` for all Reminders operations. Do NOT use `remindctl` — it has 
 
 - **To Dos - Personal** — Akash's personal reminders
 - **To Do - Work** — Work-related tasks
-- **Shared - [Your Names]** — Joint list visible to both Akash and Abhigna
+- **Shared - Akash & Abhigna** — Joint list visible to both Akash and Abhigna
 
 ## Add a reminder (no due date)
 
@@ -30,7 +30,7 @@ EOF
 ```bash
 osascript << 'EOF'
 tell application "Reminders"
-  tell list "Shared - [Your Names]"
+  tell list "Shared - Akash & Abhigna"
     make new reminder with properties {name: "TASK_NAME_HERE"}
   end tell
 end tell
@@ -61,7 +61,7 @@ ASCRIPT
 ```bash
 osascript << 'EOF'
 tell application "Reminders"
-  tell list "Shared - [Your Names]"
+  tell list "Shared - Akash & Abhigna"
     get name of every reminder whose completed is false
   end tell
 end tell
@@ -102,8 +102,8 @@ EOF
 
 ## Decision Logic
 
-- If the task involves both Akash and Abhigna, or is about the household → use **Shared - [Your Names]**
-- If Abhigna asks Lyra to add a task for Akash → use **Shared - [Your Names]**
+- If the task involves both Akash and Abhigna, or is about the household → use **Shared - Akash & Abhigna**
+- If Abhigna asks Lyra to add a task for Akash → use **Shared - Akash & Abhigna**
 - If Akash asks for a personal reminder → use **To Dos - Personal**
 - If it's work-related → use **To Do - Work**
 
