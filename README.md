@@ -1,12 +1,12 @@
 # Lyra — A Personal AI Agent for Work, Life, and a Household
 
-> Built on [OpenClaw](https://openclaw.ai) · Powered by Claude · Lives in Telegram · Thinks in Notion · Remembers with LanceDB + Ollama (local)
+> Built on [OpenClaw](https://openclaw.ai) · Powered by MiniMax M2.5 + Claude · Lives in Telegram · Thinks in Notion · Runs 24/7 on Hetzner
 
 ---
 
 I am a product leader in fintech. I lead large teams, advise startups, and create content. My wife and I share a home, a calendar, and a running list of things we keep forgetting to tell each other.
 
-I built Lyra to be the thing that holds it all together — a personal AI that runs 24/7 on my Mac, knows the full context of my life and work, and coordinates the parts of it I share with my wife. It is not a chatbot. It does not wait for me to open an app. It shows up in my Telegram, watches for things, reminds us of tasks, and quietly organises everything into Notion.
+I built Lyra to be the thing that holds it all together — a personal AI that runs 24/7 on a cloud VPS, knows the full context of my life and work, and coordinates the parts of it I share with my wife. It is not a chatbot. It does not wait for me to open an app. It shows up in my Telegram, watches for things, reminds us of tasks, and quietly organises everything into Notion.
 
 This repo is a full write-up of what I built, why, and how. Every config, skill, and decision is documented here.
 
@@ -15,25 +15,28 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 ## What Lyra does
 
 **For me:**
-- Sends a curated news digest every morning at 7am — fintech, AI, startups — directly to Telegram
-- Monitors competitors weekly and surfaces only what matters
+- Sends a curated morning digest at 7am — emails, fintech news, AI news, startup news, and tasks due today — directly to Telegram
+- Monitors competitors weekly (Revolut, Monzo, Bunq, Starling) and surfaces only what matters
 - Captures every voice note I send into a structured Second Brain in Notion (transcribe → classify → save)
-- Drafts a content post every day at noon, pulling from my ideas backlog
+- Drafts a content post reminder every day at noon, pulling from my ideas backlog
 - On Sunday evening, synthesises my week — decisions made, ideas captured, patterns forming
 - Reads and writes to all my Notion databases on command
-- Can update her own memory and rules when I tell her to
+- Reads and sends email via Gmail (himalaya CLI with App Password)
+- Can update her own memory, rules, and skills — and auto-syncs changes to this GitHub repo
+- Sends a daily activity log at 9pm — what she did today, what crons ran, any issues
 
 **For my wife (Abhigna):**
 - Has her own access to Lyra on the same Telegram bot
-- Can see and update the shared databases: Health & Meds, Meal Planning, Upcoming Trips, Shopping List
-- Cannot see my professional databases (enforced at the memory layer, not just by prompt)
-- Can assign tasks to me via Lyra — they get added to my Reminders and I get a Telegram ping
+- Gets a friendly onboarding when she first messages ("I can help with reminders, meals, health, trips, shopping")
+- Can see and update the shared databases: Health & Meds, Meal Planning, Upcoming Trips, Shopping List, Shared Reminders
+- Cannot see my professional databases (enforced by access rules, not by hoping the model behaves)
+- Can assign tasks to me via Lyra — they get added to Shared Reminders and I get a Telegram ping
+- Gets notified when I complete a task she assigned
 
 **For both of us:**
 - Joint task coordination — "Remind Abhigna to follow up with the clinic" works from my Telegram
-- Shared Apple Reminders list syncs to both iPhones via iCloud
+- Notion Reminder databases (Akash / Shared / Abhigna) with IFTTT bridge to Apple Reminders on iPhone
 - Shared Notion databases updated by either person, visible to both
-- Joint calendar events added to Apple Calendar, sync to Google Calendar
 
 ---
 
@@ -41,90 +44,133 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 
 | Layer | Tool |
 |-------|------|
-| Agent framework | [OpenClaw](https://openclaw.ai) |
-| AI model | Claude Haiku 4.5 (default) + Claude Sonnet 4.6 (synthesis tasks) |
+| Agent framework | [OpenClaw](https://openclaw.ai) v2026.3.13 |
+| Default AI model | MiniMax M2.5 (fast, cost-effective) |
+| Escalation models | Claude Haiku 4.5 (fallback) + Claude Sonnet 4.6 (synthesis) |
 | Messaging interface | Telegram Bot |
-| Memory & databases | Notion (10 databases) |
-| Persistent memory | LanceDB + Ollama (local, free, semantic embeddings) |
+| Databases | Notion (13 databases) |
+| Email | [himalaya](https://himalaya.cli.rs) CLI (Gmail IMAP/SMTP) |
 | News & RSS | [blogwatcher](https://github.com/openclaw-ai/blogwatcher) CLI |
-| Transcription | mlx-whisper (local, Apple Silicon) |
-| Email | [himalaya](https://himalaya.cli.rs) CLI |
-| Reminders | `osascript` (Apple Reminders via AppleScript) |
-| Calendar | `osascript` → Calendar.app → Google Calendar |
 | Web search | Tavily API |
-| Scheduled tasks | OpenClaw cron |
-| Secrets | `~/.openclaw/.env` (excluded from backup) |
-| Backup & monitoring | Daily backup to ~/Documents/lyra-backups; health check every 15 min with Telegram alerts |
-| Runs on | Mac (LaunchAgent daemon, auto-starts on boot) |
+| Scheduled tasks | OpenClaw cron (7 jobs, Europe/Berlin timezone) |
+| Hosting | Hetzner VPS (Ubuntu 24.04, 4GB RAM, €5.99/mo) |
+| Persistence | systemd service + PostgreSQL (Docker) |
+| Secrets | `~/.openclaw/.env` (chmod 600, excluded from git and backups) |
+| Backup | Daily at 3am UTC — workspace, config, Postgres dump, 7-day retention |
+| Monitoring | Health check every 15 min — gateway, cron failures, disk, memory, Postgres |
+| Self-edit sync | Bidirectional GitHub sync every 5 min (Lyra pushes self-edits, pulls remote changes) |
+| Reminders bridge | Notion → IFTTT → Pushcut → Apple Reminders on iPhone |
+
+**Monthly cost:** ~€18 (Hetzner €5.99 + MiniMax ~€3 + Claude API ~€5-8 + Tavily free tier)
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   TELEGRAM                          │
-│         Akash ←──────────────── Abhigna            │
-└───────────────────┬─────────────────────────────────┘
-                    │
-         ┌──────────▼──────────┐
-         │        LYRA         │
-         │   (OpenClaw Agent)  │
-         │   Mac LaunchAgent   │
-         │   Haiku / Sonnet    │
-         └──────────┬──────────┘
-                    │
-    ┌───────────────┼────────────────┐
-    │               │                │
-┌───▼────┐   ┌──────▼──────┐  ┌────▼──────────┐
-│LANCEDB │   │   NOTION    │  │   CRONS        │
-│+Ollama │   │  Cockpit    │  │ 7am digest     │
-│local   │   │             │  │ noon content   │
-│memory  │   │ 10 DBs +    │  │ Sun reviews    │
-│auto    │   │ Second Brain│  │ brain brief    │
-│capture │   │             │  │ Mon health chk │
-│recall  │   └─────────────┘  └───────────────┘
-└────────┘
-         ┌──────────────────────────┐
-         │       WORKSPACE          │
-         │  SOUL.md    (~699 tokens)│  ← rules + routing
-         │  MEMORY.md  (~357 tokens)│  ← Notion IDs only
-         │  skills/ (on-demand)     │  ← Notion, Calendar,
-         │  references/notion.md    │    Reminders, Voice
-         └──────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         TELEGRAM                                │
+│              Akash ◄──────────────────► Abhigna                 │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+              ┌────────────▼────────────┐
+              │          LYRA           │
+              │    (OpenClaw Gateway)   │
+              │    Hetzner VPS 24/7     │
+              │                         │
+              │  ┌───────┐ ┌─────────┐  │
+              │  │MiniMax│ │ Claude   │  │
+              │  │ M2.5  │ │Haiku/   │  │
+              │  │default│ │Sonnet   │  │
+              │  └───────┘ └─────────┘  │
+              └────────────┬────────────┘
+                           │
+       ┌───────────────────┼────────────────────┐
+       │                   │                    │
+┌──────▼──────┐    ┌───────▼───────┐    ┌───────▼──────────┐
+│   NOTION    │    │    CRONS      │    │   INTEGRATIONS   │
+│   Cockpit   │    │               │    │                  │
+│             │    │ 7am  digest   │    │ himalaya (email) │
+│ 13 DBs:    │    │ noon content  │    │ blogwatcher (RSS)│
+│ News       │    │ Sun  reviews  │    │ Tavily (search)  │
+│ Competitors│    │ Sun  brain    │    │ wttr.in (weather)│
+│ Recruiters │    │ Mon  health   │    │ IFTTT (reminders)│
+│ Content    │    │ 9pm  log      │    │                  │
+│ Health     │    │               │    │                  │
+│ Meals      │    │ All Europe/   │    │                  │
+│ Trips      │    │ Berlin tz     │    │                  │
+│ Reminders  │    │               │    │                  │
+│ 2nd Brain  │    │               │    │                  │
+└─────────────┘    └───────────────┘    └──────────────────┘
+
+       ┌─────────────────────────────────────────┐
+       │            RESILIENCE LAYER             │
+       │                                         │
+       │ systemd (auto-restart on failure)        │
+       │ PostgreSQL (session persistence)         │
+       │ ufw firewall (SSH + gateway only)        │
+       │ 2GB swap (OOM protection)                │
+       │ Health check every 15 min + Telegram     │
+       │ Daily backup 3am (7-day retention)       │
+       │ Bidirectional GitHub sync (5 min)         │
+       │ Cron failure alerting                    │
+       │ Model fallback: MiniMax → Haiku → alert  │
+       │ Notion failure: describe intent, retry    │
+       └─────────────────────────────────────────┘
 ```
 
-**Context per turn: ~2,900 tokens** (down from ~11,000 before optimisation)
+---
+
+## Migration story: Mac → Cloud
+
+This setup originally ran on my Mac as a LaunchAgent daemon. I migrated it to a Hetzner VPS for 24/7 availability and to remove the dependency on my Mac being powered on.
+
+**What changed:**
+- `osascript` (Apple Reminders, Calendar) → Notion databases + IFTTT bridge to iPhones
+- `mlx-whisper` (local transcription) → Planned: OpenAI Whisper API (not yet migrated)
+- `himalaya` (macOS Keychain auth) → `himalaya` (Gmail App Password auth)
+- LaunchAgent → systemd service
+- Local LanceDB + Ollama memory → Disabled (rate limit optimisation; may re-enable with cloud embeddings)
+- Default model: Claude Haiku → MiniMax M2.5 (cost reduction + speed)
+- Added: bidirectional GitHub sync, daily activity log, cron failure alerting, Postgres persistence
+
+**What stayed the same:**
+- SOUL.md personality and rules
+- All 13 Notion database integrations
+- Multi-user access control (Akash full / Abhigna sandboxed)
+- 7 scheduled cron heartbeats
+- Self-edit capability
+- Prompt injection defenses
+
+See [`blog/building-lyra.md`](blog/building-lyra.md) for the full journey from idea to working agent.
 
 ---
 
 ## What makes this different
 
-**1. Local memory, not a static file**
+**1. Three-tier model routing**
 
-Most agent setups put a massive `MEMORY.md` file in the workspace and load it on every message. This is expensive (every "add milk" loads your full professional biography) and static (it only knows what you explicitly told it to remember).
+MiniMax M2.5 handles 90% of tasks (cheap, fast). Claude Haiku catches MiniMax failures as automatic fallback. Claude Sonnet runs only for synthesis jobs (digests, analysis, complex drafts) via one-shot cron. This keeps the monthly API cost under €10 while maintaining quality where it matters.
 
-LanceDB + Ollama changes this: after every exchange, relevant context is extracted and stored as semantic embeddings. Before every message, only the most relevant memories are retrieved. "Add milk" fetches household context. "Help with interview prep" fetches professional context. The agent learns from every conversation automatically.
+**2. Notion as cockpit, not storage**
 
-**2. Dual-model routing**
+Every domain has a Notion database (13 total). Lyra reads and writes all of them. The databases are the source of truth; Lyra is the interface. When I say "add this competitor update" or "mark that task done", it's an actual API write to Notion — not a hallucinated confirmation.
 
-Haiku handles 90% of tasks. Sonnet runs only for synthesis jobs (digests, analysis, complex drafts). Lyra self-routes: if a live Telegram message needs deep reasoning, she fires a one-shot Sonnet cron that delivers the result in 15 seconds. This reduces cost by ~80% and increases capacity from 3 to 69+ messages/minute on Claude's Tier 1 limits.
+**3. Two people, one agent, isolated access**
 
-**3. Notion as cockpit, not storage**
+Lyra has two access tiers on the same bot. My wife has her own conversation, access to shared databases, and can assign tasks to me. When she completes a task I assigned, I get notified. When I complete one she assigned, she gets notified. Access control is enforced by explicit rules, not by trusting the model.
 
-Every domain has a Notion database. Lyra reads and writes all of them. The databases are the source of truth; Lyra is the interface. When I say "add this competitor update" or "mark that task done", it happens as an actual write to Notion.
+**4. Self-modifying agent with audit trail**
 
-**4. Two people, one agent, isolated memory**
+Lyra can edit her own SOUL.md, MEMORY.md, skills, and Notion references. Every change auto-syncs to this GitHub repo within 5 minutes. The commit history is the audit trail. If something breaks, `git revert` fixes it.
 
-Lyra has two access tiers on the same bot. My wife has her own conversation with Lyra, access to shared databases, and can assign tasks to me. Access control is enforced at the memory layer — she cannot retrieve professional context because it lives in a container her sessions never touch.
+**5. Resilience-first cloud design**
 
-**5. Voice → structured knowledge, automatically**
+The VPS has: systemd auto-restart, 15-minute health checks with Telegram alerts, automatic gateway restart on failure, daily backups with 7-day retention, 2GB swap for OOM protection, firewall blocking all unnecessary ports, Docker restart policies for Postgres, cron failure detection, and model fallback chains. This is infrastructure, not a hobby project.
 
-Every voice message sent to Lyra on Telegram is transcribed locally (mlx-whisper, no data sent off-device), classified (Insight / Decision / Idea / Question / Pattern), titled, tagged, and saved to the Second Brain Notion database. The Sunday brain brief surfaces patterns across the week's captures.
+**6. Graceful degradation**
 
-**6. Self-monitoring and backup**
-
-A Monday 9am cron checks the status of all other cron jobs. If any has failed consecutively, Lyra sends a Telegram alert. A separate health check runs every 15 minutes and alerts if the gateway or Ollama is down. Daily backups of memory, workspace, and config keep everything safe.
+When MiniMax fails → auto-retry → fall back to Haiku → inform user. When Notion is down → describe what would have been done → offer retry. When a cron job fails → alert within 15 minutes, not next Monday. The agent never silently fails.
 
 ---
 
@@ -132,62 +178,123 @@ A Monday 9am cron checks the status of all other cron jobs. If any has failed co
 
 ```
 lyra-ai/
-├── README.md
+├── README.md                          ← you are here
 ├── blog/
-│   └── building-lyra.md           ← full write-up of why and how
+│   └── building-lyra.md              ← full write-up of why and how
 ├── docs/
-│   ├── 1-setup.md                 ← prerequisites + full install walkthrough
-│   ├── 2-architecture.md          ← system design decisions
-│   ├── 3-notion-cockpit.md        ← Notion database schemas + setup
-│   ├── 4-household-coordination.md ← two-person agent setup
-│   ├── 5-second-brain.md          ← voice capture + weekly synthesis
-│   ├── 6-heartbeats.md            ← all scheduled tasks + rationale
-│   ├── 7-security.md              ← access control + safety model
-│   ├── 8-performance.md           ← token optimisation (74% reduction)
-│   └── 9-supermemory.md           ← persistent semantic memory (LanceDB + Ollama)
+│   ├── 1-setup.md                    ← prerequisites + full install walkthrough
+│   ├── 2-architecture.md             ← system design decisions
+│   ├── 3-notion-cockpit.md           ← Notion database schemas + setup
+│   ├── 4-household-coordination.md   ← two-person agent setup
+│   ├── 5-second-brain.md             ← voice capture + weekly synthesis
+│   ├── 6-heartbeats.md               ← all scheduled tasks + rationale
+│   ├── 7-security.md                 ← access control + safety model
+│   ├── 8-performance.md              ← token optimisation
+│   └── 9-supermemory.md              ← persistent semantic memory
 ├── config/
-│   ├── openclaw-template.json     ← OpenClaw config (secrets removed)
-│   ├── SOUL-template.md           ← personality + rules template
-│   └── MEMORY-template.md         ← memory structure template
+│   ├── openclaw-template.json        ← OpenClaw config (secrets removed)
+│   ├── SOUL-template.md              ← personality + rules template
+│   ├── MEMORY-template.md            ← memory structure template
+│   ├── SOUL.md                       ← live config (auto-synced from Hetzner)
+│   ├── MEMORY.md                     ← live config (auto-synced from Hetzner)
+│   └── HEARTBEAT.md                  ← live cron context
+├── scripts/
+│   ├── deploy-lyra.sh                ← bidirectional GitHub sync
+│   ├── lyra-backup.sh                ← daily backup with retention
+│   ├── lyra-health-check.sh          ← 15-min monitoring + alerting
+│   └── openclaw.service              ← systemd service definition
 ├── skills/
-│   ├── voice-capture/SKILL.md     ← voice → Second Brain pipeline
-│   ├── self-edit/SKILL.md         ← Lyra editing her own files
-│   ├── apple-calendar/SKILL.md    ← calendar events via osascript
-│   └── apple-reminders/SKILL.md   ← Reminders via osascript
-└── notion/
-    └── database-schemas.md        ← all 10 database structures
+│   ├── notion/SKILL.md               ← Notion API patterns
+│   ├── himalaya/SKILL.md             ← email read/write
+│   ├── blogwatcher/SKILL.md          ← RSS feed monitoring
+│   ├── weather/SKILL.md              ← weather via wttr.in
+│   ├── self-edit/SKILL.md            ← Lyra editing her own files
+│   ├── voice-capture/SKILL.md        ← voice → Second Brain pipeline
+│   ├── apple-calendar/SKILL.md       ← (legacy, Mac-only)
+│   └── apple-reminders/SKILL.md      ← (legacy, replaced by Notion reminders)
+├── notion/
+│   ├── notion.md                     ← live database IDs (auto-synced)
+│   └── database-schemas.md           ← all 13 database structures
+└── .gitignore
 ```
 
 ---
 
-## Quick start
+## Quick start (cloud deployment)
 
-See [`docs/1-setup.md`](docs/1-setup.md) for the full walkthrough. The short version:
+### Prerequisites
+- A VPS (Hetzner CPX21 recommended: 4GB RAM, €5.99/mo)
+- API keys: MiniMax, Anthropic (Claude), Telegram Bot, Notion, Tavily
+- Gmail App Password (for email integration)
+- A GitHub repo (for self-edit sync)
 
-1. Install [OpenClaw](https://openclaw.ai) and run `openclaw onboard`
-2. Create a Telegram bot via [@BotFather](https://t.me/BotFather)
-3. Set up a [Notion integration](https://notion.so/my-integrations) and create your databases
-4. Get an [Anthropic API key](https://console.anthropic.com) and a [Tavily API key](https://tavily.com)
-5. Install [Ollama](https://ollama.ai) and run `ollama pull nomic-embed-text` for local memory
-6. Copy the config template, add secrets to `~/.openclaw/.env`, deploy `SOUL.md` and `MEMORY.md`
-7. Install memory-lancedb-ollama (or use built-in memory-lancedb with Ollama baseUrl)
-8. Install skills: `apple-reminders`, `apple-calendar`, `voice-capture`, `self-edit`
-9. Set up your cron jobs (news digest, content reminder, weekly reviews)
-10. Optional: enable backup and health-check LaunchAgents
-11. Done — message your bot on Telegram
+### Deploy
+
+```bash
+# 1. Install OpenClaw on your VPS
+curl -fsSL https://get.openclaw.ai | bash
+openclaw onboard
+
+# 2. Clone this repo
+git clone https://github.com/ahkedia/lyra-ai.git /root/lyra-ai
+
+# 3. Copy config templates
+cp config/SOUL-template.md ~/.openclaw/workspace/SOUL.md
+cp config/MEMORY-template.md ~/.openclaw/workspace/MEMORY.md
+cp config/openclaw-template.json ~/.openclaw/openclaw.json
+
+# 4. Create .env with your secrets
+cat > ~/.openclaw/.env << EOF
+MINIMAX_API_KEY=your_key
+ANTHROPIC_API_KEY=your_key
+TELEGRAM_BOT_TOKEN=your_token
+NOTION_API_KEY=your_key
+TAVILY_API_KEY=your_key
+GMAIL_APP_PASSWORD=your_app_password
+GMAIL_EMAIL_ADDRESS=your@gmail.com
+OPENCLAW_GATEWAY_TOKEN=$(openssl rand -hex 24)
+NODE_ENV=production
+EOF
+chmod 600 ~/.openclaw/.env
+
+# 5. Install skills
+cp -r skills/ ~/.openclaw/workspace/skills/
+cp notion/notion.md ~/.openclaw/workspace/references/notion.md
+
+# 6. Set up systemd service
+cp scripts/openclaw.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now openclaw
+
+# 7. Set up monitoring
+cp scripts/lyra-backup.sh scripts/lyra-health-check.sh /root/
+chmod +x /root/lyra-backup.sh /root/lyra-health-check.sh
+crontab -l | { cat; echo "0 3 * * * /root/lyra-backup.sh >> /tmp/lyra-backup.log 2>&1"; } | crontab -
+crontab -l | { cat; echo "*/15 * * * * /root/lyra-health-check.sh >> /tmp/lyra-health-check.log 2>&1"; } | crontab -
+
+# 8. Harden the server
+ufw allow 22/tcp && ufw allow 18789/tcp && ufw --force enable
+fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+
+# 9. Set up cron heartbeats
+openclaw cron add --name "morning-digest" --cron "0 7 * * *" --tz "Europe/Berlin" --session isolated --announce --message "..."
+# (see docs/6-heartbeats.md for all 7 cron configurations)
+
+# 10. Message your bot on Telegram
+```
 
 ---
 
-## Fork it
+## Adapting for your own use
 
-This repo is designed to be forked. All personal information has been replaced with `[PLACEHOLDER]` values in the config templates. To adapt it:
+This repo is designed to be forked. All personal information has been replaced with `[PLACEHOLDER]` values in the template files.
 
 1. Fork the repo
-2. Fill in your values in `config/SOUL-template.md` and `config/MEMORY-template.md`
-3. Copy `config/openclaw-template.json` to `~/.openclaw/openclaw.json` and add your API keys to `~/.openclaw/.env`
-4. Create your Notion databases using the schemas in `notion/database-schemas.md`
-5. Set up LanceDB + Ollama for memory
-6. Follow `docs/1-setup.md`
+2. Fill in `config/SOUL-template.md` with your personality, rules, and access levels
+3. Fill in `config/MEMORY-template.md` with your Notion database IDs
+4. Copy `config/openclaw-template.json` to your OpenClaw config directory
+5. Create your Notion databases using the schemas in `notion/database-schemas.md`
+6. Set up your cron jobs for the heartbeats you want
+7. Deploy to your VPS
 
 ---
 
@@ -195,15 +302,13 @@ This repo is designed to be forked. All personal information has been replaced w
 
 I did not want another app to check. I wanted something that already knows my context, watches for things, and shows up where I already am (Telegram).
 
-The design principles:
-
 - **Reduce cognitive load, not add to it** — every response should make the next decision easier
 - **Notion is the source of truth** — Lyra is the interface, not the database
 - **Low friction capture** — voice notes, quick texts, no forms to fill
 - **Two people, one agent** — a household has shared context; the agent should reflect that
 - **Proactive, not just reactive** — crons fire whether or not you message it
-- **Performance first** — every addition must justify its token cost
-- **Local-first where possible** — memory and embeddings run on-device when feasible
+- **Resilience is not optional** — health checks, backups, fallbacks, alerts
+- **Self-improving** — Lyra can edit her own rules and the changes are version-controlled
 
 ---
 
