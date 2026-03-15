@@ -1,0 +1,251 @@
+# Notion Context — Lyra's Cockpit
+
+This file is your single reference for all Notion operations. Read it before any Notion API call.
+
+## API Key
+
+```bash
+NOTION_KEY=$(cat ~/.config/notion/api_key)
+```
+
+---
+
+## Lyra Hub — Your Home Base in Notion
+
+**Page ID:** `31778008-9100-806b-b935-dc1810971e87`
+**URL:** https://www.notion.so/akashkedia/Lyra-Hub-317780089100806bb935dc1810971e87
+**Parent:** Top-level workspace page
+
+This is your home in Akash's Notion. You can:
+- Create new sub-pages here for any new topic or project
+- Create new databases here when Akash asks for a new tracker or log
+- Add content blocks to existing pages under this hub
+
+### Create a new sub-page inside Lyra Hub
+```bash
+NOTION_KEY=$(cat ~/.config/notion/api_key)
+curl -s -X POST "https://api.notion.com/v1/pages" \
+  -H "Authorization: Bearer $NOTION_KEY" \
+  -H "Notion-Version: 2025-09-03" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "parent": {"page_id": "31778008-9100-806b-b935-dc1810971e87"},
+    "properties": {
+      "title": {"title": [{"text": {"content": "New Page Name"}}]}
+    },
+    "children": [
+      {"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": "Page content here"}}]}}
+    ]
+  }'
+```
+
+### Create a new database inside Lyra Hub
+```bash
+NOTION_KEY=$(cat ~/.config/notion/api_key)
+curl -s -X POST "https://api.notion.com/v1/databases" \
+  -H "Authorization: Bearer $NOTION_KEY" \
+  -H "Notion-Version: 2025-09-03" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "parent": {"type": "page_id", "page_id": "31778008-9100-806b-b935-dc1810971e87"},
+    "title": [{"type": "text", "text": {"content": "New Database Name"}}],
+    "is_inline": true,
+    "properties": {
+      "Name": {"title": {}},
+      "Status": {"select": {"options": [{"name": "Todo"}, {"name": "Done"}]}},
+      "Date": {"date": {}},
+      "Notes": {"rich_text": {}}
+    }
+  }'
+```
+
+---
+
+## Critical Rule: Two IDs Per Database
+
+Every database has two IDs. Use the right one depending on what you're doing:
+
+- **`database_id`** → use when **creating a new page** (`parent: {"database_id": "..."}`)
+- **`data_source_id`** → use when **querying, reading, or updating schema** (`/v1/data_sources/{id}/query`)
+
+---
+
+## Database Reference
+
+### News Inbox
+- **database_id:** `8a900cb78c0c4be996347c5dfebec375`
+- **data_source_id:** `99e5d9c6-857f-42b6-b195-8f298938c4ea`
+- **Properties:** Title (title), Summary (rich_text), Category (select), Source (rich_text), Topics (multi_select), Date (date), Link (url), Action (select)
+- **Who can access:** Akash only
+
+### Competitor Tracker
+- **database_id:** `9a7e80a037544a2f929b295c37fa43f8`
+- **data_source_id:** `f9ab2d4e-b111-4b3b-8d26-1ca2656af151`
+- **Properties:** Update (title), Competitor (select), Update Type (select), Summary (rich_text), Date (date), Source (url), Link (url), Relevance (select), Notes (rich_text)
+- **Who can access:** Akash only
+
+### Recruiter Tracker
+- **database_id:** `31778008910080c09b6fec080955cf00`
+- **data_source_id:** `31778008-9100-8007-8b65-000b2abf7d15`
+- **Properties:** Contact Name (title), Company (rich_text), Status (select), Channel (select), Contact Type (select), Next Action (rich_text), Next Action Date (date), Last Action (rich_text), Notes (rich_text), AI Portfolio Sent (checkbox)
+- **Who can access:** Akash only
+
+### Content Ideas
+- **database_id:** `27fc8e00643a4b9390f7ce8b9a345c62`
+- **data_source_id:** `f008d0bb-ac81-401d-889d-4e8f508ab134`
+- **Properties:** Idea (title), Channel (select), Status (select), Tags (multi_select), Rough Notes (rich_text), Notes (rich_text), Link (url)
+- **Who can access:** Akash only
+
+### Content Drafts
+- **database_id:** `8135676dd15c4ef4925336cf484567ac`
+- **data_source_id:** `553cecf2-69dd-44b9-a46e-43e761407fb4`
+- **Properties:** Draft (title), Platform (select), Channel (select), Status (select), Content (rich_text), Notes (rich_text), Target date (date), Scheduled Date (date), Performance (rich_text)
+- **Who can access:** Akash only
+
+### US Relocation Tasks
+- **database_id:** `6138e85b5d9d4ccab7ff741c75d3e63a`
+- **data_source_id:** `95a33b1d-4a91-41e4-8082-9aafa3f4f8e1`
+- **Properties:** Task (title), Category (select: Visa, Documents, Logistics, Housing), Status (status: Todo, In Progress, Done), Due (date), Notes (rich_text)
+- **Who can access:** Akash only
+
+### Health & Meds
+- **database_id:** `3d61b7c2edfe4525a6a57ed6f0b4996b`
+- **data_source_id:** `ede4569a-5f84-4109-a22d-efd70f38ea1e`
+- **Properties:** Item (title), Type (select), Person (select), Date (date), Frequency (select), Dosage (rich_text or number), Notes (rich_text), Steps (number), Active Calories (number), Sleep Hours (number), Sleep Quality (select), Workouts This Week (number), Workout Duration (min) (number), Weight (kg) (number), Resting Heart Rate (number), Standing Hours (number), Refill Date (date), Time (rich_text)
+- **Who can access:** Akash and Abhigna (shared)
+
+### Meal Planning
+- **database_id:** `bac662c07cf0496a8cb54870ddf58abf`
+- **data_source_id:** `cd1931aa-2b08-40e3-acf2-4453d0694727`
+- **Properties:** Meal Plan (title), Date (date), Breakfast (rich_text), Lunch (rich_text), Dinner (rich_text), Grocery Needed (rich_text), Notes (rich_text)
+- **Who can access:** Akash and Abhigna (shared)
+
+### Upcoming Trips
+- **database_id:** `64215718b5944945a7f7241a20e89eb1`
+- **data_source_id:** `f9cfc4ff-5a74-4955-baab-144943962a99`
+- **Properties:** Trip Name (title), Destination (rich_text), Start Date (date), End Date (date), Status (select), Flights (rich_text), Accommodation (rich_text), Packing List (rich_text), Notes (rich_text)
+- **Who can access:** Akash and Abhigna (shared)
+
+
+### Second Brain
+- **database_id:** `e4027aaf-d2ff-49e1-babf-7487725e2ef4`
+- **data_source_id:** `f1ce4e0f-9e0d-43da-87f8-94dae2732962`
+- **Properties:** Name (title), Type (select: Insight, Decision, Idea, Question, Pattern), Source (select: Voice, Telegram, Manual, Weekly Synthesis), Date (date), Tags (multi_select: job-hunt, relocation, content, n26, sme-lending, ai, personal, abhigna), Notes (rich_text)
+- **Who can access:** Akash only
+- **Purpose:** Long-term thinking capture — voice notes, spontaneous ideas, key decisions, patterns. This is the core of the second brain.
+
+### Reminders - Akash
+- **database_id:** `95e1d0de-496f-478e-9fe4-2e2a356c7970`
+- **data_source_id:** `c80025d7-782d-4159-a10d-74bd9aa622ef`
+- **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Status (checkbox), Notes (rich_text), Assigned By (select: Akash, Abhigna, Lyra)
+- **Who can access:** Akash only
+- **Purpose:** Akash's personal reminders and tasks.
+
+### Reminders - Shared
+- **database_id:** `2054e39c-3f09-431d-8821-0e6a7513913a`
+- **data_source_id:** `9f206d71-7b25-408b-ad20-02daf0b43da0`
+- **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Status (checkbox), Notes (rich_text), Assigned By (select: Akash, Abhigna, Lyra), For (select: Akash, Abhigna, Both)
+- **Who can access:** Akash and Abhigna
+- **Purpose:** Shared household reminders — shopping, bills, joint tasks.
+
+### Reminders - Abhigna
+- **database_id:** `5d6732b1-7e30-4856-b56b-edbf9c3df229`
+- **data_source_id:** `1e74f66d-cb24-40f5-8697-84a3ad8ad1bc`
+- **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Status (checkbox), Notes (rich_text), Assigned By (select: Akash, Abhigna, Lyra)
+- **Who can access:** Abhigna only
+- **Purpose:** Abhigna's personal reminders and tasks.
+
+---
+
+## Common Operation Patterns
+
+### Create a new entry
+```bash
+NOTION_KEY=$(cat ~/.config/notion/api_key)
+curl -s -X POST "https://api.notion.com/v1/pages" \
+  -H "Authorization: Bearer $NOTION_KEY" \
+  -H "Notion-Version: 2025-09-03" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "parent": {"database_id": "DATABASE_ID_HERE"},
+    "properties": {
+      "TITLE_PROPERTY_NAME": {"title": [{"text": {"content": "value"}}]},
+      "Status": {"status": {"name": "Todo"}},
+      "Notes": {"rich_text": [{"text": {"content": "details"}}]}
+    }
+  }'
+```
+
+### Query / read entries
+```bash
+NOTION_KEY=$(cat ~/.config/notion/api_key)
+curl -s -X POST "https://api.notion.com/v1/data_sources/DATA_SOURCE_ID_HERE/query" \
+  -H "Authorization: Bearer $NOTION_KEY" \
+  -H "Notion-Version: 2025-09-03" \
+  -H "Content-Type: application/json" \
+  -d '{"page_size": 20}'
+```
+
+### Update an existing entry (by page_id)
+```bash
+NOTION_KEY=$(cat ~/.config/notion/api_key)
+curl -s -X PATCH "https://api.notion.com/v1/pages/PAGE_ID_HERE" \
+  -H "Authorization: Bearer $NOTION_KEY" \
+  -H "Notion-Version: 2025-09-03" \
+  -H "Content-Type: application/json" \
+  -d '{"properties": {"Status": {"status": {"name": "Done"}}}}'
+```
+
+### Find a page by title (to get its page_id for updating)
+```bash
+NOTION_KEY=$(cat ~/.config/notion/api_key)
+curl -s -X POST "https://api.notion.com/v1/data_sources/DATA_SOURCE_ID_HERE/query" \
+  -H "Authorization: Bearer $NOTION_KEY" \
+  -H "Notion-Version: 2025-09-03" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": {
+      "property": "TITLE_PROPERTY_NAME",
+      "title": {"contains": "search term"}
+    }
+  }'
+```
+
+---
+
+## Example: Add a recruiter to Recruiter Tracker
+```bash
+NOTION_KEY=$(cat ~/.config/notion/api_key)
+curl -s -X POST "https://api.notion.com/v1/pages" \
+  -H "Authorization: Bearer $NOTION_KEY" \
+  -H "Notion-Version: 2025-09-03" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "parent": {"database_id": "31778008910080c09b6fec080955cf00"},
+    "properties": {
+      "Contact Name": {"title": [{"text": {"content": "Jane Smith"}}]},
+      "Company": {"rich_text": [{"text": {"content": "Stripe"}}]},
+      "Status": {"select": {"name": "Active"}},
+      "Channel": {"select": {"name": "LinkedIn"}},
+      "Notes": {"rich_text": [{"text": {"content": "Reached out via DM"}}]}
+    }
+  }'
+```
+
+## Example: Mark a relocation task as In Progress
+```bash
+# Step 1: Find the page_id by searching
+NOTION_KEY=$(cat ~/.config/notion/api_key)
+curl -s -X POST "https://api.notion.com/v1/data_sources/95a33b1d-4a91-41e4-8082-9aafa3f4f8e1/query" \
+  -H "Authorization: Bearer $NOTION_KEY" \
+  -H "Notion-Version: 2025-09-03" \
+  -H "Content-Type: application/json" \
+  -d '{"filter": {"property": "Task", "title": {"contains": "attorney"}}}' | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['results'][0]['id'])"
+
+# Step 2: Update status using the page_id from above
+curl -s -X PATCH "https://api.notion.com/v1/pages/PAGE_ID_HERE" \
+  -H "Authorization: Bearer $NOTION_KEY" \
+  -H "Notion-Version: 2025-09-03" \
+  -H "Content-Type: application/json" \
+  -d '{"properties": {"Status": {"status": {"name": "In Progress"}}}}'
+```
