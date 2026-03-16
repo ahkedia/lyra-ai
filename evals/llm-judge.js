@@ -41,7 +41,9 @@ Rubric: ${rubric}
 Score this response.`;
 
   try {
-    const result = await callHaiku(systemPrompt, userMessage, apiKey);
+    let result = await callHaiku(systemPrompt, userMessage, apiKey);
+    // Strip markdown code fences if present
+    result = result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     const parsed = JSON.parse(result);
     const score = parsed.score || 0;
     return {
