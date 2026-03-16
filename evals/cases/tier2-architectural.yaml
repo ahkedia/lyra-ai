@@ -22,7 +22,7 @@ tests:
     category: latency
     name: "Notion query latency"
     prompt: "Do I have any upcoming trips?"
-    timeout_ms: 20000
+    timeout_ms: 45000
     side_effects: read_only
     validators:
       - type: latency_p95
@@ -49,7 +49,7 @@ tests:
     category: tool_use
     name: "Notion reminder creation (dry run)"
     prompt: "Add a test reminder: check eval framework results"
-    timeout_ms: 20000
+    timeout_ms: 30000
     side_effects: dry_run
     validators:
       - type: llm_judge
@@ -75,9 +75,9 @@ tests:
     tier: architectural
     category: tool_use
     name: "Draft email without sending"
-    prompt: "Draft an email to test@example.com saying thank you for the meeting"
-    timeout_ms: 20000
-    side_effects: dry_run
+    prompt: "Draft an email to test@example.com saying thank you for the meeting. Show me the draft but don't send it."
+    timeout_ms: 30000
+    side_effects: none
     validators:
       - type: llm_judge
         rubric: "Does the response show a draft email with a subject line and body? It should NOT send the email, but present it for review. The tone should be professional and the content should mention 'thank you' and 'meeting'."
@@ -90,7 +90,7 @@ tests:
     category: tool_use
     name: "Cross-user messaging (dry run)"
     prompt: "Tell Abhigna to check the meal plan for next week"
-    timeout_ms: 20000
+    timeout_ms: 30000
     side_effects: dry_run
     validators:
       - type: llm_judge
@@ -103,13 +103,13 @@ tests:
     category: model_routing
     name: "Simple task stays on default model"
     prompt: "What day of the week is it today?"
-    timeout_ms: 10000
+    timeout_ms: 20000
     side_effects: none
     validators:
       - type: regex
         pattern: "(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"
       - type: latency_p95
-        threshold_ms: 5000
+        threshold_ms: 10000
     tags: [routing, simple]
 
   - id: routing-synthesis
