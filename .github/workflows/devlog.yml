@@ -1,0 +1,31 @@
+name: Update Lyra Dev Log
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/dashboard/**'
+      - '*.md'
+
+jobs:
+  devlog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install @anthropic-ai/sdk
+
+      - name: Generate and post dev log entry
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DEVLOG_PAGE_ID: "3257800891008166a2c1db67b324f25e"
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        run: node scripts/devlog-to-notion.js
