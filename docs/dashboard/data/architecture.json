@@ -16,7 +16,9 @@
     "fallback": "Claude Haiku 4.5",
     "escalation": "Claude Sonnet 4.6"
   },
-  "channels": ["Telegram"],
+  "channels": [
+    "Telegram"
+  ],
   "databases": {
     "count": 13,
     "engine": "Notion API"
