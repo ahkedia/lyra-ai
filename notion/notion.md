@@ -259,3 +259,9 @@ curl -s -X PATCH "https://api.notion.com/v1/pages/PAGE_ID_HERE" \
   -H "Content-Type: application/json" \
   -d '{"properties": {"Status": {"status": {"name": "In Progress"}}}}'
 ```
+
+### Lyra Dev Log
+- **page_id:** `3257800891008166a2c1db67b324f25e`
+- **Type:** Page (not a database) — content is appended as blocks
+- **Who can access:** Akash only
+- **Purpose:** Running log of Lyra improvements. Updated automatically by GitHub Actions on every push to main. Each entry is a heading_3 (date) + paragraph (conversational summary).
