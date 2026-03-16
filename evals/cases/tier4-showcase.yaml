@@ -1,0 +1,113 @@
+# Tier 4: Showcase & Regression Tests
+# These demonstrate multi-step capability, proactive value, and edge case handling.
+
+tests:
+  # --- Multi-Step Tasks ---
+  - id: multi-reminder-flow
+    tier: showcase
+    category: multi_step
+    name: "Create reminder with date parsing"
+    prompt: "Remind me to call the dentist tomorrow at 3pm"
+    timeout_ms: 25000
+    side_effects: dry_run
+    validators:
+      - type: llm_judge
+        rubric: "Does the response describe creating a reminder with the correct details? It should parse 'tomorrow' to the correct date, set time to 3pm, mention adding to the Reminders database in Notion, and include the task 'call the dentist'. Vague or incomplete parsing is a low score."
+    tags: [multi-step, reminder, dry-run]
+
+  - id: multi-cross-user-task
+    tier: showcase
+    category: multi_step
+    name: "Cross-user task delegation"
+    prompt: "Tell Abhigna we need to plan meals for next week"
+    timeout_ms: 25000
+    side_effects: dry_run
+    validators:
+      - type: llm_judge
+        rubric: "Does the response describe a multi-step flow? It should: (1) describe writing to the shared Reminders or Meal Planning database, (2) describe sending a Telegram message to Abhigna. Both steps should be mentioned. Only doing one is incomplete."
+    tags: [multi-step, cross-user, dry-run]
+
+  - id: multi-insight-capture
+    tier: showcase
+    category: multi_step
+    name: "Classify and save insight"
+    prompt: "I just realized that the biggest risk in our product is not competition, it is internal alignment. Teams are optimizing for different metrics and nobody is noticing."
+    timeout_ms: 25000
+    side_effects: dry_run
+    validators:
+      - type: llm_judge
+        rubric: "Does the response describe capturing this as an insight in the Second Brain database? It should: (1) recognize this as a product insight worth saving, (2) describe classifying it (e.g., type: Insight, tags: product/leadership), (3) describe saving to Second Brain in Notion. Simply responding conversationally without capturing is a low score."
+    tags: [multi-step, second-brain, dry-run]
+
+  # --- Proactive Quality ---
+  - id: proactive-digest-quality
+    tier: showcase
+    category: proactive_quality
+    name: "Morning digest quality"
+    prompt: "Generate my morning digest for today. Include news, tasks due, and any important reminders."
+    timeout_ms: 45000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Is this a well-structured morning digest? It should have clear sections (news, tasks, reminders), be actionable (not just informational), be concise (under 400 words), and feel like a briefing from a capable executive assistant. Generic or overly long responses score low."
+      - type: length_range
+        min: 100
+        max: 2500
+    tags: [proactive, digest]
+
+  - id: proactive-brain-brief
+    tier: showcase
+    category: proactive_quality
+    name: "Weekly brain brief quality"
+    prompt: "Generate my weekly brain brief. Synthesize patterns from the past week across my Second Brain, content ideas, and any recurring themes."
+    timeout_ms: 45000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Does this brain brief demonstrate synthesis? It should identify patterns, connect dots between different entries, and surface non-obvious insights. Simply listing items is a low score. Genuine pattern recognition and strategic suggestions score high."
+      - type: length_range
+        min: 150
+        max: 2000
+    tags: [proactive, brain-brief]
+
+  - id: proactive-content-suggestion
+    tier: showcase
+    category: proactive_quality
+    name: "Content suggestion quality"
+    prompt: "Based on my recent content ideas, suggest 3 posts I should write this week and explain why each would resonate with my audience."
+    timeout_ms: 45000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Are these content suggestions specific and well-reasoned? Each suggestion should have a clear title/topic, a reason why it would resonate, and connect to the user's actual content ideas (not generic AI blog topics). Three distinct, actionable suggestions score high."
+      - type: regex
+        pattern: "(1|2|3|first|second|third)"
+        flags: "i"
+    tags: [proactive, content]
+
+  # --- Edge Cases ---
+  - id: edge-empty-message
+    tier: showcase
+    category: edge_cases
+    name: "Handle empty message"
+    prompt: ""
+    timeout_ms: 10000
+    side_effects: none
+    validators:
+      - type: llm_judge
+        rubric: "Does the response handle an empty message gracefully? It should ask what the user needs help with, not crash or return an error. A friendly prompt like 'What can I help with?' scores high."
+    tags: [edge, empty]
+
+  - id: edge-long-message
+    tier: showcase
+    category: edge_cases
+    name: "Handle very long message"
+    prompt: "I need to plan a complex trip. We are going from Berlin to Tokyo via Dubai, staying 3 nights in Dubai at a hotel near the Marina, then flying to Tokyo for 5 nights where we want to visit Shibuya, Asakusa, Akihabara, and take a day trip to Hakone. Budget is around 5000 euros total for two people including flights but not including food. We need to book the flights by next Friday and the hotels by the end of the month. Also check if our passports need renewal since they expire in September. And remind me to get travel insurance at least 2 weeks before departure. Can you help organize all of this into a structured plan with timeline and checklist?"
+    timeout_ms: 45000
+    side_effects: dry_run
+    validators:
+      - type: llm_judge
+        rubric: "Does the response handle this complex, multi-part request well? It should break down the trip into structured components (flights, hotels, activities, documents, insurance), create a timeline or checklist, and not miss major elements. Addressing only one part or giving a generic response scores low."
+      - type: length_range
+        min: 300
+    tags: [edge, long-input]

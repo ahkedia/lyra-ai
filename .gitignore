@@ -14,3 +14,5 @@ config.toml
 .cursor/
 .vscode/
 *.swp
+evals/results/*.jsonl
+evals/results/*-summary.json

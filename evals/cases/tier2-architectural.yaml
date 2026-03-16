@@ -1,0 +1,139 @@
+# Tier 2: Architectural Tests
+# These show system-level quality: latency, tool use, model routing.
+
+tests:
+  # --- Latency Profiling ---
+  - id: latency-simple-greeting
+    tier: architectural
+    category: latency
+    name: "Simple greeting latency"
+    prompt: "Hi"
+    timeout_ms: 10000
+    side_effects: none
+    validators:
+      - type: latency_p95
+        threshold_ms: 5000
+      - type: length_range
+        min: 2
+    tags: [latency, quick]
+
+  - id: latency-notion-lookup
+    tier: architectural
+    category: latency
+    name: "Notion query latency"
+    prompt: "Do I have any upcoming trips?"
+    timeout_ms: 20000
+    side_effects: read_only
+    validators:
+      - type: latency_p95
+        threshold_ms: 12000
+    tags: [latency, notion]
+
+  - id: latency-multi-tool
+    tier: architectural
+    category: latency
+    name: "Multi-tool task latency"
+    prompt: "Check the weather in Berlin and tell me if I should carry an umbrella"
+    timeout_ms: 25000
+    side_effects: none
+    validators:
+      - type: latency_p95
+        threshold_ms: 20000
+      - type: contains
+        value: "Berlin"
+    tags: [latency, weather, multi-tool]
+
+  # --- Tool Use Reliability ---
+  - id: tool-reminder-dryrun
+    tier: architectural
+    category: tool_use
+    name: "Notion reminder creation (dry run)"
+    prompt: "Add a test reminder: check eval framework results"
+    timeout_ms: 20000
+    side_effects: dry_run
+    validators:
+      - type: llm_judge
+        rubric: "Does the response describe creating a reminder in Notion? It should mention the Reminders database, the reminder text, and confirm it would write to Notion. It should NOT actually execute the write since this is dry-run mode."
+    tags: [notion, tool-use, dry-run]
+
+  - id: tool-cron-list
+    tier: architectural
+    category: tool_use
+    name: "List cron jobs correctly"
+    prompt: "List all my scheduled cron jobs with their times"
+    timeout_ms: 15000
+    side_effects: none
+    validators:
+      - type: contains
+        value: "digest"
+      - type: regex
+        pattern: "(morning|content|brain|competitor|weekly)"
+        flags: "i"
+    tags: [cron, tool-use]
+
+  - id: tool-email-draft
+    tier: architectural
+    category: tool_use
+    name: "Draft email without sending"
+    prompt: "Draft an email to test@example.com saying thank you for the meeting"
+    timeout_ms: 20000
+    side_effects: dry_run
+    validators:
+      - type: llm_judge
+        rubric: "Does the response show a draft email with a subject line and body? It should NOT send the email, but present it for review. The tone should be professional and the content should mention 'thank you' and 'meeting'."
+      - type: not_contains
+        value: "sent"
+    tags: [email, tool-use, dry-run]
+
+  - id: tool-cross-user-dryrun
+    tier: architectural
+    category: tool_use
+    name: "Cross-user messaging (dry run)"
+    prompt: "Tell Abhigna to check the meal plan for next week"
+    timeout_ms: 20000
+    side_effects: dry_run
+    validators:
+      - type: llm_judge
+        rubric: "Does the response describe sending a message to Abhigna via Telegram? It should mention notifying Abhigna, referencing the meal plan. It should describe what it WOULD do, not actually execute."
+    tags: [cross-user, telegram, dry-run]
+
+  # --- Model Routing ---
+  - id: routing-simple-minimax
+    tier: architectural
+    category: model_routing
+    name: "Simple task stays on default model"
+    prompt: "What day of the week is it today?"
+    timeout_ms: 10000
+    side_effects: none
+    validators:
+      - type: regex
+        pattern: "(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"
+      - type: latency_p95
+        threshold_ms: 5000
+    tags: [routing, simple]
+
+  - id: routing-synthesis
+    tier: architectural
+    category: model_routing
+    name: "Complex task triggers escalation"
+    prompt: "Analyze the themes across my recent Second Brain entries and suggest a content strategy for next week"
+    timeout_ms: 45000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Does this response demonstrate synthesis and strategic thinking? It should analyze themes, identify patterns, and make concrete content suggestions. A shallow or generic response scores low. A thoughtful, specific analysis scores high."
+      - type: length_range
+        min: 200
+    tags: [routing, synthesis, escalation]
+
+  - id: routing-fallback-graceful
+    tier: architectural
+    category: model_routing
+    name: "Graceful handling of edge request"
+    prompt: "What would happen if your primary model went down right now?"
+    timeout_ms: 15000
+    side_effects: none
+    validators:
+      - type: llm_judge
+        rubric: "Does the response explain the fallback chain? It should mention that if MiniMax fails, it retries, then falls back to Claude Haiku, and informs the user. A good response shows awareness of the resilience architecture."
+    tags: [routing, fallback]

@@ -1,0 +1,30 @@
+{
+  "server": {
+    "provider": "Hetzner",
+    "type": "CX22",
+    "ram": "4 GB",
+    "location": "Nuremberg, Germany",
+    "os": "Ubuntu 24.04",
+    "cost": "6 EUR/month"
+  },
+  "framework": {
+    "name": "OpenClaw",
+    "version": "v2026.3.13"
+  },
+  "models": {
+    "default": "MiniMax M2.5",
+    "fallback": "Claude Haiku 4.5",
+    "escalation": "Claude Sonnet 4.6"
+  },
+  "channels": ["Telegram"],
+  "databases": {
+    "count": 13,
+    "engine": "Notion API"
+  },
+  "cron_jobs": 7,
+  "persistence": "PostgreSQL",
+  "monitoring": "15-min health checks + Telegram alerts",
+  "backup": "Daily at 3am UTC, 7-day retention",
+  "sync": "Bidirectional GitHub every 5 min",
+  "monthly_cost": "~18 EUR (VPS + APIs)"
+}
