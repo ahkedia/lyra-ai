@@ -130,6 +130,12 @@ Every database has two IDs. Use the right one depending on what you're doing:
 ### Second Brain
 - **database_id:** `e4027aaf-d2ff-49e1-babf-7487725e2ef4`
 - **data_source_id:** `f1ce4e0f-9e0d-43da-87f8-94dae2732962`
+
+### AI Evals Dashboard
+- **database_id:** `a028ad4e-43d2-4406-bae7-65f9b41f006f`
+- **data_source_id:** `63d1d1cd-a7d9-4518-b91e-b3013fea9171`
+- **Properties:** Date (date), Total Tests (number), Passed (number), Failed (number), Pass Rate (number), Avg Latency (ms) (number), Top Failure (rich_text), Notes (rich_text)
+- **Purpose:** Track Lyra's performance over time for the AI portfolio
 - **Properties:** Name (title), Type (select: Insight, Decision, Idea, Question, Pattern), Source (select: Voice, Telegram, Manual, Weekly Synthesis), Date (date), Tags (multi_select: job-hunt, relocation, content, n26, sme-lending, ai, personal, abhigna), Notes (rich_text)
 - **Who can access:** Akash only
 - **Purpose:** Long-term thinking capture — voice notes, spontaneous ideas, key decisions, patterns. This is the core of the second brain.
