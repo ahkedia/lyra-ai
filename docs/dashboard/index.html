@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lyra AI — Production Eval Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1>Lyra AI</h1>
+        <span class="badge">Production Eval Dashboard</span>
+      </div>
+      <div class="header-right">
+        <span class="last-updated" id="lastUpdated">Loading...</span>
+        <a href="https://github.com/ahkedia/lyra-ai" class="github-link" target="_blank">GitHub</a>
+      </div>
+    </header>
+
+    <!-- Hero Stats -->
+    <section class="hero-stats" id="heroStats">
+      <div class="stat-card primary">
+        <div class="stat-value" id="passRate">—</div>
+        <div class="stat-label">Pass Rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="totalTests">—</div>
+        <div class="stat-label">Total Tests</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="avgLatency">—</div>
+        <div class="stat-label">Avg Latency</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="p95Latency">—</div>
+        <div class="stat-label">P95 Latency</div>
+      </div>
+    </section>
+
+    <!-- Charts Row -->
+    <section class="charts-row">
+      <div class="chart-card wide">
+        <h2>Pass Rate Over Time</h2>
+        <canvas id="passRateChart"></canvas>
+        <p class="chart-empty" id="passRateEmpty" style="display:none">Run evals for multiple days to see trends</p>
+      </div>
+      <div class="chart-card">
+        <h2>Category Breakdown</h2>
+        <canvas id="categoryChart"></canvas>
+        <p class="chart-empty" id="categoryEmpty" style="display:none">No category data yet</p>
+      </div>
+    </section>
+
+    <!-- Latency Chart -->
+    <section class="charts-row">
+      <div class="chart-card wide">
+        <h2>Latency Distribution (ms)</h2>
+        <canvas id="latencyChart"></canvas>
+        <p class="chart-empty" id="latencyEmpty" style="display:none">Run evals for multiple days to see latency trends</p>
+      </div>
+      <div class="chart-card">
+        <h2>Tier Pass Rates</h2>
+        <canvas id="tierChart"></canvas>
+        <p class="chart-empty" id="tierEmpty" style="display:none">No tier data yet</p>
+      </div>
+    </section>
+
+    <!-- Recent Failures -->
+    <section class="card">
+      <h2>Recent Failures</h2>
+      <div class="table-wrapper">
+        <table id="failuresTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Test</th>
+              <th>Category</th>
+              <th>Error</th>
+              <th>Latency</th>
+            </tr>
+          </thead>
+          <tbody id="failuresBody">
+            <tr><td colspan="5" class="empty-state">No failures recorded yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Architecture -->
+    <section class="card">
+      <h2>Architecture</h2>
+      <div class="arch-grid" id="archGrid">
+        <p class="empty-state">Loading architecture info...</p>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>
+        Built by <a href="https://github.com/ahkedia" target="_blank">Akash Kedia</a> |
+        Powered by <a href="https://openclaw.com" target="_blank">OpenClaw</a> +
+        <a href="https://minimaxi.com" target="_blank">MiniMax</a> +
+        <a href="https://anthropic.com" target="_blank">Claude</a>
+      </p>
+      <p class="footer-sub">Evals run daily at 4am UTC. Dashboard auto-updates via GitHub Pages.</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

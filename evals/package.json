@@ -1,0 +1,15 @@
+{
+  "name": "lyra-evals",
+  "version": "1.0.0",
+  "description": "Production eval framework for Lyra AI assistant",
+  "type": "module",
+  "scripts": {
+    "eval": "node runner.js",
+    "aggregate": "node aggregate.js",
+    "notion-sync": "node notion-sync.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0",
+    "yaml": "^2.4.0"
+  }
+}
