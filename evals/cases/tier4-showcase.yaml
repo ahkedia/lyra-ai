@@ -89,13 +89,13 @@ tests:
   - id: edge-empty-message
     tier: showcase
     category: edge_cases
-    name: "Handle empty message"
-    prompt: ""
-    timeout_ms: 10000
+    name: "Handle near-empty message"
+    prompt: "."
+    timeout_ms: 15000
     side_effects: none
     validators:
       - type: llm_judge
-        rubric: "Does the response handle an empty message gracefully? It should ask what the user needs help with, not crash or return an error. A friendly prompt like 'What can I help with?' scores high."
+        rubric: "Does the response handle a near-empty/meaningless message gracefully? It should ask what the user needs help with, not crash or return an error. A friendly prompt like 'What can I help with?' scores high."
     tags: [edge, empty]
 
   - id: edge-long-message

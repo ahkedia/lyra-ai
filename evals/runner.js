@@ -102,9 +102,13 @@ async function runTest(testCase) {
   console.log(`  [${id}] ${(prompt || '(empty)').slice(0, 60)}...`);
 
   // Prepend dry-run instruction if needed
-  const finalPrompt = isDryRun
-    ? `[EVAL MODE - DRY RUN] Describe what you WOULD do, including the exact tools and databases you would use, but do NOT execute any write operations. Show the plan without running it.\n\n${prompt}`
-    : prompt;
+  // Handle empty prompt edge case
+  let finalPrompt = prompt;
+  if (!prompt || prompt.trim() === '') {
+    finalPrompt = ' ';  // Send a single space — tests Lyra's handling of empty-like input
+  } else if (isDryRun) {
+    finalPrompt = `[EVAL MODE - DRY RUN] Describe what you WOULD do, including the exact tools and databases you would use, but do NOT execute any write operations. Show the plan without running it.\n\n${prompt}`;
+  }
 
   const result = sendToLyra(finalPrompt, timeout_ms);
   const { text: response, durationMs: latencyMs, error } = result;
@@ -218,8 +222,8 @@ async function main() {
       failed++;
     }
 
-    // Delay between tests
-    await new Promise((r) => setTimeout(r, 2000));
+    // Delay between tests (3s to avoid Notion rate limits)
+    await new Promise((r) => setTimeout(r, 3000));
   }
 
   // Write results

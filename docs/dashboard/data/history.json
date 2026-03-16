@@ -2,16 +2,16 @@
   {
     "date": "2026-03-16",
     "total": 40,
-    "passed": 30,
-    "failed": 10,
-    "pass_rate": 0.75,
-    "avg_latency_ms": 6296,
-    "p95_latency_ms": 16561,
+    "passed": 27,
+    "failed": 13,
+    "pass_rate": 0.68,
+    "avg_latency_ms": 7218,
+    "p95_latency_ms": 15654,
     "by_tier": {
       "core_capability": {
         "total": 12,
-        "passed": 11,
-        "pass_rate": 0.92
+        "passed": 10,
+        "pass_rate": 0.83
       },
       "architectural": {
         "total": 10,
@@ -20,8 +20,8 @@
       },
       "judgment": {
         "total": 10,
-        "passed": 8,
-        "pass_rate": 0.8
+        "passed": 6,
+        "pass_rate": 0.6
       },
       "showcase": {
         "total": 8,

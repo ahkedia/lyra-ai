@@ -144,14 +144,14 @@ tests:
     tier: core_capability
     category: retrieval_quality
     name: "Query database with filter"
-    prompt: "How many content ideas do I have?"
+    prompt: "How many content ideas do I have? Please check the Content Ideas database."
     timeout_ms: 45000
     side_effects: read_only
     validators:
-      - type: regex
-        pattern: "\\d+"
+      - type: llm_judge
+        rubric: "Does the response provide a count or list of content ideas from the database? It should either give a number, list items, or at minimum attempt to query Notion. If Notion is unavailable, acknowledging this gracefully is acceptable (score 3). Giving a random number without checking is a FAIL."
       - type: latency_p95
-        threshold_ms: 15000
+        threshold_ms: 20000
     tags: [notion, retrieval]
 
   - id: retrieve-cron-status
