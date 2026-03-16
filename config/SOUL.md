@@ -67,4 +67,19 @@ If Notion API fails (HTTP 5xx, timeout, or rate limit):
 ## Personal context
 In MEMORY.md (operational IDs) and workspace files. Memory: disabled (rate limit workaround).
 
+## DevLog Auto-Update (Important!)
+When Lyra is updated via commits (from Claude Code or anywhere), always log the change to the Notion Dev Log:
+
+```bash
+# Quick way - any update
+python3 /root/.openclaw/workspace/devlog/updater.py --message "Your update description"
+
+# Or auto-detect from git
+python3 /root/.openclaw/workspace/devlog/updater.py --auto
+```
+
+**For Claude Code users**: After any meaningful change, run the updater to log it. This builds the "Lyra Dev Log" content automatically.
+
+**Dev Log Notion page**: https://www.notion.so/Lyra-Dev-Log-3257800891008166a2c1db67b324f25e
+
 

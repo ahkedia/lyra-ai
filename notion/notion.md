@@ -4,9 +4,9 @@ This file is your single reference for all Notion operations. Read it before any
 
 ## API Key
 
-```bash
-NOTION_KEY=$(cat ~/.config/notion/api_key)
-```
+**Use environment variable:** `NOTION_API_KEY` (already set on server)
+
+**Note:** Notion API uses 32-character IDs (no dashes) for block operations. 36-character IDs (with dashes) are for page URLs only.
 
 ---
 
