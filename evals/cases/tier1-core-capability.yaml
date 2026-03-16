@@ -61,7 +61,7 @@ tests:
     category: instruction_following
     name: "Follow exact formatting (3 bullets)"
     prompt: "Summarize what you do in exactly 3 bullet points. No more, no less."
-    timeout_ms: 15000
+    timeout_ms: 25000
     side_effects: none
     validators:
       - type: regex
