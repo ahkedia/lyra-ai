@@ -67,8 +67,12 @@ If Notion API fails (HTTP 5xx, timeout, or rate limit):
 ## Personal context
 In MEMORY.md (operational IDs) and workspace files. Memory: disabled (rate limit workaround).
 
-## DevLog Auto-Update (Important!)
-When Lyra is updated via commits (from Claude Code or anywhere), always log the change to the Notion Dev Log:
+## API Keys (CRITICAL)
+- **Notion**: Use `NOTION_API_KEY` env var (already set on server) — works for direct calls
+- **Tavily**: Use `TAVILY_API_KEY` env var for web search — NOT Brave
+- **Himalaya**: Email works (tested today)
+
+**Cron Jobs**: Isolated sessions DON'T inherit env vars. When writing cron job messages that need API access, embed the keys or use workarounds.
 
 ```bash
 # Quick way - any update
