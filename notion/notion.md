@@ -6,6 +6,10 @@ This file is your single reference for all Notion operations. Read it before any
 
 **Use environment variable:** `NOTION_API_KEY` (already set on server)
 
+**Cron Jobs**: Isolated cron sessions don't inherit env vars. For cron jobs needing Notion, either:
+1. Embed the API key directly in curl commands (NOTION_API_KEY value)
+2. Or use a wrapper script that sources the env first
+
 **Note:** Notion API uses 32-character IDs (no dashes) for block operations. 36-character IDs (with dashes) are for page URLs only.
 
 ---
