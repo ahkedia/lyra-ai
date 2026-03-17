@@ -38,19 +38,15 @@ The "List" property maps to Apple Reminders list names for future sync.
 
 ## Add a Reminder
 
-Use the Notion skill's "Create a new entry" pattern with the reminder database_id.
-Key properties to set: Task (title), Due (date), Priority, Done (false), List, Assigned By.
+{"object":"error","status":400,"code":"validation_error","message":"body failed validation. Fix one:\nbody.parent.page_id should be defined, instead was `undefined`.\nbody.parent.database_id should be a valid uuid, instead was `\"DATABASE_ID\"`.\nbody.parent.data_source_id should be defined, instead was `undefined`.\nbody.parent.workspace should be defined, instead was `undefined`.","request_id":"8a8eb504-f091-4c85-abc8-1619f3b506f6"}
 
 ## Query Incomplete Reminders
 
-Use the Notion skill's "Query / read entries" pattern with the data_source_id.
-Filter: `{"property": "Done", "checkbox": {"equals": false}}`
-Sort: `[{"property": "Due", "direction": "ascending"}]`
+{"object":"error","status":400,"code":"invalid_request_url","message":"Invalid request URL.","request_id":"041607db-85df-4b40-bdb4-bae23a98c03f"}
 
 ## Mark a Reminder Done
 
-Use the Notion skill's "Update an existing entry" pattern.
-Set: `{"Done": {"checkbox": true}}`
+{"object":"error","status":400,"code":"validation_error","message":"path failed validation: path.page_id should be a valid uuid, instead was `\"PAGE_ID\"`.","request_id":"25a4fd5a-102e-4ebb-b677-e0f4d943d284"}
 
 ## Decision Logic
 
