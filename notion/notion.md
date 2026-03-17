@@ -147,21 +147,21 @@ Every database has two IDs. Use the right one depending on what you're doing:
 ### Reminders - Akash
 - **database_id:** `95e1d0de-496f-478e-9fe4-2e2a356c7970`
 - **data_source_id:** `c80025d7-782d-4159-a10d-74bd9aa622ef`
-- **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Status (checkbox), Notes (rich_text), Assigned By (select: Akash, Abhigna, Lyra)
+- **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Done (checkbox), List (select: Personal, Work, Health, Finance, Travel, Relocation), Recurrence (select: Once, Daily, Weekly, Monthly), Assigned By (select: Akash, Abhigna, Lyra), Notes (rich_text)
 - **Who can access:** Akash only
 - **Purpose:** Akash's personal reminders and tasks.
 
 ### Reminders - Shared
 - **database_id:** `2054e39c-3f09-431d-8821-0e6a7513913a`
 - **data_source_id:** `9f206d71-7b25-408b-ad20-02daf0b43da0`
-- **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Status (checkbox), Notes (rich_text), Assigned By (select: Akash, Abhigna, Lyra), For (select: Akash, Abhigna, Both)
+- **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Done (checkbox), List (select: Groceries, Household, Bills, Travel, Shopping), Recurrence (select: Once, Daily, Weekly, Monthly), For (select: Akash, Abhigna, Both), Assigned By (select: Akash, Abhigna, Lyra), Notes (rich_text)
 - **Who can access:** Akash and Abhigna
 - **Purpose:** Shared household reminders — shopping, bills, joint tasks.
 
 ### Reminders - Abhigna
 - **database_id:** `5d6732b1-7e30-4856-b56b-edbf9c3df229`
 - **data_source_id:** `1e74f66d-cb24-40f5-8697-84a3ad8ad1bc`
-- **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Status (checkbox), Notes (rich_text), Assigned By (select: Akash, Abhigna, Lyra)
+- **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Done (checkbox), List (select: Personal, Health, Shopping, Appointments), Recurrence (select: Once, Daily, Weekly, Monthly), Assigned By (select: Akash, Abhigna, Lyra), Notes (rich_text)
 - **Who can access:** Abhigna only
 - **Purpose:** Abhigna's personal reminders and tasks.
 
