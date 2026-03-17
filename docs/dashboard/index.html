@@ -75,6 +75,10 @@
         <div class="stat-value" id="p95Latency">&mdash;</div>
         <div class="stat-label">P95 Latency</div>
       </div>
+      <div class="stat-card cost-card">
+        <div class="stat-value" id="dailyCost">&mdash;</div>
+        <div class="stat-label">Daily Cost</div>
+      </div>
     </section>
 
     <!-- Test Tier Breakdown -->
@@ -83,6 +87,16 @@
       <div class="tier-grid" id="tierGrid">
         <!-- Populated by JS -->
       </div>
+    </section>
+
+    <!-- Model Routing Section -->
+    <section class="card model-routing-section" id="modelRoutingSection">
+      <h2>3-Tier Model Routing</h2>
+      <p class="section-subtitle">Tests run on MiniMax first (free). Failures retry on Haiku, then Sonnet &mdash; identifying the cheapest model each test needs.</p>
+      <div class="routing-funnel" id="routingFunnel">
+        <p class="empty-state">Loading model routing data...</p>
+      </div>
+      <div class="routing-details" id="routingDetails"></div>
     </section>
 
     <!-- Charts Row -->
@@ -110,6 +124,31 @@
         <h2>Tier Pass Rates</h2>
         <canvas id="tierChart"></canvas>
         <p class="chart-empty" id="tierEmpty" style="display:none">No tier data yet</p>
+      </div>
+    </section>
+
+    <!-- Daily Run History -->
+    <section class="card daily-history-section">
+      <div class="history-header">
+        <h2>Daily Run History</h2>
+        <button class="toggle-btn" id="historyToggle">Show all</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="historyTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Pass Rate</th>
+              <th>Tests</th>
+              <th>Avg Latency</th>
+              <th>Top Failure</th>
+              <th>Tier Breakdown</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="6" class="empty-state">Loading history...</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
@@ -212,16 +251,24 @@
         <div class="pipeline-step">
           <div class="step-num">3</div>
           <div class="step-content">
-            <h4>Validate</h4>
-            <p>Responses checked via regex, substring, latency thresholds, and LLM-as-judge (Claude Haiku)</p>
+            <h4>Smart Retry</h4>
+            <p>Failed tests re-run on Claude Haiku, then Sonnet &mdash; identifying which model each test needs</p>
           </div>
         </div>
         <div class="pipeline-arrow">&rarr;</div>
         <div class="pipeline-step">
           <div class="step-num">4</div>
           <div class="step-content">
+            <h4>Cost Tracking</h4>
+            <p>Daily costs tracked: MiniMax quota + Anthropic token spend</p>
+          </div>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+          <div class="step-num">5</div>
+          <div class="step-content">
             <h4>Publish</h4>
-            <p>Results aggregated, pushed to GitHub, dashboard auto-updates via GitHub Pages</p>
+            <p>Results + model comparison + costs pushed to GitHub, Notion, and Telegram</p>
           </div>
         </div>
       </div>
