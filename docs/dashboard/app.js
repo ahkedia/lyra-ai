@@ -38,29 +38,34 @@ async function fetchJSON(file) {
 }
 
 async function init() {
-  const [summary, history, failures, architecture] = await Promise.all([
+  const [summary, history, failures, architecture, modelComparison, costReport] = await Promise.all([
     fetchJSON('summary.json'),
     fetchJSON('history.json'),
     fetchJSON('failures.json'),
     fetchJSON('architecture.json'),
+    fetchJSON('model-comparison.json'),
+    fetchJSON('cost-report.json'),
   ]);
 
-  renderHeroStats(summary);
+  renderHeroStats(summary, costReport);
   renderTierBreakdown(summary);
+  renderModelRouting(modelComparison, costReport);
   renderPassRateChart(history);
   renderCategoryChart(summary);
   renderLatencyChart(history);
   renderTierChart(summary);
+  renderDailyHistory(history, failures);
   renderFailures(failures);
   renderArchitecture(architecture);
 }
 
-function renderHeroStats(summary) {
+function renderHeroStats(summary, costReport) {
   if (!summary || summary.message) {
     document.getElementById('passRate').textContent = '\u2014';
     document.getElementById('totalTests').textContent = '0';
     document.getElementById('avgLatency').textContent = '\u2014';
     document.getElementById('p95Latency').textContent = '\u2014';
+    document.getElementById('dailyCost').textContent = '\u2014';
     document.getElementById('lastUpdated').textContent = 'No eval runs yet';
     return;
   }
@@ -70,6 +75,14 @@ function renderHeroStats(summary) {
   document.getElementById('totalTests').textContent = summary.total_tests || 0;
   document.getElementById('avgLatency').textContent = formatLatency(summary.avg_latency_ms);
   document.getElementById('p95Latency').textContent = formatLatency(summary.p95_latency_ms);
+
+  // Daily cost from cost report
+  if (costReport && costReport.totals) {
+    const cost = costReport.totals.total_cost_usd;
+    document.getElementById('dailyCost').textContent = `$${cost.toFixed(2)}`;
+  } else {
+    document.getElementById('dailyCost').textContent = '\u2014';
+  }
 
   // Color the pass rate card
   const card = document.querySelector('.stat-card.primary');
@@ -119,6 +132,249 @@ function renderTierBreakdown(summary) {
       </div>
     `;
   }).join('');
+}
+
+/* ── Model Routing Funnel ── */
+function renderModelRouting(mc, costReport) {
+  const funnel = document.getElementById('routingFunnel');
+  const details = document.getElementById('routingDetails');
+
+  if (!mc) {
+    funnel.innerHTML = '<p class="empty-state">Model routing data not available yet. Run evals with <code>retry-on-better-model.js</code> to generate.</p>';
+    details.innerHTML = '';
+    return;
+  }
+
+  const total = mc.minimax_results?.total || 40;
+  const mmPassed = mc.minimax_results?.passed || 0;
+  const mmRate = Math.round((mc.minimax_results?.pass_rate || 0) * 100);
+  const haikuImproved = mc.haiku_retry?.improved || 0;
+  const sonnetImproved = mc.sonnet_retry?.improved || 0;
+  const afterHaiku = mmPassed + haikuImproved;
+  const afterSonnet = afterHaiku + sonnetImproved;
+  const afterHaikuRate = Math.round((afterHaiku / total) * 100);
+  const afterSonnetRate = Math.round((afterSonnet / total) * 100);
+
+  const mmCost = costReport?.minimax?.effective_cost_usd || costReport?.minimax?.daily_plan_cost_usd || 0.33;
+  const haikuCost = mc.haiku_retry?.cost_usd || 0;
+  const sonnetCost = mc.sonnet_retry?.cost_usd || 0;
+
+  const stillFailing = mc.projected_with_routing?.breakdown?.still_failing || (total - afterSonnet);
+
+  funnel.innerHTML = `
+    <div class="funnel-stages">
+      <div class="funnel-stage">
+        <div class="funnel-bar-wrapper">
+          <div class="funnel-bar" style="width:100%;background:linear-gradient(90deg, ${rateColor(mmRate)} 0%, ${rateColor(mmRate)}cc 100%)">
+            <span class="funnel-bar-label">${mmPassed}/${total}</span>
+          </div>
+        </div>
+        <div class="funnel-meta">
+          <div class="funnel-model">
+            <span class="funnel-model-badge mm">M2.5</span>
+            <span class="funnel-model-name">MiniMax M2.5</span>
+          </div>
+          <div class="funnel-stats">
+            <span class="funnel-rate">${mmRate}%</span>
+            <span class="funnel-cost">$${mmCost.toFixed(2)}/day</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="funnel-connector">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        <span class="funnel-connector-label">${mc.haiku_retry?.retried || 0} failures retried</span>
+      </div>
+
+      <div class="funnel-stage">
+        <div class="funnel-bar-wrapper">
+          <div class="funnel-bar" style="width:${afterHaikuRate}%;background:linear-gradient(90deg, ${rateColor(afterHaikuRate)} 0%, ${rateColor(afterHaikuRate)}cc 100%)">
+            <span class="funnel-bar-label">${afterHaiku}/${total}</span>
+          </div>
+        </div>
+        <div class="funnel-meta">
+          <div class="funnel-model">
+            <span class="funnel-model-badge haiku">H</span>
+            <span class="funnel-model-name">+ Claude Haiku</span>
+          </div>
+          <div class="funnel-stats">
+            <span class="funnel-rate">${afterHaikuRate}%</span>
+            <span class="funnel-cost">+$${haikuCost.toFixed(2)}/day</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="funnel-connector">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        <span class="funnel-connector-label">${mc.sonnet_retry?.retried || 0} failures retried</span>
+      </div>
+
+      <div class="funnel-stage ${afterSonnetRate >= 95 ? 'stage-success' : ''}">
+        <div class="funnel-bar-wrapper">
+          <div class="funnel-bar" style="width:${afterSonnetRate}%;background:linear-gradient(90deg, ${rateColor(afterSonnetRate)} 0%, ${rateColor(afterSonnetRate)}cc 100%)">
+            <span class="funnel-bar-label">${afterSonnet}/${total}</span>
+          </div>
+        </div>
+        <div class="funnel-meta">
+          <div class="funnel-model">
+            <span class="funnel-model-badge sonnet">S</span>
+            <span class="funnel-model-name">+ Claude Sonnet</span>
+          </div>
+          <div class="funnel-stats">
+            <span class="funnel-rate">${afterSonnetRate}%</span>
+            <span class="funnel-cost">+$${sonnetCost.toFixed(2)}/day</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="funnel-summary">
+      <div class="funnel-summary-item">
+        <span class="funnel-summary-label">Total daily cost</span>
+        <span class="funnel-summary-value">$${(mmCost + haikuCost + sonnetCost).toFixed(2)}</span>
+      </div>
+      <div class="funnel-summary-item">
+        <span class="funnel-summary-label">Projected with routing</span>
+        <span class="funnel-summary-value">${afterSonnetRate}% pass rate</span>
+      </div>
+      <div class="funnel-summary-item">
+        <span class="funnel-summary-label">Still failing</span>
+        <span class="funnel-summary-value ${stillFailing > 0 ? 'val-red' : 'val-green'}">${stillFailing} test${stillFailing !== 1 ? 's' : ''}</span>
+      </div>
+    </div>
+  `;
+
+  // Render details of which tests each model fixed
+  let detailsHtml = '<div class="routing-detail-grid">';
+
+  if (mc.haiku_retry?.details?.length) {
+    const haikuWins = mc.haiku_retry.details.filter(d => d.would_pass_on_haiku);
+    const haikuFails = mc.haiku_retry.details.filter(d => !d.would_pass_on_haiku);
+    if (haikuWins.length > 0) {
+      detailsHtml += `
+        <div class="routing-detail-card">
+          <h4><span class="funnel-model-badge haiku small">H</span> Haiku fixes (${haikuWins.length})</h4>
+          <ul class="routing-test-list">${haikuWins.map(d =>
+            `<li><code>${d.test_id}</code> <span class="score-change">${d.minimax_score} &rarr; ${d.haiku_score}</span></li>`
+          ).join('')}</ul>
+        </div>`;
+    }
+    if (haikuFails.length > 0) {
+      detailsHtml += `
+        <div class="routing-detail-card">
+          <h4><span class="funnel-model-badge haiku small">H</span> Still failed on Haiku (${haikuFails.length})</h4>
+          <ul class="routing-test-list muted">${haikuFails.map(d =>
+            `<li><code>${d.test_id}</code> <span class="score-change">${d.minimax_score} &rarr; ${d.haiku_score ?? '?'}</span></li>`
+          ).join('')}</ul>
+        </div>`;
+    }
+  }
+
+  if (mc.sonnet_retry?.details?.length) {
+    const sonnetWins = mc.sonnet_retry.details.filter(d => d.would_pass_on_sonnet);
+    const sonnetFails = mc.sonnet_retry.details.filter(d => !d.would_pass_on_sonnet);
+    if (sonnetWins.length > 0) {
+      detailsHtml += `
+        <div class="routing-detail-card">
+          <h4><span class="funnel-model-badge sonnet small">S</span> Sonnet fixes (${sonnetWins.length})</h4>
+          <ul class="routing-test-list">${sonnetWins.map(d =>
+            `<li><code>${d.test_id}</code> <span class="score-change">${d.haiku_score ?? '?'} &rarr; ${d.sonnet_score}</span></li>`
+          ).join('')}</ul>
+        </div>`;
+    }
+    if (sonnetFails.length > 0) {
+      detailsHtml += `
+        <div class="routing-detail-card">
+          <h4><span class="funnel-model-badge sonnet small">S</span> Still failed on Sonnet (${sonnetFails.length})</h4>
+          <ul class="routing-test-list muted">${sonnetFails.map(d =>
+            `<li><code>${d.test_id}</code> <span class="score-change">${d.haiku_score ?? '?'} &rarr; ${d.sonnet_score}</span></li>`
+          ).join('')}</ul>
+        </div>`;
+    }
+  }
+
+  detailsHtml += '</div>';
+  detailsHtml += '<p class="routing-explanation">This data drives real-time model routing decisions. Tests that consistently need a stronger model get auto-escalated, keeping costs minimal while maintaining quality.</p>';
+  details.innerHTML = detailsHtml;
+}
+
+function rateColor(rate) {
+  if (rate >= 90) return '#22c55e';
+  if (rate >= 70) return '#eab308';
+  return '#ef4444';
+}
+
+/* ── Daily Run History ── */
+function renderDailyHistory(history, failures) {
+  const tbody = document.getElementById('historyBody');
+  const toggleBtn = document.getElementById('historyToggle');
+
+  if (!history || history.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No daily history yet</td></tr>';
+    toggleBtn.style.display = 'none';
+    return;
+  }
+
+  // Sort most recent first
+  const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date));
+  const DEFAULT_SHOW = 7;
+  let showAll = false;
+
+  function getTopFailure(date) {
+    if (!failures || failures.length === 0) return '\u2014';
+    const dayFailures = failures.filter(f => f.date === date);
+    if (dayFailures.length === 0) return '\u2014';
+    const top = dayFailures[0];
+    return `<code>${top.name || top.id || '?'}</code>`;
+  }
+
+  function renderRows() {
+    const toShow = showAll ? sorted : sorted.slice(0, DEFAULT_SHOW);
+    tbody.innerHTML = toShow.map(h => {
+      const rate = Math.round((h.pass_rate || 0) * 100);
+      const rateClass = rate >= 90 ? 'rate-green' : rate >= 70 ? 'rate-yellow' : 'rate-red';
+      const tierBars = renderMiniTierBars(h.by_tier, h.total || 40);
+      return `
+        <tr>
+          <td class="date-cell">${h.date}</td>
+          <td><span class="rate-badge ${rateClass}">${rate}%</span></td>
+          <td>${h.passed}/${h.total || 40}</td>
+          <td>${formatLatency(h.avg_latency_ms)}</td>
+          <td>${getTopFailure(h.date)}</td>
+          <td class="tier-bars-cell">${tierBars}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Toggle button
+  if (sorted.length <= DEFAULT_SHOW) {
+    toggleBtn.style.display = 'none';
+  } else {
+    toggleBtn.addEventListener('click', () => {
+      showAll = !showAll;
+      toggleBtn.textContent = showAll ? 'Show less' : 'Show all';
+      renderRows();
+    });
+  }
+
+  renderRows();
+}
+
+function renderMiniTierBars(byTier, total) {
+  if (!byTier) return '\u2014';
+  const tiers = ['core_capability', 'architectural', 'judgment', 'showcase'];
+  const colors = { core_capability: '#3b82f6', architectural: '#a855f7', judgment: '#f97316', showcase: '#14b8a6' };
+  const labels = { core_capability: 'T1', architectural: 'T2', judgment: 'T3', showcase: 'T4' };
+
+  return `<div class="mini-tier-bars">${tiers.map(t => {
+    const d = byTier[t];
+    if (!d) return '';
+    const pct = d.total > 0 ? Math.round((d.passed / d.total) * 100) : 0;
+    return `<div class="mini-tier" title="${labels[t]}: ${d.passed}/${d.total} (${pct}%)">
+      <div class="mini-tier-fill" style="width:${pct}%;background:${colors[t]}"></div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function renderPassRateChart(history) {

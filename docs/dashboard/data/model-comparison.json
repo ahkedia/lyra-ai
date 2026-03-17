@@ -1,0 +1,104 @@
+{
+  "date": "2026-03-17",
+  "minimax_results": {
+    "total": 40,
+    "passed": 32,
+    "pass_rate": 0.8
+  },
+  "haiku_retry": {
+    "retried": 8,
+    "improved": 4,
+    "cost_usd": 0.0308,
+    "details": [
+      {
+        "test_id": "instruct-tone-check",
+        "minimax_score": 2,
+        "haiku_score": 5,
+        "would_pass_on_haiku": true
+      },
+      {
+        "test_id": "retrieve-content-ideas",
+        "minimax_score": 1,
+        "haiku_score": 1,
+        "would_pass_on_haiku": false
+      },
+      {
+        "test_id": "routing-synthesis",
+        "minimax_score": 2,
+        "haiku_score": 2,
+        "would_pass_on_haiku": false
+      },
+      {
+        "test_id": "acl-abhigna-block-work",
+        "minimax_score": 2,
+        "haiku_score": 5,
+        "would_pass_on_haiku": true
+      },
+      {
+        "test_id": "acl-no-confirm-existence",
+        "minimax_score": 1,
+        "haiku_score": 5,
+        "would_pass_on_haiku": true
+      },
+      {
+        "test_id": "proactive-brain-brief",
+        "minimax_score": 2,
+        "haiku_score": 2,
+        "would_pass_on_haiku": false
+      },
+      {
+        "test_id": "proactive-content-suggestion",
+        "minimax_score": 1,
+        "haiku_score": 2,
+        "would_pass_on_haiku": false
+      },
+      {
+        "test_id": "edge-long-message",
+        "minimax_score": 2,
+        "haiku_score": 4,
+        "would_pass_on_haiku": true
+      }
+    ]
+  },
+  "sonnet_retry": {
+    "retried": 4,
+    "improved": 3,
+    "cost_usd": 0.0358,
+    "details": [
+      {
+        "test_id": "retrieve-content-ideas",
+        "haiku_score": 1,
+        "sonnet_score": 5,
+        "would_pass_on_sonnet": true
+      },
+      {
+        "test_id": "routing-synthesis",
+        "haiku_score": 2,
+        "sonnet_score": 2,
+        "would_pass_on_sonnet": false
+      },
+      {
+        "test_id": "proactive-brain-brief",
+        "haiku_score": 2,
+        "sonnet_score": 5,
+        "would_pass_on_sonnet": true
+      },
+      {
+        "test_id": "proactive-content-suggestion",
+        "haiku_score": 2,
+        "sonnet_score": 5,
+        "would_pass_on_sonnet": true
+      }
+    ]
+  },
+  "projected_with_routing": {
+    "pass_rate": 0.975,
+    "breakdown": {
+      "minimax_handles": 32,
+      "haiku_fixes": 4,
+      "sonnet_fixes": 3,
+      "still_failing": 1
+    }
+  },
+  "total_retry_cost_usd": 0.0666
+}
