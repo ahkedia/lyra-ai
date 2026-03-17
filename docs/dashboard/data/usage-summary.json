@@ -1,0 +1,36 @@
+{
+  "date": "2026-03-17",
+  "providers": {
+    "minimax/MiniMax-M2.5": {
+      "provider": "minimax",
+      "model": "MiniMax-M2.5",
+      "queries": 161,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_read_tokens": 0,
+      "cost_usd": 0,
+      "input_tokens_estimated": 1127000,
+      "output_tokens_estimated": 24150,
+      "note": "MiniMax reports 0 tokens (free tier). Estimates: ~7K input + 150 output per query."
+    },
+    "minimax/minimax-m2-5": {
+      "provider": "minimax",
+      "model": "minimax-m2-5",
+      "queries": 29,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_read_tokens": 0,
+      "cost_usd": 0,
+      "input_tokens_estimated": 203000,
+      "output_tokens_estimated": 4350,
+      "note": "MiniMax reports 0 tokens (free tier). Estimates: ~7K input + 150 output per query."
+    }
+  },
+  "totals": {
+    "queries": 190,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cache_read_tokens": 0,
+    "cost_usd": 0
+  }
+}
