@@ -26,6 +26,26 @@ if (!NOTION_API_KEY || !NOTION_DEVLOG_PAGE_ID || !ANTHROPIC_API_KEY) {
   process.exit(1);
 }
 
+/**
+ * SECURITY: Scrub potential secrets from text before sending to Claude/Notion.
+ */
+function scrubSecrets(text) {
+  return text
+    .replace(/sk-[a-zA-Z0-9_-]{20,}/g, 'sk-***REDACTED***')
+    .replace(/ntn_[a-zA-Z0-9_-]{20,}/g, 'ntn_***REDACTED***')
+    .replace(/xoxb-[a-zA-Z0-9-]+/g, 'xoxb-***REDACTED***')
+    .replace(/ghp_[a-zA-Z0-9]{36,}/g, 'ghp_***REDACTED***')
+    .replace(/[a-zA-Z0-9+/]{40,}={0,2}/g, (match) => {
+      // Only redact if it looks like a base64 key (not a SHA or normal text)
+      if (/^[A-Za-z0-9+/]+=*$/.test(match) && match.length >= 40) {
+        return '***POSSIBLE_KEY_REDACTED***';
+      }
+      return match;
+    })
+    .replace(/password\s*[:=]\s*\S+/gi, 'password=***REDACTED***')
+    .replace(/token\s*[:=]\s*\S+/gi, 'token=***REDACTED***');
+}
+
 async function getCommitInfo() {
   // Get commits from this push (between previous HEAD and current)
   // In GitHub Actions, GITHUB_SHA is the current commit
@@ -58,8 +78,8 @@ async function getCommitInfo() {
     ).trim();
 
     return {
-      commitMessages: log.split('\n').filter(Boolean),
-      diffStat,
+      commitMessages: log.split('\n').filter(Boolean).map(scrubSecrets),
+      diffStat: scrubSecrets(diffStat),
       filesChanged: filesChanged.split('\n').filter(Boolean),
       sha: sha.slice(0, 7),
     };
@@ -68,7 +88,7 @@ async function getCommitInfo() {
     const log = execSync('git log -1 --pretty=format:"%s"', { encoding: 'utf-8' }).trim();
     const filesChanged = execSync('git diff --name-only HEAD~1 2>/dev/null || echo "N/A"', { encoding: 'utf-8' }).trim();
     return {
-      commitMessages: [log],
+      commitMessages: [scrubSecrets(log)],
       diffStat: 'N/A',
       filesChanged: filesChanged.split('\n').filter(Boolean),
       sha: sha.slice(0, 7),

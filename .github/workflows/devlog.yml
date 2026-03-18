@@ -11,21 +11,22 @@ jobs:
   devlog:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # SECURITY: Pinned to specific SHA to prevent supply chain attacks
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install @anthropic-ai/sdk
+        run: npm ci
 
       - name: Generate and post dev log entry
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
-          NOTION_DEVLOG_PAGE_ID: "3257800891008166a2c1db67b324f25e"
+          NOTION_DEVLOG_PAGE_ID: ${{ secrets.NOTION_DEVLOG_PAGE_ID }}
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
         run: node scripts/devlog-to-notion.js
