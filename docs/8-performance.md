@@ -37,11 +37,11 @@ After optimisation:
 | IDENTITY.md, TOOLS.md, USER.md | ~106 |
 | HEARTBEAT.md | ~42 |
 | Skill frontmatter (8 skills) | ~544 |
-| SuperMemory recall (5 relevant memories) | ~250 |
+| SQLite memory recall (keyword + tags) | ~100 |
 | System overhead | ~500 |
-| **Total** | **~2,879** |
+| **Total** | **~2,729** |
 
-**74% reduction. ~4x more capacity.**
+**75% reduction. ~4x more capacity.**
 
 ---
 
@@ -76,15 +76,15 @@ Update SOUL.md to reference `~/.openclaw/references/notion.md` instead.
 
 `AGENTS.md`, `IDENTITY.md`, `TOOLS.md`, `USER.md` are OpenClaw system templates with generic instructions. Replace with tight, purpose-specific versions. The default AGENTS.md alone has full sections on Discord formatting, group chat emoji reactions, and TTS voice storytelling — none of which apply.
 
-### 5. Switch default model to Haiku
+### 5. Switch default model to MiniMax M2.5
 
-OpenClaw defaults to Sonnet. For 90% of Lyra's tasks — reminders, Notion writes, weather, quick replies — Haiku is identical in practice and has 5× the TPM headroom.
+OpenClaw defaults to Sonnet. For ~87% of Lyra's tasks — reminders, Notion writes, weather, quick replies — MiniMax M2.5 is sufficient and dramatically cheaper.
 
 ```json
 {
   "agents": {
     "defaults": {
-      "model": "anthropic/claude-haiku-3-5"
+      "model": "minimax/minimax-m2-5"
     }
   }
 }
@@ -92,17 +92,21 @@ OpenClaw defaults to Sonnet. For 90% of Lyra's tasks — reminders, Notion write
 
 ---
 
-## Model routing architecture
+## Model routing architecture (3-tier)
 
-Not all tasks are equal. Haiku handles most things; Sonnet is reserved for tasks that genuinely need deep reasoning.
+Not all tasks are equal. A rule-based classifier + LLM fallback routes each message to the cheapest capable model. See `config/routing-rules.yaml` and `scripts/model-router.js`.
 
-### Haiku (default, live Telegram chat)
+### MiniMax M2.5 (default, ~87% of tasks)
 - Single-action commands: add reminder, write to Notion, check weather
 - Lookups: query database, check calendar
-- Short drafts: quick replies, one-paragraph summaries
-- Routing: "what should I do next", "add X to Y"
+- Quick replies, status confirmations, simple Q&A
 
-### Sonnet (scheduled synthesis crons)
+### Claude Haiku 4.5 (moderate, ~9% of tasks)
+- Short drafts: email replies, one-paragraph summaries
+- Multi-step but single-domain tasks
+- Data formatting, comparisons within one source
+
+### Claude Sonnet 4.6 (complex, ~4% of tasks)
 The 4 synthesis cron jobs always run on Sonnet:
 - Morning news digest (aggregates RSS + Notion + search)
 - Weekly job review (reasons about recruiter priorities)
@@ -111,7 +115,7 @@ The 4 synthesis cron jobs always run on Sonnet:
 - Content reminder (drafts from Content Ideas, needs tone judgment)
 
 ### On-demand Sonnet escalation
-Lyra self-routes. If a live message requires synthesis, strategic analysis, or complex planning, she escalates automatically:
+Lyra self-routes via `scripts/model-router.js`. If a live message requires synthesis, strategic analysis, or multi-domain reasoning, she escalates automatically:
 
 ```bash
 openclaw cron add --at +0m \
@@ -123,35 +127,24 @@ openclaw cron add --at +0m \
   --message "<full task here>"
 ```
 
-The result arrives in Telegram in ~15 seconds. Lyra never attempts complex tasks in Haiku first.
+The result arrives in Telegram in ~15 seconds. Lyra never attempts complex tasks in MiniMax first. Fallback chain: MiniMax error → retry → Haiku → if both fail, tell user.
 
 ---
 
-## SuperMemory: solving static context
+## Memory: from SuperMemory to SQLite hybrid
 
 **The problem with MEMORY.md:** It's a flat file loaded on every message. "Add milk to the shopping list" loads Akash's full professional history, recruiter contacts, and content strategy. None of that is relevant. It's pure waste.
 
-**What SuperMemory does differently:**
-- Stores all facts as semantic embeddings in the cloud
-- Before each turn, retrieves only the 5 most relevant memories to that specific message
-- "Add milk" → recalls household context, not job search data
-- "Help me prep for the Stripe interview" → recalls professional context automatically
+**Original approach (SuperMemory Pro, $19/month):** Semantic embeddings in the cloud, dynamic recall per-turn. Worked well but cost-prohibitive and cloud-locked at scale. See `docs/9-supermemory.md` for the full migration story.
 
-**Token impact:** Instead of 555 tokens of static context every turn, you get ~250 tokens of *relevant* context. And those 250 tokens actually help.
+**Current approach (SQLite hybrid, $0/month):**
+- Layer 1: SQLite local DB — contacts, schedules, preferences (keyword + tag search, instant)
+- Layer 2: Skill files — detailed instructions loaded on-demand only
+- Layer 3: MEMORY.md — operational IDs only (Notion DBs, schedules), kept under 357 tokens
 
-**Setup:**
-```bash
-openclaw plugins install @supermemory/openclaw-supermemory
-```
+**Token impact:** Instead of 555 tokens of static context every turn, you get ~100 tokens of operational IDs. Relevant context is retrieved on-demand via skill files and SQLite queries.
 
-Set `plugins.slots.memory = "openclaw-supermemory"` in `openclaw.json`. Add `SUPERMEMORY_API_KEY` to your LaunchAgent plist.
-
-**Containers:** Route different memory types to isolated namespaces:
-- `work` — professional context (only accessible in primary user sessions)
-- `household` — shared context (accessible to both users)
-- `second-brain` — ideas, decisions, patterns
-
-This also enforces the multi-user access control at the infrastructure level: your partner's sessions only touch the `household` container.
+**Access control:** SQLite tables are namespaced per user — Abhigna's sessions only query `household` and her personal tables.
 
 ---
 
@@ -161,7 +154,7 @@ Written into `AGENTS.md` so Lyra enforces it herself during self-edits:
 
 - SOUL.md + MEMORY.md combined must stay under 600 tokens
 - MEMORY.md is for operational IDs only (Notion databases, schedules)
-- Never add prose about people or preferences to MEMORY.md — use SuperMemory
+- Never add prose about people or preferences to MEMORY.md — use SQLite or skill files
 - Never add a new always-loaded file to workspace — use skills (on-demand)
 - New skill frontmatter descriptions must stay under 30 words
 - New crons must check if they can batch with existing ones first
