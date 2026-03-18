@@ -1,6 +1,6 @@
 ---
 name: self-edit
-description: Edit Lyra's own configuration, memory, and personality files directly from Telegram. Use when Akash asks you to update your memory, change your behavior, add a rule, update a skill, or modify any part of your own setup.
+description: Edit Lyra's own config, memory, and personality files from Telegram. Use when Akash asks to update memory, change behavior, add rules, update skills, or modify setup.
 ---
 
 # Self-Edit — Lyra Editing Her Own Files
