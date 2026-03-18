@@ -5,12 +5,12 @@
     "daily_plan_cost_usd": 0.333,
     "coding_plan_quota": {
       "model": "MiniMax-M2.5",
-      "used": 1253,
+      "used": 1247,
       "total": 1500,
-      "remaining": 247,
-      "resets_in_min": 88
+      "remaining": 253,
+      "resets_in_min": 87
     },
-    "queries_today": 254,
+    "queries_today": 260,
     "tokens": {
       "input": 0,
       "output": 0
@@ -42,6 +42,6 @@
     "minimax_cost_usd": 0.333,
     "anthropic_cost_usd": 0.0296,
     "total_cost_usd": 0.3626,
-    "total_queries": 258
+    "total_queries": 264
   }
 }
