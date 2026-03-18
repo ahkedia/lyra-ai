@@ -128,10 +128,11 @@ tiers:
       email_draft:
         patterns:
           - "(draft|write|compose|reply to) .*(email|mail|message to|reply)"
+          - "(draft|write) (a |an |the )?(email|mail|reply|response)"
           - "(draft|write) .*(reply|response) .*(to|about|regarding)"
           - "send .*(email|mail) .+"
           - "reply to .*(recruiter|manager|team|colleague)"
-        keywords: ["draft email", "write email", "compose", "reply to email", "send email", "draft a reply", "reply to the"]
+        keywords: ["draft email", "write email", "write an email", "compose", "reply to email", "send email", "draft a reply", "reply to the", "declining"]
         examples:
           - "Draft a reply to the recruiter about the timeline"
           - "Write an email declining the meeting"
@@ -160,8 +161,9 @@ tiers:
       cross_user_coordination:
         patterns:
           - "(assign|delegate|tell|ask) (abhigna|akash) to .+"
+          - "(assign|delegate) .+ to (abhigna|akash)"
           - ".+ for (abhigna|akash) .+"
-        keywords: ["assign to", "delegate to", "tell abhigna", "ask akash"]
+        keywords: ["assign to", "delegate to", "tell abhigna", "ask akash", "to abhigna", "to akash", "assign the"]
         examples:
           - "Assign the grocery shopping to Abhigna for this weekend"
 
@@ -195,12 +197,15 @@ tiers:
 
       strategic_analysis:
         patterns:
-          - "(analyze|analyse|compare|evaluate|assess|review) .*(strategy|approach|option|competitor|market)"
+          - "(analyze|analyse|compare|evaluate|assess|review) .*(strategy|approach|option|competitor|market|theme|second brain)"
+          - "(compare|contrast) .*(revolut|monzo|bunq|starling|n26|competitor)"
           - "should I .+"
+          - "what should .*(my |I |the )?(priorit|focus|next)"
           - "what('s| is) the best (way|approach|strategy) .+"
           - "pros and cons .+"
           - "trade.?off .+"
-        keywords: ["analyze", "strategy", "compare", "evaluate", "should I", "pros and cons", "trade-off", "recommendation"]
+          - "what .*(career|job|move) .*(make|sense|best)"
+        keywords: ["analyze", "strategy", "compare", "evaluate", "should I", "pros and cons", "trade-off", "recommendation", "priorities", "what should my"]
         examples:
           - "Analyze Revolut vs Monzo's approach to crypto in Q1"
           - "Should I focus on LinkedIn or Twitter for my content strategy?"
@@ -219,7 +224,9 @@ tiers:
         patterns:
           - "(competitor|competitive|market) .*(analysis|review|update|digest|landscape)"
           - "(what is|how is|compare) .*(revolut|monzo|bunq|starling|n26) .+"
-        keywords: ["competitor analysis", "market landscape", "competitive review"]
+          - "compare .*(revolut|monzo|bunq|starling|n26)"
+          - "(revolut|monzo|bunq|starling|n26) .*(launch|feature|update|release|what it means)"
+        keywords: ["competitor analysis", "market landscape", "competitive review", "compare revolut", "compare monzo", "feature launches"]
         examples:
           - "Give me a competitive digest for this week"
           - "Compare Revolut and Monzo's latest feature launches"
@@ -237,8 +244,9 @@ tiers:
       multi_source_reasoning:
         patterns:
           - ".*(based on|considering|given|taking into account) .*(multiple|several|all|various|different) .+"
+          - ".*(based on|considering) my .*(tracking|ideas|content|brain|notes).*(and|,) .+"
           - ".*(cross.?reference|correlate|combine) .+"
-        keywords: ["based on multiple", "cross-reference", "considering all", "taking into account"]
+        keywords: ["based on multiple", "based on my", "cross-reference", "considering all", "taking into account", "competitor tracking and"]
         examples:
           - "Based on my competitor tracking, content ideas, and recruiter conversations — what career move makes the most sense?"
 
