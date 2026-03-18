@@ -122,9 +122,10 @@ Every self-edit is a git commit. The audit trail is the commit history. If somet
 
 Here's what's actually running:
 
-![Lyra Architecture](https://s3-alpha.figma.com/thumbnails/55b446b8-eb0a-469f-9aca-6b6ed4161e34?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAQ4GOSFWCVLWKB6UZ%2F20260315%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260315T202127Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=59ddb6134dce13e0c5616465f674f4085377f53455ef502123c31d9ab63c1d1e)
+<img width="1248" height="625" alt="Screenshot 2026-03-18 at 09 44 55" src="https://github.com/user-attachments/assets/28c3277e-d96d-48ef-89e6-d866b44a52c8" />
 
-*[Open in FigJam](https://www.figma.com/online-whiteboard/create-diagram/d8abfc41-1606-4936-b60c-7343a18b5257?utm_source=claude&utm_content=edit_in_figjam)*
+
+*https://ahkedia.github.io/lyra-ai/dashboard/architecture-diagram.html*
 
 **The flow:**
 
