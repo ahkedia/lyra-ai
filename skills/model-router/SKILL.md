@@ -27,14 +27,23 @@ Does it need pattern-finding or synthesis? → sonnet
 Unsure? → haiku (safe middle ground)
 ```
 
-## Routing command
+## Escalation
 
-```bash
-node ~/lyra-ai/scripts/model-router.js "message here"
-node ~/lyra-ai/scripts/model-router.js --json "message here"
-node ~/lyra-ai/scripts/model-router.js --stats
-node ~/lyra-ai/scripts/model-router.js --test
-```
+To escalate to Sonnet: `openclaw cron add --at +0m --model anthropic/claude-sonnet-4-6 --session isolated --announce --delete-after-run --name "sonnet-task" --message "<full task>"`. Do NOT attempt in MiniMax first.
+
+To use Haiku: process using `anthropic/claude-haiku-4-5`.
+
+## Fallback behavior
+
+If MiniMax API returns error (HTTP 400/429/500/timeout):
+1. Retry once after 3 seconds
+2. If still failing, auto-escalate to Haiku
+3. If Haiku also fails: "Both models are down. Try again in a few minutes."
+
+If Notion API fails (5xx/timeout/rate limit):
+1. Tell user: "Notion is temporarily unreachable. Here's what I would have done: [action]. I'll retry."
+2. NEVER hallucinate success. Never say "Done" if the API call failed.
+3. For task creation: save intent, retry on next message.
 
 ## Key rules
 
@@ -42,3 +51,11 @@ node ~/lyra-ai/scripts/model-router.js --test
 2. **When in doubt, escalate** — haiku is cheap, Sonnet is worth it for quality
 3. **Override rules are absolute** — "weekly review" always goes to Sonnet
 4. **Log every decision** — routing logs enable tuning over time
+
+## Routing command
+
+```bash
+node ~/lyra-ai/scripts/model-router.js "message here"
+node ~/lyra-ai/scripts/model-router.js --json "message here"
+node ~/lyra-ai/scripts/model-router.js --stats
+```

@@ -1,3 +1,6 @@
+# Dependencies
+node_modules/
+
 # Never commit real credentials or personal config
 *.env
 .env.*
@@ -16,3 +19,5 @@ config.toml
 *.swp
 evals/results/*.jsonl
 evals/results/*-summary.json
+evals/results/*-routing.json
+logs/
