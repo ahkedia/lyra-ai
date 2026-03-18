@@ -1,0 +1,29 @@
+# Caddy reverse proxy for Lyra OpenClaw Gateway
+# Provides automatic TLS via Let's Encrypt
+#
+# Setup on Hetzner:
+#   1. apt install caddy
+#   2. Copy this file to /etc/caddy/Caddyfile
+#   3. Point your domain DNS A record to your VPS IP
+#   4. systemctl restart caddy
+#
+# This encrypts all traffic to the gateway, so the auth token
+# is never sent in plaintext over the internet.
+
+# Replace with your actual domain
+lyra.yourdomain.com {
+    reverse_proxy localhost:18789
+
+    # Rate limiting headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+    }
+
+    # Access log
+    log {
+        output file /var/log/caddy/lyra-access.log
+        format json
+    }
+}

@@ -23,7 +23,7 @@ echo "🔧 Installing Docker and dependencies..."
 ssh "$SSH_USER@$VPS_IP" << 'EOF'
     set -e
     apt-get update
-    apt-get install -y docker.io docker-compose curl git wget
+    apt-get install -y docker.io docker-compose curl git wget rsync ufw
 
     # Start Docker service
     systemctl start docker
@@ -34,17 +34,31 @@ ssh "$SSH_USER@$VPS_IP" << 'EOF'
     cd /opt/lyra-agent
 EOF
 
-# 2. Copy code to VPS
-echo "📤 Copying code to VPS..."
-scp -r . "$SSH_USER@$VPS_IP:/opt/lyra-agent/"
+# 2. Copy code to VPS — SECURITY: use rsync with excludes instead of scp -r .
+echo "📤 Syncing code to VPS (excluding secrets, .git, node_modules)..."
+rsync -avz --delete \
+    --exclude='.git' \
+    --exclude='node_modules' \
+    --exclude='.env' \
+    --exclude='.env.*' \
+    --exclude='!.env.example' \
+    --exclude='secrets.json' \
+    --exclude='logs/' \
+    --exclude='evals/results/' \
+    --exclude='.DS_Store' \
+    . "$SSH_USER@$VPS_IP:/opt/lyra-agent/"
 
 # 3. Create .env file on VPS
 echo "📝 Creating .env file (you'll need to fill in secrets)..."
 ssh "$SSH_USER@$VPS_IP" << 'EOF'
     cd /opt/lyra-agent
-    cp .env.example .env
-    echo "⚠️  You need to fill in your secrets in .env"
-    echo "Edit with: nano .env"
+    if [ ! -f .env ]; then
+        cp .env.example .env
+        echo "⚠️  You need to fill in your secrets in .env"
+        echo "Edit with: nano .env"
+    else
+        echo "✅ .env already exists (not overwriting)"
+    fi
 EOF
 
 # 4. Build and start containers
@@ -58,12 +72,27 @@ ssh "$SSH_USER@$VPS_IP" << 'EOF'
     docker-compose ps
 EOF
 
-# 5. Wait for services to be healthy
+# 5. Set up firewall — SECURITY: only allow SSH and gateway
+echo "🔒 Setting up firewall..."
+ssh "$SSH_USER@$VPS_IP" << 'EOF'
+    # UFW firewall: only allow SSH + OpenClaw gateway
+    ufw default deny incoming
+    ufw default allow outgoing
+    ufw allow 22/tcp comment "SSH"
+    ufw allow 18789/tcp comment "OpenClaw Gateway"
+    # Postgres (5432) and Evolution API (9000) are NOT allowed from outside
+    # They are bound to 127.0.0.1 in docker-compose.yml
+    echo "y" | ufw enable
+    ufw status verbose
+    echo "✅ Firewall configured — only SSH (22) and Gateway (18789) open"
+EOF
+
+# 6. Wait for services to be healthy
 echo "⏳ Waiting for services to be healthy..."
 ssh "$SSH_USER@$VPS_IP" << 'EOF'
     cd /opt/lyra-agent
 
-    # Wait for Evolution API
+    # Wait for Evolution API (localhost only)
     for i in {1..30}; do
         if curl -f http://localhost:9000/api/v1/health &>/dev/null; then
             echo "✅ Evolution API is healthy"
@@ -84,7 +113,7 @@ ssh "$SSH_USER@$VPS_IP" << 'EOF'
     done
 EOF
 
-# 6. Set up systemd service for auto-restart
+# 7. Set up systemd service for auto-restart
 echo "⚙️  Setting up systemd service..."
 ssh "$SSH_USER@$VPS_IP" << 'EOF'
     cat > /etc/systemd/system/lyra-agent.service << 'SYSTEMD'
@@ -113,7 +142,7 @@ SYSTEMD
     echo "✅ Systemd service installed"
 EOF
 
-# 7. Set up health check monitoring
+# 8. Set up health check monitoring
 echo "📊 Setting up health checks..."
 ssh "$SSH_USER@$VPS_IP" << 'EOF'
     mkdir -p /opt/lyra-agent/scripts
@@ -157,7 +186,13 @@ echo "3. Restart containers: docker-compose -f /opt/lyra-agent/docker-compose.ym
 echo "4. Check logs: docker-compose -f /opt/lyra-agent/docker-compose.yml logs -f"
 echo "5. Scan WhatsApp QR code: curl http://localhost:9000/api/v1/messages/qrcode?instance=lyra-whatsapp"
 echo ""
-echo "🔗 Access points:"
-echo "   OpenClaw Gateway: http://$VPS_IP:18789"
-echo "   Evolution API: http://$VPS_IP:9000"
+echo "🔒 Security:"
+echo "   Firewall: Only SSH (22) and Gateway (18789) open"
+echo "   Postgres: localhost only (127.0.0.1:5432)"
+echo "   Evolution API: localhost only (127.0.0.1:9000)"
+echo "   OpenClaw Gateway: http://$VPS_IP:18789 (token auth required)"
+echo ""
+echo "⚠️  IMPORTANT: Set up TLS with Caddy for production:"
+echo "   apt install caddy"
+echo "   caddy reverse-proxy --from lyra.yourdomain.com --to localhost:18789"
 echo ""
