@@ -1,0 +1,274 @@
+# Lyra Model Routing Rules
+# Maps task categories to models based on patterns, keywords, and complexity signals.
+#
+# Three tiers:
+#   minimax   → MiniMax M2.5 (fast, cheap, 87% of tasks)
+#   haiku     → Claude Haiku 4.5 (fallback, moderate complexity)
+#   sonnet    → Claude Sonnet 4.6 (synthesis, judgment, strategic)
+#
+# Router flow:
+#   1. Rule-based classifier checks patterns (free, <1ms)
+#   2. If confidence < threshold → LLM classifier via Haiku (~$0.001, ~500ms)
+#   3. Selected model handles the task
+
+version: 1
+default_model: minimax
+confidence_threshold: 0.7
+
+# --- TIER 1: MiniMax (simple, single-action) ---
+tiers:
+  minimax:
+    description: "Fast, single-action commands. No reasoning required."
+    model: "minimax/minimax-m2-5"
+    max_tokens: 2048
+    categories:
+      notion_write:
+        patterns:
+          - "add .+ to .+ (list|database|db)"
+          - "create .+ (reminder|task|entry|item)"
+          - "mark .+ (done|complete|finished)"
+          - "update .+ (status|checkbox|field)"
+          - "set .+ to .+"
+        keywords: ["add", "create", "mark done", "check off", "update status", "set"]
+        examples:
+          - "Add milk to the shopping list"
+          - "Create a reminder to call the dentist by Friday"
+          - "Mark the electrician task as done"
+
+      notion_read:
+        patterns:
+          - "what('s| is| are) (in |on )?(my |the )?.+"
+          - "show (me )?(my |the )?.+"
+          - "list (my |the |all )?.+"
+          - "how many .+"
+          - "check .+ (database|db|list)"
+        keywords: ["show", "list", "what's", "check", "how many", "query", "look up", "find"]
+        examples:
+          - "What's on my shopping list?"
+          - "Show me today's tasks"
+          - "How many content ideas do I have?"
+
+      reminders:
+        patterns:
+          - "remind (me|abhigna|us) .+"
+          - "set (a )?reminder .+"
+          - "don't forget .+"
+          - "tell (abhigna|akash) .+"
+        keywords: ["remind", "reminder", "don't forget", "tell abhigna", "tell akash"]
+        examples:
+          - "Remind me to renew insurance by Monday"
+          - "Tell Abhigna to pick up the prescription"
+
+      weather:
+        patterns:
+          - "(what's |how's |)the weather .+"
+          - "weather (in|for|at) .+"
+          - "will it rain .+"
+          - "temperature .+"
+        keywords: ["weather", "rain", "temperature", "forecast", "sunny", "cloudy"]
+        examples:
+          - "What's the weather in Berlin?"
+          - "Will it rain tomorrow?"
+
+      quick_lookup:
+        patterns:
+          - "what time .+"
+          - "when (is|does|did) .+"
+          - "who (is|was) .+"
+          - "how (do|does|did) .+"
+        keywords: ["what time", "when is", "who is"]
+        examples:
+          - "What time does the morning digest run?"
+          - "When is the next competitor review?"
+
+      short_reply:
+        patterns:
+          - "^(yes|no|ok|thanks|done|got it|sure|good|great|cool|perfect)$"
+          - "^.{1,30}$"
+        keywords: ["yes", "no", "ok", "thanks", "done", "got it"]
+        examples:
+          - "Thanks!"
+          - "Yes, send it"
+          - "Done"
+
+      cron_management:
+        patterns:
+          - "(add|remove|list|show|change|update) .* cron .+"
+          - "schedule .+ (at|every|daily|weekly) .+"
+        keywords: ["cron", "schedule", "heartbeat"]
+        examples:
+          - "List my cron jobs"
+          - "Add a cron to check news at 3pm"
+
+      self_edit:
+        patterns:
+          - "(edit|update|change|modify) .*(SOUL|MEMORY|skill|config)"
+          - "add .+ to .*(SOUL|MEMORY|skill)"
+        keywords: ["edit SOUL", "update MEMORY", "modify skill", "self-edit"]
+        examples:
+          - "Add a new rule to SOUL.md"
+          - "Update your memory about my timezone"
+
+  # --- TIER 2: Haiku (moderate complexity, some reasoning) ---
+  haiku:
+    description: "Moderate tasks needing some reasoning, multi-step coordination, or nuance."
+    model: "anthropic/claude-haiku-4-5"
+    max_tokens: 4096
+    categories:
+      email_read:
+        patterns:
+          - "(read|check|show|summarize) .*(email|inbox|mail|gmail)"
+          - "any .*(new |unread )?(email|mail)"
+          - "what .*(email|mail) .+"
+        keywords: ["email", "inbox", "unread", "gmail", "mail"]
+        examples:
+          - "Check my email for anything urgent"
+          - "Summarize my unread emails"
+
+      email_draft:
+        patterns:
+          - "(draft|write|compose|reply to) .*(email|mail|message to|reply)"
+          - "(draft|write) .*(reply|response) .*(to|about|regarding)"
+          - "send .*(email|mail) .+"
+          - "reply to .*(recruiter|manager|team|colleague)"
+        keywords: ["draft email", "write email", "compose", "reply to email", "send email", "draft a reply", "reply to the"]
+        examples:
+          - "Draft a reply to the recruiter about the timeline"
+          - "Write an email declining the meeting"
+
+      web_search:
+        patterns:
+          - "(search|look up|find|google|research) .+"
+          - "what (is|are|was|were) .+ (latest|recent|new|current)"
+        keywords: ["search", "look up", "research", "latest", "find out"]
+        examples:
+          - "Search for the latest ECB digital euro updates"
+          - "Look up Revolut's latest product launch"
+
+      multi_step:
+        patterns:
+          - ".+,\\s*(then|and then|also|plus|after that) .+"
+          - ".+(then|and also|and then) .+(and|then|also) .+"
+        keywords: ["and then", "after that", "step 1", "first then", ", then ", ", also "]
+        signals:
+          conjunction_count: ">= 2"
+          sentence_count: ">= 3"
+        examples:
+          - "Add milk to the list, then remind Abhigna to buy it tomorrow, and also check if we have eggs"
+          - "Check my calendar, draft a reply to the recruiter, and add it to my content ideas"
+
+      cross_user_coordination:
+        patterns:
+          - "(assign|delegate|tell|ask) (abhigna|akash) to .+"
+          - ".+ for (abhigna|akash) .+"
+        keywords: ["assign to", "delegate to", "tell abhigna", "ask akash"]
+        examples:
+          - "Assign the grocery shopping to Abhigna for this weekend"
+
+      data_formatting:
+        patterns:
+          - "(format|organize|structure|table|csv|export) .+"
+          - "give me .+ as (a )?(table|list|csv|summary)"
+        keywords: ["format", "table", "csv", "export", "organize"]
+        examples:
+          - "Show my tasks as a table with deadlines"
+          - "Export my content ideas as a CSV"
+
+  # --- TIER 3: Sonnet (synthesis, strategic, complex reasoning) ---
+  sonnet:
+    description: "Complex tasks requiring synthesis across multiple sources, strategic thinking, or nuanced judgment."
+    model: "anthropic/claude-sonnet-4-6"
+    max_tokens: 8192
+    categories:
+      synthesis:
+        patterns:
+          - "(synthesize|synthesise|summarize|summarise|digest|brief|review) .*(week|month|pattern|across|multiple)"
+          - "(summarize|summarise) (my |the |this )?(week|month|quarter)"
+          - "what .*(pattern|theme|trend|insight)"
+          - "(connect|combine|aggregate) .+"
+          - "what (decision|idea|pattern).*(capture|make|see|notice)"
+        keywords: ["synthesize", "summarize my week", "digest", "weekly review", "patterns", "trends", "insights", "brief me", "aggregate", "what patterns"]
+        examples:
+          - "Summarize my week — what decisions did I make, what ideas did I capture?"
+          - "What patterns do you see across my content ideas this month?"
+          - "Give me a weekly brain brief"
+
+      strategic_analysis:
+        patterns:
+          - "(analyze|analyse|compare|evaluate|assess|review) .*(strategy|approach|option|competitor|market)"
+          - "should I .+"
+          - "what('s| is) the best (way|approach|strategy) .+"
+          - "pros and cons .+"
+          - "trade.?off .+"
+        keywords: ["analyze", "strategy", "compare", "evaluate", "should I", "pros and cons", "trade-off", "recommendation"]
+        examples:
+          - "Analyze Revolut vs Monzo's approach to crypto in Q1"
+          - "Should I focus on LinkedIn or Twitter for my content strategy?"
+          - "What are the trade-offs between staying in Berlin vs relocating to the US?"
+
+      complex_drafting:
+        patterns:
+          - "(draft|write|compose) .*(blog|article|post|essay|proposal|pitch|strategy)"
+          - "(draft|write) .*(long|detailed|comprehensive|thoughtful) .+"
+        keywords: ["blog post", "article", "essay", "proposal", "pitch", "long-form", "thought piece", "strategy doc"]
+        examples:
+          - "Draft a blog post about my experience building a personal AI"
+          - "Write a proposal for the new product feature"
+
+      competitive_intelligence:
+        patterns:
+          - "(competitor|competitive|market) .*(analysis|review|update|digest|landscape)"
+          - "(what is|how is|compare) .*(revolut|monzo|bunq|starling|n26) .+"
+        keywords: ["competitor analysis", "market landscape", "competitive review"]
+        examples:
+          - "Give me a competitive digest for this week"
+          - "Compare Revolut and Monzo's latest feature launches"
+
+      planning:
+        patterns:
+          - "(plan|roadmap|timeline|breakdown|prioritize|prioritise) .+"
+          - "help me (think through|plan|structure|organize|figure out) .+"
+          - "what .*(priority|priorities|focus|next) .+"
+        keywords: ["plan", "roadmap", "prioritize", "think through", "help me decide", "figure out"]
+        examples:
+          - "Help me plan the next quarter's content strategy"
+          - "What should my priorities be this week given everything on my plate?"
+
+      multi_source_reasoning:
+        patterns:
+          - ".*(based on|considering|given|taking into account) .*(multiple|several|all|various|different) .+"
+          - ".*(cross.?reference|correlate|combine) .+"
+        keywords: ["based on multiple", "cross-reference", "considering all", "taking into account"]
+        examples:
+          - "Based on my competitor tracking, content ideas, and recruiter conversations — what career move makes the most sense?"
+
+# --- Ambiguity signals ---
+# If none of the above match with high confidence, these signals help the LLM classifier
+ambiguity_signals:
+  escalate_to_haiku:
+    - message_length: "> 200 characters"
+    - question_marks: ">= 2"
+    - conditional_language: ["if", "unless", "depending", "it depends"]
+  escalate_to_sonnet:
+    - message_length: "> 500 characters"
+    - multiple_domains: true  # mentions work + personal + content etc.
+    - temporal_scope: ["this week", "this month", "this quarter", "over time", "lately"]
+    - meta_reasoning: ["what do you think", "help me decide", "what should I"]
+
+# --- Override rules ---
+# These override any classification when matched
+overrides:
+  always_minimax:
+    - "^(hi|hello|hey|good morning|good evening|gm|thanks|thank you|ok|done|yes|no|sure|got it|👍|🙏)$"
+  always_sonnet:
+    - "^(give me |run |do )?(the |my |a )?(morning digest|weekly review|brain brief|competitor digest|content reminder)$"
+    - "^weekly review$"
+    - "^brain brief$"
+    - "^morning digest$"
+    - "^competitor digest$"
+  never_minimax:
+    - "draft .*(blog|article|proposal)"
+    - "analyze .*(competitor|market|strategy)"
+    - "synthesize .*(week|month)"
+    - "summarize .*(my |the )?(week|month|quarter)"
+    - "what pattern"

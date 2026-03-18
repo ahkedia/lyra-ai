@@ -1,0 +1,17 @@
+{
+  "name": "lyra-ai",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Personal AI agent for work, life, and household — built on OpenClaw, Claude, Telegram, Notion",
+  "private": true,
+  "scripts": {
+    "route": "node scripts/model-router.js",
+    "route:test": "node scripts/model-router.js --test",
+    "route:stats": "node scripts/model-router.js --stats"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@supermemory/tools": "^1.4.0",
+    "yaml": "^2.8.2"
+  }
+}
