@@ -1,16 +1,16 @@
 {
-  "date": "2026-03-17",
+  "date": "2026-03-18",
   "minimax": {
     "plan": "Coding Plan ($9.99/mo)",
     "daily_plan_cost_usd": 0.333,
     "coding_plan_quota": {
       "model": "MiniMax-M2.5",
-      "used": 1491,
+      "used": 1256,
       "total": 1500,
-      "remaining": 9,
-      "resets_in_min": 146
+      "remaining": 244,
+      "resets_in_min": 89
     },
-    "queries_today": 198,
+    "queries_today": 251,
     "tokens": {
       "input": 0,
       "output": 0
@@ -20,38 +20,28 @@
   "anthropic": {
     "plan": "Pay-as-you-go",
     "models": {
-      "claude-haiku-4-5-20251001": {
-        "queries": 16,
-        "input_tokens": 0,
-        "output_tokens": 0,
-        "cache_read_tokens": 0,
-        "cache_write_tokens": 0,
-        "cost_usd": 0.0308,
-        "source": "eval-retry"
-      },
-      "claude-sonnet-4-20250514": {
-        "queries": 8,
-        "input_tokens": 0,
-        "output_tokens": 0,
-        "cache_read_tokens": 0,
-        "cache_write_tokens": 0,
-        "cost_usd": 0.0358,
-        "source": "eval-retry-sonnet"
+      "claude-haiku-4-5": {
+        "queries": 4,
+        "input_tokens": 24,
+        "output_tokens": 1174,
+        "cache_read_tokens": 56063,
+        "cache_write_tokens": 20363,
+        "cost_usd": 0.029563239999999998
       }
     },
-    "total_queries": 24,
+    "total_queries": 4,
     "total_tokens": {
-      "input": 0,
-      "output": 0,
-      "cache_read": 0,
-      "cache_write": 0
+      "input": 24,
+      "output": 1174,
+      "cache_read": 56063,
+      "cache_write": 20363
     },
-    "total_cost_usd": 0.0666
+    "total_cost_usd": 0.0296
   },
   "totals": {
     "minimax_cost_usd": 0.333,
-    "anthropic_cost_usd": 0.0666,
-    "total_cost_usd": 0.3996,
-    "total_queries": 222
+    "anthropic_cost_usd": 0.0296,
+    "total_cost_usd": 0.3626,
+    "total_queries": 255
   }
 }
