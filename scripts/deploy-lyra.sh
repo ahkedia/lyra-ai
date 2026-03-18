@@ -117,4 +117,12 @@ if [ "$BEFORE" != "$AFTER" ]; then
     else
         log "WARNING: Gateway may not be healthy after deploy!"
     fi
+
+    # Ensure eval cron is installed (idempotent — only installs if missing)
+    if [ -f "$REPO_DIR/scripts/setup-eval-cron.sh" ]; then
+        if ! crontab -l 2>/dev/null | grep -q "lyra-eval-4am"; then
+            bash "$REPO_DIR/scripts/setup-eval-cron.sh" >> "$LOG" 2>&1
+            log "  Installed eval cron (was missing)"
+        fi
+    fi
 fi
