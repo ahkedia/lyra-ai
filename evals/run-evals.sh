@@ -1,6 +1,13 @@
 #!/bin/bash
 # Lyra Eval Runner — Entry point
 # Runs eval suite, aggregates results, syncs to Notion, pushes dashboard data
+#
+# Cost optimization:
+#   - Routing eval (Step 0) runs DAILY — it's free (offline, no API calls)
+#   - Full Lyra eval (Step 1) runs on ODD days only (1st, 3rd, 5th, etc.)
+#   - This cuts eval LLM costs from ~$10.80/month to ~$5.40/month
+#   - Override: pass --force to run full evals regardless of day
+#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -17,10 +24,27 @@ if [ -f /root/.openclaw/.env ]; then
   set +a
 fi
 
+# Determine if today is a full eval day (odd days: 1st, 3rd, 5th, ...)
+DAY_OF_MONTH=$(date -u +%-d)
+FORCE_FULL="${1:-}"
+IS_FULL_EVAL_DAY=false
+
+if [ "$FORCE_FULL" = "--force" ]; then
+  IS_FULL_EVAL_DAY=true
+  echo "Mode: FORCED full eval run"
+  shift  # Remove --force from args
+elif [ $((DAY_OF_MONTH % 2)) -eq 1 ]; then
+  IS_FULL_EVAL_DAY=true
+  echo "Mode: Full eval (odd day: $DAY_OF_MONTH)"
+else
+  echo "Mode: Routing-only (even day: $DAY_OF_MONTH) — full eval skipped to save costs"
+  echo "  Tip: Run with --force to override"
+fi
+echo ""
+
 # Health check: is gateway running?
 if ! ss -tlnp | grep -q 18789; then
   echo "ERROR: OpenClaw gateway not running on port 18789"
-  # Send Telegram alert
   if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_USER_ID:-}" ]; then
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
       -d "chat_id=${TELEGRAM_USER_ID}" \
@@ -29,7 +53,7 @@ if ! ss -tlnp | grep -q 18789; then
   exit 1
 fi
 
-# Step 0: Run routing accuracy eval (offline — no API calls to Lyra, just classifier tests)
+# Step 0: Run routing accuracy eval (ALWAYS — offline, free, no API calls)
 echo "Step 0: Running routing accuracy eval..."
 node routing-eval.js 2>&1
 ROUTING_EXIT=$?
@@ -38,43 +62,49 @@ if [ $ROUTING_EXIT -ne 0 ]; then
 fi
 echo ""
 
-# Step 1: Run evals
-echo "Step 1: Running eval tests..."
-node runner.js "$@"
-EVAL_EXIT=$?
+# Step 1: Run full evals (only on odd days or --force)
+EVAL_EXIT=0
+if [ "$IS_FULL_EVAL_DAY" = true ]; then
+  echo "Step 1: Running full eval tests..."
+  node runner.js "$@"
+  EVAL_EXIT=$?
 
-# Step 2: Aggregate results
-echo ""
-echo "Step 2: Aggregating results..."
-OUTPUT_DIR="$SCRIPT_DIR/output" node aggregate.js
+  # Step 2: Aggregate results
+  echo ""
+  echo "Step 2: Aggregating results..."
+  OUTPUT_DIR="$SCRIPT_DIR/output" node aggregate.js
 
-# Step 3: Sync to Notion
-echo ""
-echo "Step 3: Syncing to Notion..."
-node notion-sync.js || echo "[warn] Notion sync failed (non-fatal)"
+  # Step 3: Sync to Notion
+  echo ""
+  echo "Step 3: Syncing to Notion..."
+  node notion-sync.js || echo "[warn] Notion sync failed (non-fatal)"
 
-# Step 4: Push dashboard data
-echo ""
-echo "Step 4: Pushing dashboard data..."
-DASHBOARD_DATA_DIR="/root/lyra-ai/docs/dashboard/data"
-if [ -d "$DASHBOARD_DATA_DIR" ]; then
-  cp -f "$SCRIPT_DIR/output/"*.json "$DASHBOARD_DATA_DIR/" 2>/dev/null || true
+  # Step 4: Push dashboard data
+  echo ""
+  echo "Step 4: Pushing dashboard data..."
+  DASHBOARD_DATA_DIR="/root/lyra-ai/docs/dashboard/data"
+  if [ -d "$DASHBOARD_DATA_DIR" ]; then
+    cp -f "$SCRIPT_DIR/output/"*.json "$DASHBOARD_DATA_DIR/" 2>/dev/null || true
 
-  cd /root/lyra-ai
-  if git diff --quiet docs/dashboard/data/; then
-    echo "  No changes to push."
-  else
-    git add docs/dashboard/data/
-    git commit -m "Update eval dashboard data $(date +%Y-%m-%d)" > /dev/null 2>&1
-    git push origin main > /dev/null 2>&1
-    echo "  Dashboard data pushed to GitHub."
+    cd /root/lyra-ai
+    if git diff --quiet docs/dashboard/data/; then
+      echo "  No changes to push."
+    else
+      git add docs/dashboard/data/
+      git commit -m "Update eval dashboard data $(date +%Y-%m-%d)" > /dev/null 2>&1
+      git push origin main > /dev/null 2>&1
+      echo "  Dashboard data pushed to GitHub."
+    fi
   fi
+else
+  echo "Step 1: Skipped (even day — routing-only mode)"
+  echo "Steps 2-4: Skipped"
 fi
 
 # Step 5: Alert if pass rate < 80% or routing accuracy < 90%
 ALERT_TEXT=""
 
-if [ $EVAL_EXIT -ne 0 ]; then
+if [ "$IS_FULL_EVAL_DAY" = true ] && [ $EVAL_EXIT -ne 0 ]; then
   echo ""
   echo "WARNING: Pass rate below 80%!"
   SUMMARY=$(cat "$SCRIPT_DIR/output/summary.json" 2>/dev/null | python3 -c "
@@ -111,4 +141,8 @@ Run: $(date -u '+%Y-%m-%d %H:%M UTC')" > /dev/null 2>&1
 fi
 
 echo ""
-echo "=== Eval suite complete ==="
+if [ "$IS_FULL_EVAL_DAY" = true ]; then
+  echo "=== Eval suite complete (full run) ==="
+else
+  echo "=== Eval suite complete (routing-only, next full run tomorrow) ==="
+fi
