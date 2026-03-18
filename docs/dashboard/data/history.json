@@ -60,5 +60,15 @@
         "pass_rate": 0.63
       }
     }
+  },
+  {
+    "date": "2026-03-18",
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "pass_rate": 0,
+    "avg_latency_ms": 0,
+    "p95_latency_ms": 0,
+    "by_tier": {}
   }
 ]
