@@ -14,8 +14,8 @@
  *   NOTION_DEVLOG_PAGE_ID - The Notion page ID for the dev log
  */
 
-const { execSync } = require('child_process');
-const Anthropic = require('@anthropic-ai/sdk');
+import { execSync } from 'child_process';
+import Anthropic from '@anthropic-ai/sdk';
 
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 const NOTION_DEVLOG_PAGE_ID = process.env.NOTION_DEVLOG_PAGE_ID;
