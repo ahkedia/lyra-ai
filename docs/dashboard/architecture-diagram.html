@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>Lyra AI — Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #e0e0e8;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  #root { width: 1200px; height: 800px; position: relative; overflow: hidden; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ─── Palette ─── */
+const C = {
+  bg: '#0a0a0f',
+  card: 'rgba(255,255,255,0.04)',
+  cardBorder: 'rgba(255,255,255,0.08)',
+  cardHover: 'rgba(255,255,255,0.06)',
+  text: '#e0e0e8',
+  textMuted: '#8a8a9a',
+  textDim: '#5a5a6a',
+  accent: '#6366f1',    // indigo
+  blue: '#3b82f6',
+  purple: '#a855f7',
+  amber: '#f59e0b',
+  green: '#10b981',
+  teal: '#14b8a6',
+  rose: '#f43f5e',
+  cyan: '#06b6d4',
+};
+
+/* ─── Reusable Card ─── */
+function Card({ x, y, w, h, children, glow, style = {} }) {
+  const glowColor = glow || 'transparent';
+  return (
+    <foreignObject x={x} y={y} width={w} height={h}>
+      <div xmlns="http://www.w3.org/1999/xhtml" style={{
+        width: '100%', height: '100%',
+        background: C.card,
+        border: `1px solid ${C.cardBorder}`,
+        borderRadius: 12,
+        padding: '14px 16px',
+        boxShadow: glow ? `0 0 20px ${glowColor}15, 0 0 40px ${glowColor}08` : 'none',
+        backdropFilter: 'blur(8px)',
+        ...style,
+      }}>
+        {children}
+      </div>
+    </foreignObject>
+  );
+}
+
+/* ─── Label helpers ─── */
+const Label = ({ children, color, size = 11 }) => (
+  <span style={{ fontSize: size, fontWeight: 600, color: color || C.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+    {children}
+  </span>
+);
+
+const Title = ({ children, size = 14 }) => (
+  <div style={{ fontSize: size, fontWeight: 600, color: C.text, marginTop: 4 }}>{children}</div>
+);
+
+const Sub = ({ children, size = 11.5 }) => (
+  <div style={{ fontSize: size, color: C.textMuted, marginTop: 3, lineHeight: 1.45 }}>{children}</div>
+);
+
+const Tag = ({ children, color }) => (
+  <span style={{
+    display: 'inline-block',
+    fontSize: 10,
+    fontWeight: 600,
+    color: color,
+    background: `${color}18`,
+    border: `1px solid ${color}30`,
+    borderRadius: 6,
+    padding: '2px 7px',
+    marginRight: 4,
+    marginTop: 4,
+  }}>{children}</span>
+);
+
+/* ─── Arrow path builder ─── */
+function Arrow({ from, to, color = 'rgba(255,255,255,0.12)', dashed = false, label, labelOffset }) {
+  const [fx, fy] = from;
+  const [tx, ty] = to;
+  const mx = (fx + tx) / 2;
+  const my = (fy + ty) / 2;
+  // Determine curvature
+  const dx = tx - fx;
+  const dy = ty - fy;
+  let path;
+  if (Math.abs(dy) < 10) {
+    // Horizontal
+    path = `M${fx},${fy} C${fx + dx * 0.4},${fy} ${tx - dx * 0.4},${ty} ${tx},${ty}`;
+  } else if (Math.abs(dx) < 10) {
+    // Vertical
+    path = `M${fx},${fy} C${fx},${fy + dy * 0.4} ${tx},${ty - dy * 0.4} ${tx},${ty}`;
+  } else {
+    path = `M${fx},${fy} C${fx + dx * 0.5},${fy} ${tx - dx * 0.5},${ty} ${tx},${ty}`;
+  }
+  return (
+    <g>
+      <path d={path} fill="none" stroke={color} strokeWidth={1.5}
+        strokeDasharray={dashed ? '4,4' : 'none'} opacity={0.7} />
+      <circle cx={tx} cy={ty} r={2.5} fill={color} opacity={0.9} />
+      {label && (
+        <text x={mx + (labelOffset?.[0] || 0)} y={my + (labelOffset?.[1] || 0)}
+          fill={C.textDim} fontSize={9} textAnchor="middle" fontFamily="Inter, sans-serif">
+          {label}
+        </text>
+      )}
+    </g>
+  );
+}
+
+/* ─── Main Diagram ─── */
+function Diagram() {
+  return (
+    <svg width={1200} height={800} viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+      {/* Background gradient */}
+      <defs>
+        <radialGradient id="bgGlow" cx="50%" cy="40%">
+          <stop offset="0%" stopColor="#6366f120" />
+          <stop offset="60%" stopColor="transparent" />
+        </radialGradient>
+        <linearGradient id="headerLine" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0%" stopColor="transparent" />
+          <stop offset="20%" stopColor={C.accent} stopOpacity="0.4" />
+          <stop offset="80%" stopColor={C.accent} stopOpacity="0.4" />
+          <stop offset="100%" stopColor="transparent" />
+        </linearGradient>
+      </defs>
+      <rect width={1200} height={800} fill={C.bg} />
+      <rect width={1200} height={800} fill="url(#bgGlow)" />
+
+      {/* Title */}
+      <text x={600} y={38} textAnchor="middle" fill={C.text} fontSize={20} fontWeight="700" fontFamily="Inter, sans-serif" letterSpacing="-0.02em">
+        Lyra AI
+      </text>
+      <text x={600} y={56} textAnchor="middle" fill={C.textMuted} fontSize={11.5} fontFamily="Inter, sans-serif">
+        Personal AI assistant · 3-tier model routing · $0.40/day
+      </text>
+      <line x1={100} y1={68} x2={1100} y2={68} stroke="url(#headerLine)" strokeWidth={1} />
+
+      {/* ═══════ COLUMN 1: USERS ═══════ */}
+      <text x={85} y={96} fill={C.textDim} fontSize={10} fontWeight="600" fontFamily="Inter, sans-serif" letterSpacing="0.08em">
+        USERS
+      </text>
+
+      <Card x={24} y={108} w={155} h={90} glow={C.accent}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 20 }}>👤</span>
+          <div>
+            <Label color={C.accent}>Primary</Label>
+            <Title size={13}>Akash</Title>
+          </div>
+        </div>
+        <Sub>Full access · 13 databases</Sub>
+        <Tag color={C.accent}>Admin</Tag>
+      </Card>
+
+      <Card x={24} y={210} w={155} h={90} glow={C.purple}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 20 }}>👤</span>
+          <div>
+            <Label color={C.purple}>Household</Label>
+            <Title size={13}>Abhigna</Title>
+          </div>
+        </div>
+        <Sub>Household only · 5 databases</Sub>
+        <Tag color={C.purple}>Scoped</Tag>
+      </Card>
+
+      {/* ═══════ COLUMN 2: TELEGRAM ═══════ */}
+      <text x={265} y={96} fill={C.textDim} fontSize={10} fontWeight="600" fontFamily="Inter, sans-serif" letterSpacing="0.08em">
+        INTERFACE
+      </text>
+
+      <Card x={210} y={108} w={145} h={192} glow={C.cyan}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 20 }}>✈️</span>
+          <div>
+            <Label color={C.cyan}>Interface</Label>
+            <Title size={13}>Telegram Bot</Title>
+          </div>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <Sub>⬆ Messages + voice notes</Sub>
+          <Sub>⬇ Notifications</Sub>
+          <Sub>⬇ Daily digests</Sub>
+          <Sub>⬇ Smart alerts</Sub>
+          <Sub>⬇ Reminder nudges</Sub>
+        </div>
+      </Card>
+
+      {/* ═══════ COLUMN 3: ORCHESTRATION ═══════ */}
+      <text x={465} y={96} fill={C.textDim} fontSize={10} fontWeight="600" fontFamily="Inter, sans-serif" letterSpacing="0.08em">
+        ORCHESTRATION
+      </text>
+
+      <Card x={390} y={108} w={195} h={192} glow={C.green}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>⚡</span>
+          <div>
+            <Label color={C.green}>Gateway</Label>
+            <Title size={13}>OpenClaw</Title>
+          </div>
+        </div>
+        <Sub>Hetzner VPS · €6/mo</Sub>
+        <div style={{ marginTop: 10 }}>
+          <Sub>• Message routing + ACL</Sub>
+          <Sub>• Session state (PostgreSQL)</Sub>
+          <Sub>• 7 scheduled cron jobs</Sub>
+          <Sub>• Self-edit → GitHub push</Sub>
+          <Sub>• Smart retry pipeline</Sub>
+        </div>
+      </Card>
+
+      {/* ═══════ COLUMN 4: MODEL ROUTING ═══════ */}
+      <text x={695} y={96} fill={C.textDim} fontSize={10} fontWeight="600" fontFamily="Inter, sans-serif" letterSpacing="0.08em">
+        3-TIER MODEL ROUTING
+      </text>
+
+      {/* MiniMax */}
+      <Card x={625} y={108} w={210} h={56} glow={C.blue}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.blue, display: 'inline-block', boxShadow: `0 0 6px ${C.blue}` }}></span>
+              <Title size={12}>MiniMax M2.5</Title>
+            </div>
+            <Sub size={10}>Reminders · lookups · quick replies</Sub>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: C.blue }}>80%</div>
+            <div style={{ fontSize: 9, color: C.textDim }}>$9.99/mo</div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Haiku */}
+      <Card x={625} y={174} w={210} h={56} glow={C.purple}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.purple, display: 'inline-block', boxShadow: `0 0 6px ${C.purple}` }}></span>
+              <Title size={12}>Claude Haiku 4.5</Title>
+            </div>
+            <Sub size={10}>ACL enforcement · tone · instructions</Sub>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: C.purple }}>13%</div>
+            <div style={{ fontSize: 9, color: C.textDim }}>fallback</div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Sonnet */}
+      <Card x={625} y={240} w={210} h={56} glow={C.amber}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.amber, display: 'inline-block', boxShadow: `0 0 6px ${C.amber}` }}></span>
+              <Title size={12}>Claude Sonnet 4.6</Title>
+            </div>
+            <Sub size={10}>Synthesis · proactive briefs · drafting</Sub>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: C.amber }}>7%</div>
+            <div style={{ fontSize: 9, color: C.textDim }}>escalation</div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Funnel arrows between models */}
+      <Arrow from={[730, 164]} to={[730, 174]} color={C.blue} />
+      <Arrow from={[730, 230]} to={[730, 240]} color={C.purple} />
+
+      {/* ═══════ COLUMN 5: DATA LAYER ═══════ */}
+      <text x={950} y={96} fill={C.textDim} fontSize={10} fontWeight="600" fontFamily="Inter, sans-serif" letterSpacing="0.08em">
+        DATA LAYER
+      </text>
+
+      <Card x={870} y={108} w={305} h={78}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>📋</span>
+          <div>
+            <Title size={12}>Notion</Title>
+            <Sub size={10}>13 databases · Professional · Household · Reminders · Second Brain</Sub>
+          </div>
+        </div>
+        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap' }}>
+          <Tag color={C.accent}>Professional</Tag>
+          <Tag color={C.purple}>Household</Tag>
+          <Tag color={C.amber}>Reminders</Tag>
+          <Tag color={C.teal}>Second Brain</Tag>
+        </div>
+      </Card>
+
+      <Card x={870} y={196} w={148} h={56}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>🧠</span>
+          <div>
+            <Title size={12}>SuperMemory</Title>
+            <Sub size={10}>Semantic recall</Sub>
+          </div>
+        </div>
+      </Card>
+
+      <Card x={1027} y={196} w={148} h={56}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>📧</span>
+          <div>
+            <Title size={12}>Gmail</Title>
+            <Sub size={10}>himalaya CLI</Sub>
+          </div>
+        </div>
+      </Card>
+
+      <Card x={870} y={262} w={305} h={40}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center' }}>
+          <span style={{ fontSize: 10, color: C.textMuted }}>📡 RSS feeds</span>
+          <span style={{ fontSize: 10, color: C.textDim }}>·</span>
+          <span style={{ fontSize: 10, color: C.textMuted }}>🔍 Web search</span>
+          <span style={{ fontSize: 10, color: C.textDim }}>·</span>
+          <span style={{ fontSize: 10, color: C.textMuted }}>🌤 Weather</span>
+        </div>
+      </Card>
+
+      {/* ═══════ ARROWS: Users → Telegram ═══════ */}
+      <Arrow from={[179, 153]} to={[210, 170]} color={C.accent} />
+      <Arrow from={[179, 255]} to={[210, 230]} color={C.purple} />
+
+      {/* ═══════ ARROWS: Telegram → Orchestration ═══════ */}
+      <Arrow from={[355, 200]} to={[390, 200]} color={C.cyan} />
+
+      {/* ═══════ ARROWS: Orchestration → Models ═══════ */}
+      <Arrow from={[585, 160]} to={[625, 136]} color={C.blue} />
+      <Arrow from={[585, 200]} to={[625, 202]} color={C.purple} />
+      <Arrow from={[585, 230]} to={[625, 268]} color={C.amber} />
+
+      {/* ═══════ ARROWS: Models → Data ═══════ */}
+      <Arrow from={[835, 136]} to={[870, 140]} color="rgba(255,255,255,0.1)" />
+      <Arrow from={[835, 202]} to={[870, 220]} color="rgba(255,255,255,0.1)" />
+      <Arrow from={[835, 268]} to={[870, 275]} color="rgba(255,255,255,0.1)" />
+
+      {/* ═══════ OPERATIONS LAYER ═══════ */}
+      <line x1={24} y1={330} x2={1176} y2={330} stroke={C.cardBorder} strokeWidth={1} />
+      <text x={600} y={360} textAnchor="middle" fill={C.textDim} fontSize={10} fontWeight="600" fontFamily="Inter, sans-serif" letterSpacing="0.08em">
+        OPERATIONS & RELIABILITY
+      </text>
+
+      {/* Evals */}
+      <Card x={24} y={376} w={222} h={120}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>🧪</span>
+          <div>
+            <Label color={C.rose}>Quality</Label>
+            <Title size={13}>Daily Evals</Title>
+          </div>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <Sub>• 40 tests at 4am UTC</Sub>
+          <Sub>• LLM-as-judge scoring</Sub>
+          <Sub>• Eval dashboard (GitHub Pages)</Sub>
+        </div>
+      </Card>
+
+      {/* Retry Pipeline */}
+      <Card x={262} y={376} w={222} h={120}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>🔄</span>
+          <div>
+            <Label color={C.blue}>Resilience</Label>
+            <Title size={13}>Smart Retry</Title>
+          </div>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            <Tag color={C.blue}>MiniMax</Tag>
+            <span style={{ color: C.textDim, fontSize: 10 }}>→</span>
+            <Tag color={C.purple}>Haiku</Tag>
+            <span style={{ color: C.textDim, fontSize: 10 }}>→</span>
+            <Tag color={C.amber}>Sonnet</Tag>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <Sub>97.5% projected success rate</Sub>
+          </div>
+        </div>
+      </Card>
+
+      {/* Cost */}
+      <Card x={500} y={376} w={170} h={120}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>💰</span>
+          <div>
+            <Label color={C.green}>Cost</Label>
+            <Title size={13}>$0.40/day</Title>
+          </div>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <Sub>• MiniMax plan: $9.99/mo</Sub>
+          <Sub>• Hetzner VPS: €6/mo</Sub>
+          <Sub>• Claude API: usage-based</Sub>
+        </div>
+      </Card>
+
+      {/* Health */}
+      <Card x={686} y={376} w={170} h={120}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>💓</span>
+          <div>
+            <Label color={C.teal}>Uptime</Label>
+            <Title size={13}>Health Checks</Title>
+          </div>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <Sub>• Every 15 minutes</Sub>
+          <Sub>• Auto-restart on failure</Sub>
+          <Sub>• Telegram alerts</Sub>
+        </div>
+      </Card>
+
+      {/* Backups */}
+      <Card x={872} y={376} w={303} h={120}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>🔒</span>
+          <div>
+            <Label color={C.accent}>Persistence</Label>
+            <Title size={13}>Backups & Sync</Title>
+          </div>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <Sub>• Daily automated backups</Sub>
+          <Sub>• GitHub bidirectional sync</Sub>
+          <Sub>• Self-edit: code → commit → deploy</Sub>
+        </div>
+      </Card>
+
+      {/* ═══════ FOOTER ═══════ */}
+      <line x1={100} y1={520} x2={1100} y2={520} stroke="url(#headerLine)" strokeWidth={1} />
+
+      {/* Flow summary at bottom */}
+      <Card x={24} y={538} w={1152} h={52}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, height: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13 }}>📱</span>
+            <span style={{ fontSize: 11, color: C.textMuted }}>Telegram message</span>
+          </div>
+          <span style={{ color: C.textDim, fontSize: 11 }}>→</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13 }}>⚡</span>
+            <span style={{ fontSize: 11, color: C.textMuted }}>OpenClaw routes</span>
+          </div>
+          <span style={{ color: C.textDim, fontSize: 11 }}>→</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13 }}>🤖</span>
+            <span style={{ fontSize: 11, color: C.textMuted }}>Best-fit model responds</span>
+          </div>
+          <span style={{ color: C.textDim, fontSize: 11 }}>→</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13 }}>📋</span>
+            <span style={{ fontSize: 11, color: C.textMuted }}>Notion + Memory updated</span>
+          </div>
+          <span style={{ color: C.textDim, fontSize: 11 }}>→</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13 }}>✅</span>
+            <span style={{ fontSize: 11, color: C.textMuted }}>Reply delivered</span>
+          </div>
+        </div>
+      </Card>
+
+      {/* Tiny footer text */}
+      <text x={600} y={620} textAnchor="middle" fill={C.textDim} fontSize={10} fontFamily="Inter, sans-serif">
+        Lyra AI · v3 Architecture · March 2026
+      </text>
+    </svg>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Diagram />);
+</script>
+</body>
+</html>
