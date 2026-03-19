@@ -1,6 +1,6 @@
 ---
 name: voice-capture
-description: Process incoming voice messages from Telegram. Transcribe them using mlx-whisper, classify the content, and save to the Second Brain Notion database. Use this whenever a voice note arrives from Akash or Abhigna.
+description: Transcribe Telegram voice messages, classify content, and save to Second Brain in Notion. Triggers on voice notes from Akash or Abhigna.
 ---
 
 # Voice Capture — Think Out Loud, Lyra Captures It
