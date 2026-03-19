@@ -158,7 +158,7 @@ function Diagram() {
         Lyra AI
       </text>
       <text x={600} y={56} textAnchor="middle" fill={C.textMuted} fontSize={11.5} fontFamily="Inter, sans-serif">
-        Personal AI assistant · 3-tier model routing · $0.40/day
+        Personal AI assistant · 3-tier model routing · 20+ integrations · ~$0.03/day
       </text>
       <line x1={100} y1={68} x2={1100} y2={68} stroke="url(#headerLine)" strokeWidth={1} />
 
@@ -298,10 +298,10 @@ function Diagram() {
 
       {/* ═══════ COLUMN 5: DATA LAYER ═══════ */}
       <text x={950} y={96} fill={C.textDim} fontSize={10} fontWeight="600" fontFamily="Inter, sans-serif" letterSpacing="0.08em">
-        DATA LAYER
+        DATA & INTEGRATIONS
       </text>
 
-      <Card x={870} y={108} w={305} h={78}>
+      <Card x={870} y={108} w={305} h={72}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 18 }}>📋</span>
           <div>
@@ -309,7 +309,7 @@ function Diagram() {
             <Sub size={10}>13 databases · Professional · Household · Reminders · Second Brain</Sub>
           </div>
         </div>
-        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap' }}>
           <Tag color={C.accent}>Professional</Tag>
           <Tag color={C.purple}>Household</Tag>
           <Tag color={C.amber}>Reminders</Tag>
@@ -317,17 +317,7 @@ function Diagram() {
         </div>
       </Card>
 
-      <Card x={870} y={196} w={148} h={56}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 16 }}>🧠</span>
-          <div>
-            <Title size={12}>SuperMemory</Title>
-            <Sub size={10}>Semantic recall</Sub>
-          </div>
-        </div>
-      </Card>
-
-      <Card x={1027} y={196} w={148} h={56}>
+      <Card x={870} y={190} w={148} h={50}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16 }}>📧</span>
           <div>
@@ -337,13 +327,25 @@ function Diagram() {
         </div>
       </Card>
 
-      <Card x={870} y={262} w={305} h={40}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center' }}>
+      <Card x={1027} y={190} w={148} h={50}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>📅</span>
+          <div>
+            <Title size={12}>Google Calendar</Title>
+            <Sub size={10}>OAuth2 · 3 calendars</Sub>
+          </div>
+        </div>
+      </Card>
+
+      <Card x={870} y={250} w={305} h={52}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: C.textMuted }}>📡 RSS feeds</span>
           <span style={{ fontSize: 10, color: C.textDim }}>·</span>
           <span style={{ fontSize: 10, color: C.textMuted }}>🔍 Web search</span>
           <span style={{ fontSize: 10, color: C.textDim }}>·</span>
           <span style={{ fontSize: 10, color: C.textMuted }}>🌤 Weather</span>
+          <span style={{ fontSize: 10, color: C.textDim }}>·</span>
+          <span style={{ fontSize: 10, color: C.textMuted }}>🧠 SuperMemory</span>
         </div>
       </Card>
 
@@ -371,89 +373,104 @@ function Diagram() {
       </text>
 
       {/* Evals */}
-      <Card x={24} y={376} w={222} h={120}>
+      <Card x={24} y={376} w={185} h={120}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 18 }}>🧪</span>
           <div>
             <Label color={C.rose}>Quality</Label>
-            <Title size={13}>Daily Evals</Title>
+            <Title size={12}>Daily Evals</Title>
           </div>
         </div>
-        <div style={{ marginTop: 8 }}>
-          <Sub>• 40 tests at 4am UTC</Sub>
+        <div style={{ marginTop: 6 }}>
+          <Sub>• 69 tests at 4am UTC</Sub>
           <Sub>• LLM-as-judge scoring</Sub>
-          <Sub>• Eval dashboard (GitHub Pages)</Sub>
+          <Sub>• Router + injection tests</Sub>
+          <Sub>• Dashboard (GH Pages)</Sub>
         </div>
       </Card>
 
-      {/* Retry Pipeline */}
-      <Card x={262} y={376} w={222} h={120}>
+      {/* Auto-Recovery */}
+      <Card x={219} y={376} w={185} h={120}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 18 }}>🔄</span>
           <div>
             <Label color={C.blue}>Resilience</Label>
-            <Title size={13}>Smart Retry</Title>
+            <Title size={12}>Auto-Recovery</Title>
           </div>
         </div>
-        <div style={{ marginTop: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-            <Tag color={C.blue}>MiniMax</Tag>
-            <span style={{ color: C.textDim, fontSize: 10 }}>→</span>
-            <Tag color={C.purple}>Haiku</Tag>
-            <span style={{ color: C.textDim, fontSize: 10 }}>→</span>
-            <Tag color={C.amber}>Sonnet</Tag>
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <Sub>97.5% projected success rate</Sub>
-          </div>
+        <div style={{ marginTop: 6 }}>
+          <Sub>• 5 failure mode playbooks</Sub>
+          <Sub>• Graceful shutdown wrapper</Sub>
+          <Sub>• Model fallback chain</Sub>
+          <Sub>• 15-min health checks</Sub>
         </div>
       </Card>
 
-      {/* Cost */}
-      <Card x={500} y={376} w={170} h={120}>
+      {/* Observability */}
+      <Card x={414} y={376} w={185} h={120}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18 }}>💰</span>
+          <span style={{ fontSize: 18 }}>📊</span>
           <div>
-            <Label color={C.green}>Cost</Label>
-            <Title size={13}>$0.40/day</Title>
+            <Label color={C.green}>Observability</Label>
+            <Title size={12}>Monitoring</Title>
           </div>
         </div>
-        <div style={{ marginTop: 8 }}>
-          <Sub>• MiniMax plan: $9.99/mo</Sub>
-          <Sub>• Hetzner VPS: €6/mo</Sub>
-          <Sub>• Claude API: usage-based</Sub>
-        </div>
-      </Card>
-
-      {/* Health */}
-      <Card x={686} y={376} w={170} h={120}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18 }}>💓</span>
-          <div>
-            <Label color={C.teal}>Uptime</Label>
-            <Title size={13}>Health Checks</Title>
-          </div>
-        </div>
-        <div style={{ marginTop: 8 }}>
-          <Sub>• Every 15 minutes</Sub>
-          <Sub>• Auto-restart on failure</Sub>
+        <div style={{ marginTop: 6 }}>
+          <Sub>• Status dashboard (/status)</Sub>
+          <Sub>• Structured JSON logging</Sub>
+          <Sub>• Daily cost tracker</Sub>
           <Sub>• Telegram alerts</Sub>
         </div>
       </Card>
 
-      {/* Backups */}
-      <Card x={872} y={376} w={303} h={120}>
+      {/* Security */}
+      <Card x={609} y={376} w={185} h={120}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 18 }}>🔒</span>
           <div>
-            <Label color={C.accent}>Persistence</Label>
-            <Title size={13}>Backups & Sync</Title>
+            <Label color={C.amber}>Security</Label>
+            <Title size={12}>Hardened</Title>
           </div>
         </div>
-        <div style={{ marginTop: 8 }}>
-          <Sub>• Daily automated backups</Sub>
-          <Sub>• GitHub bidirectional sync</Sub>
-          <Sub>• Self-edit: code → commit → deploy</Sub>
+        <div style={{ marginTop: 6 }}>
+          <Sub>• TLS via Caddy</Sub>
+          <Sub>• UFW firewall</Sub>
+          <Sub>• Auto security updates</Sub>
+          <Sub>• Secret rotation script</Sub>
+        </div>
+      </Card>
+
+      {/* CI + Backups */}
+      <Card x={804} y={376} w={185} h={120}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>⚙️</span>
+          <div>
+            <Label color={C.teal}>CI/CD</Label>
+            <Title size={12}>Pipeline</Title>
+          </div>
+        </div>
+        <div style={{ marginTop: 6 }}>
+          <Sub>• PR validation + lint</Sub>
+          <Sub>• Router tests on push</Sub>
+          <Sub>• Secret scanning</Sub>
+          <Sub>• Auto dev log to Notion</Sub>
+        </div>
+      </Card>
+
+      {/* Backup & Sync */}
+      <Card x={999} y={376} w={175} h={120}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18 }}>💾</span>
+          <div>
+            <Label color={C.accent}>Persistence</Label>
+            <Title size={12}>Backup & Sync</Title>
+          </div>
+        </div>
+        <div style={{ marginTop: 6 }}>
+          <Sub>• Daily backups (3am)</Sub>
+          <Sub>• GitHub sync (5 min)</Sub>
+          <Sub>• Self-edit → deploy</Sub>
+          <Sub>• Non-root containers</Sub>
         </div>
       </Card>
 
@@ -492,7 +509,7 @@ function Diagram() {
 
       {/* Tiny footer text */}
       <text x={600} y={620} textAnchor="middle" fill={C.textDim} fontSize={10} fontFamily="Inter, sans-serif">
-        Lyra AI · v3 Architecture · March 2026
+        Lyra AI · v4 Architecture · March 2026
       </text>
     </svg>
   );

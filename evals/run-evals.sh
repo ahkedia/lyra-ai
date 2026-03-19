@@ -140,6 +140,34 @@ Run: $(date -u '+%Y-%m-%d %H:%M UTC')" > /dev/null 2>&1
   fi
 fi
 
+# Step 6: Infrastructure checks (always run — free)
+echo ""
+echo "Step 6: Infrastructure checks..."
+
+# 6a: Run recovery check (diagnose only, no auto-fix during eval)
+if [ -x /root/lyra-ai/scripts/lyra-recovery.sh ]; then
+  RECOVERY_ISSUES=$(/root/lyra-ai/scripts/lyra-recovery.sh --check 2>&1 | grep -c "\[ISSUE\]" || echo "0")
+  if [ "$RECOVERY_ISSUES" -gt 0 ]; then
+    echo "  ⚠️ $RECOVERY_ISSUES infrastructure issue(s) detected — running auto-fix"
+    /root/lyra-ai/scripts/lyra-recovery.sh --fix 2>&1 | tail -5
+  else
+    echo "  ✓ All infrastructure healthy"
+  fi
+fi
+
+# 6b: Refresh status dashboard
+if [ -x /root/lyra-ai/scripts/lyra-status.sh ]; then
+  /root/lyra-ai/scripts/lyra-status.sh 2>&1 | tail -1
+  echo "  ✓ Status dashboard updated"
+fi
+
+# Step 7: Cost report (on full eval days)
+if [ "$IS_FULL_EVAL_DAY" = true ] && [ -x /root/lyra-ai/scripts/cost-tracker.sh ]; then
+  echo ""
+  echo "Step 7: Cost report..."
+  /root/lyra-ai/scripts/cost-tracker.sh --telegram 2>&1
+fi
+
 echo ""
 if [ "$IS_FULL_EVAL_DAY" = true ]; then
   echo "=== Eval suite complete (full run) ==="

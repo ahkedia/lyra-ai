@@ -16,17 +16,49 @@
     "fallback": "Claude Haiku 4.5",
     "escalation": "Claude Sonnet 4.6"
   },
-  "channels": [
-    "Telegram"
-  ],
+  "routing": {
+    "categories": 20,
+    "test_cases": 69,
+    "classifier": "rule-based + LLM fallback",
+    "accuracy": "100%"
+  },
+  "channels": ["Telegram"],
   "databases": {
     "count": 13,
     "engine": "Notion API"
   },
+  "integrations": [
+    "Gmail (himalaya CLI)",
+    "Google Calendar (API v3)",
+    "RSS feeds (blogwatcher)",
+    "Web search (Tavily)",
+    "Weather (wttr.in)",
+    "SuperMemory",
+    "IFTTT (Apple Reminders bridge)"
+  ],
   "cron_jobs": 7,
   "persistence": "PostgreSQL",
-  "monitoring": "15-min health checks + Telegram alerts",
+  "monitoring": {
+    "health_check": "every 15 min",
+    "status_dashboard": "every 5 min",
+    "cost_tracking": "daily at 11pm UTC",
+    "auto_recovery": "5 failure modes"
+  },
+  "security": {
+    "tls": "Caddy (Let's Encrypt)",
+    "firewall": "UFW (SSH + gateway only)",
+    "containers": "non-root user",
+    "auto_updates": "security-only",
+    "secret_rotation": "one-command script",
+    "ci_scanning": "hardcoded secret detection"
+  },
+  "ci": {
+    "pipeline": "GitHub Actions",
+    "checks": ["YAML validation", "token count", "skill frontmatter", "secret scanning", "router tests"],
+    "dev_log": "auto-generated on push"
+  },
   "backup": "Daily at 3am UTC, 7-day retention",
   "sync": "Bidirectional GitHub every 5 min",
-  "monthly_cost": "~18 EUR (VPS + APIs)"
+  "monthly_cost": "~18 EUR (VPS + APIs)",
+  "daily_api_cost": "~$0.03"
 }
