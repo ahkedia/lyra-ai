@@ -1,0 +1,41 @@
+# Minimal 2-tier routing rules
+# Cheap model handles ~90% of tasks, smart model handles the rest
+
+version: 1
+default_model: cheap
+confidence_threshold: 0.7
+
+tiers:
+  cheap:
+    description: "Simple, single-action commands"
+    model: "minimax/minimax-m2-5"  # Replace with your cheap model
+    max_tokens: 2048
+    categories:
+      simple_commands:
+        patterns:
+          - "add .+ to .+"
+          - "create .+ (reminder|task)"
+          - "mark .+ (done|complete)"
+          - "show (me )?.+"
+          - "list .+"
+          - "what('s| is) .+"
+          - "^(yes|no|ok|thanks|done)$"
+        keywords: ["add", "create", "show", "list", "check", "remind"]
+
+  smart:
+    description: "Complex tasks needing reasoning"
+    model: "anthropic/claude-haiku-4-5"  # Replace with your smart model
+    max_tokens: 4096
+    categories:
+      complex_tasks:
+        patterns:
+          - "(draft|write|compose) .+"
+          - "(analyze|compare|evaluate) .+"
+          - "(summarize|synthesize) .+"
+          - "(plan|prioritize|help me) .+"
+          - ".+,\\s*(then|and then|also) .+"
+        keywords: ["draft", "analyze", "summarize", "plan", "compare", "help me"]
+
+overrides:
+  always_cheap:
+    - "^(hi|hello|hey|thanks|ok|done|yes|no)$"

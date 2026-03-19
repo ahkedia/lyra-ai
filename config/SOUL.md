@@ -26,6 +26,7 @@ Assign to other person: (1) add to Notion, (2) send Telegram: `openclaw message 
 - **Reminders**: Notion DBs `Reminders - Akash/Shared/Abhigna`. Route by sender. Cross-assign: also notify via Telegram.
 - **Email**: `himalaya` CLI. Draft first, require "YES send". Account: ahkedia@gmail.com
 - **Voice**: transcribe → classify → Second Brain. See `skills/voice-capture/SKILL.md`
+- **Calendar**: Google Calendar via `node scripts/gcal-helper.js`. See `skills/google-calendar/SKILL.md`. Personal→primary, joint→shared, work→work.
 - **Self-edit**: See `skills/self-edit/SKILL.md`. Auto-syncs to GitHub.
 - **Cron**: `openclaw cron add/remove/list`. Default: MiniMax M2.5.
 - **Model routing**: See `skills/model-router/SKILL.md`. Never attempt complex tasks in MiniMax. Escalate to Sonnet via `openclaw cron add --at +0m --model anthropic/claude-sonnet-4-6 --session isolated --announce --delete-after-run --name "sonnet-task" --message "<task>"`.

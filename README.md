@@ -1,5 +1,7 @@
 # Lyra — A Personal AI Agent for Work, Life, and a Household
 
+![CI](https://github.com/ahkedia/lyra-ai/actions/workflows/ci.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Built with OpenClaw](https://img.shields.io/badge/Built%20with-OpenClaw-blue)
+
 > Built on [OpenClaw](https://openclaw.ai) · Powered by MiniMax M2.5 + Claude · Lives in Telegram · Thinks in Notion · Runs 24/7 on Hetzner
 
 ---
@@ -22,6 +24,7 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 - On Sunday evening, synthesises my week — decisions made, ideas captured, patterns forming
 - Reads and writes to all my Notion databases on command
 - Reads and sends email via Gmail (himalaya CLI with App Password)
+- Manages Google Calendar — create events, check availability, coordinate joint calendar with wife
 - Can update her own memory, rules, and skills — and auto-syncs changes to this GitHub repo
 - Sends a daily activity log at 9pm — what she did today, what crons ran, any issues
 
@@ -50,6 +53,7 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 | Messaging interface | Telegram Bot |
 | Databases | Notion (13 databases) |
 | Email | [himalaya](https://himalaya.cli.rs) CLI (Gmail IMAP/SMTP) |
+| Calendar | Google Calendar API v3 (OAuth2) |
 | News & RSS | [blogwatcher](https://github.com/openclaw-ai/blogwatcher) CLI |
 | Web search | Tavily API |
 | Scheduled tasks | OpenClaw cron (7 jobs, Europe/Berlin timezone) |
@@ -57,7 +61,7 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 | Persistence | systemd service + PostgreSQL (Docker) |
 | Secrets | `~/.openclaw/.env` (chmod 600, excluded from git and backups) |
 | Backup | Daily at 3am UTC — workspace, config, Postgres dump, 7-day retention |
-| Monitoring | Health check every 15 min — gateway, cron failures, disk, memory, Postgres |
+| Monitoring | Health check every 15 min + status dashboard + auto-recovery |
 | Self-edit sync | Bidirectional GitHub sync every 5 min (Lyra pushes self-edits, pulls remote changes) |
 | Reminders bridge | Notion → IFTTT → Pushcut → Apple Reminders on iPhone |
 
@@ -116,6 +120,15 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
        │ Cron failure alerting                    │
        │ Model fallback: MiniMax → Haiku → alert  │
        │ Notion failure: describe intent, retry    │
+       │ Auto-recovery playbook (5 failure modes)  │
+       │ Status dashboard (updates every 5 min)    │
+       │ Daily cost tracking + Telegram reports    │
+       │ Structured JSON logging + log rotation    │
+       │ Graceful gateway shutdown wrapper          │
+       │ Secret rotation script                     │
+       │ Automatic security updates                 │
+       │ TLS via Caddy (Let's Encrypt)             │
+       │ CI pipeline (lint, routing eval, secrets)  │
        └─────────────────────────────────────────┘
 ```
 
@@ -202,16 +215,27 @@ lyra-ai/
 │   ├── deploy-lyra.sh                ← bidirectional GitHub sync
 │   ├── lyra-backup.sh                ← daily backup with retention
 │   ├── lyra-health-check.sh          ← 15-min monitoring + alerting
+│   ├── lyra-logger.sh                ← structured JSON logging
+│   ├── lyra-status.sh                ← status dashboard generator
+│   ├── lyra-recovery.sh              ← auto-recovery playbook
+│   ├── cost-tracker.sh               ← daily cost tracking
+│   ├── openclaw-wrapper.sh           ← graceful gateway shutdown
+│   ├── rotate-secret.sh              ← secret rotation utility
+│   ├── setup-auto-updates.sh         ← security auto-updates
+│   ├── model-router.js               ← 3-tier message classifier
+│   ├── gcal-auth.js                  ← Google Calendar OAuth2
+│   ├── gcal-helper.js                ← Google Calendar CLI
 │   └── openclaw.service              ← systemd service definition
 ├── skills/
 │   ├── notion/SKILL.md               ← Notion API patterns
 │   ├── himalaya/SKILL.md             ← email read/write
+│   ├── google-calendar/SKILL.md      ← Google Calendar integration
 │   ├── blogwatcher/SKILL.md          ← RSS feed monitoring
 │   ├── weather/SKILL.md              ← weather via wttr.in
 │   ├── self-edit/SKILL.md            ← Lyra editing her own files
 │   ├── voice-capture/SKILL.md        ← voice → Second Brain pipeline
-│   ├── apple-calendar/SKILL.md       ← (legacy, Mac-only)
-│   └── apple-reminders/SKILL.md      ← (legacy, replaced by Notion reminders)
+│   ├── model-router/SKILL.md         ← 3-tier routing logic
+│   └── _template/SKILL.md            ← template for new skills
 ├── notion/
 │   ├── notion.md                     ← live database IDs (auto-synced)
 │   └── database-schemas.md           ← all 13 database structures
@@ -284,9 +308,21 @@ openclaw cron add --name "morning-digest" --cron "0 7 * * *" --tz "Europe/Berlin
 
 ---
 
-## Adapting for your own use
+## Fork & Build Your Own
 
-This repo is designed to be forked. All personal information has been replaced with `[PLACEHOLDER]` values in the template files.
+Want to build your own personal AI agent? Start with the minimal template:
+
+```bash
+cp -r templates/minimal-agent/ ~/my-agent/
+cd ~/my-agent/
+# Edit config/SOUL.md with your personality
+# Edit .env with your API keys
+# Deploy: openclaw gateway
+```
+
+The template gives you a 2-tier model router, one example skill, and 5 starter eval cases. See [`templates/minimal-agent/README.md`](templates/minimal-agent/README.md) for the full guide.
+
+For a full fork with all features:
 
 1. Fork the repo
 2. Fill in `config/SOUL-template.md` with your personality, rules, and access levels
@@ -295,6 +331,10 @@ This repo is designed to be forked. All personal information has been replaced w
 5. Create your Notion databases using the schemas in `notion/database-schemas.md`
 6. Set up your cron jobs for the heartbeats you want
 7. Deploy to your VPS
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to add skills, eval cases, and routing patterns.
 
 ---
 

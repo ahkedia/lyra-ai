@@ -70,6 +70,19 @@ tiers:
           - "What's the weather in Berlin?"
           - "Will it rain tomorrow?"
 
+      calendar_read:
+        patterns:
+          - "what('s| is| are) (on |in )?(my |the )?(calendar|schedule|agenda)"
+          - "(any |what )?(meetings?|events?|calls?) (today|tomorrow|this week)"
+          - "when (is|does) (my |the )?(next |upcoming )?(meeting|event|call)"
+          - "am I free .+"
+          - "what do I have .+(today|tomorrow|this week)"
+        keywords: ["calendar", "schedule", "meetings today", "agenda", "next meeting", "what's on my calendar", "am I free"]
+        examples:
+          - "What's on my calendar today?"
+          - "Any meetings tomorrow?"
+          - "When is my next call?"
+
       quick_lookup:
         patterns:
           - "what time .+"
@@ -136,6 +149,18 @@ tiers:
         examples:
           - "Draft a reply to the recruiter about the timeline"
           - "Write an email declining the meeting"
+
+      calendar_write:
+        patterns:
+          - "(schedule|book|create|add|block) .*(meeting|event|call|time|slot|calendar)"
+          - "(block|reserve) .*(time|hour|slot) .+"
+          - "(move|reschedule|cancel|delete) .*(meeting|event|call)"
+          - "put .+ on .*(calendar|schedule)"
+        keywords: ["schedule meeting", "book", "block time", "create event", "add to calendar", "reschedule", "cancel meeting"]
+        examples:
+          - "Schedule a meeting with the team at 3pm"
+          - "Block 2 hours for deep work tomorrow morning"
+          - "Cancel my 4pm call"
 
       web_search:
         patterns:

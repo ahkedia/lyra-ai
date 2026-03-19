@@ -1,0 +1,18 @@
+# Starter eval cases - add your own!
+# Run: node scripts/model-router.js --test
+
+cases:
+  - message: "Add milk to the shopping list"
+    expected_tier: cheap
+
+  - message: "What's on my task list?"
+    expected_tier: cheap
+
+  - message: "Thanks!"
+    expected_tier: cheap
+
+  - message: "Draft a reply to the recruiter about the timeline"
+    expected_tier: smart
+
+  - message: "Analyze the pros and cons of switching jobs"
+    expected_tier: smart
