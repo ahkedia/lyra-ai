@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate YAML configs
+        run: |
+          node -e "
+            import YAML from 'yaml';
+            import { readFileSync } from 'fs';
+            const files = ['config/routing-rules.yaml'];
+            for (const f of files) {
+              try {
+                YAML.parse(readFileSync(f, 'utf8'));
+                console.log('✓ ' + f);
+              } catch (e) {
+                console.error('✗ ' + f + ': ' + e.message);
+                process.exit(1);
+              }
+            }
+          "
+
+      - name: Check SOUL.md token count
+        run: |
+          TOKENS=$(wc -w < config/SOUL.md)
+          echo "SOUL.md: $TOKENS words"
+          if [ "$TOKENS" -gt 700 ]; then
+            echo "FAIL: SOUL.md has $TOKENS words (limit: 700)"
+            exit 1
+          fi
+
+      - name: Check skill frontmatter descriptions
+        run: |
+          node -e "
+            import { readFileSync, readdirSync, statSync } from 'fs';
+            import { join } from 'path';
+            const dir = 'skills';
+            let failed = false;
+            for (const skill of readdirSync(dir)) {
+              const p = join(dir, skill, 'SKILL.md');
+              try {
+                const content = readFileSync(p, 'utf8');
+                const match = content.match(/^---\n[\s\S]*?description:\s*(.+)\n[\s\S]*?---/);
+                if (match) {
+                  const words = match[1].trim().split(/\s+/).length;
+                  if (words > 30) {
+                    console.error('✗ ' + skill + ': description is ' + words + ' words (max 30)');
+                    failed = true;
+                  } else {
+                    console.log('✓ ' + skill + ' (' + words + ' words)');
+                  }
+                }
+              } catch {}
+            }
+            if (failed) process.exit(1);
+          "
+
+      - name: Check for hardcoded secrets
+        run: |
+          FOUND=$(grep -rn --include='*.js' --include='*.sh' --include='*.yml' --include='*.yaml' --include='*.md' \
+            -E '(sk-[a-zA-Z0-9]{20,}|ntn_[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{20,}|xoxb-[0-9]|AKIA[0-9A-Z])' \
+            --exclude-dir=node_modules --exclude-dir=.git . || true)
+          if [ -n "$FOUND" ]; then
+            echo "FAIL: Potential hardcoded secrets found:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✓ No hardcoded secrets detected"
+
+      - name: Validate .env.example has no real values
+        run: |
+          if grep -E '(sk-ant|ntn_|ghp_|[0-9]{10,})' .env.example | grep -v '_here\|XXXXXXXXXX\|123456789\|987654321\|000000'; then
+            echo "FAIL: .env.example may contain real values"
+            exit 1
+          fi
+          echo "✓ .env.example looks clean"
+
+  routing-eval:
+    name: Router Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run router tests
+        run: node scripts/model-router.js --test
