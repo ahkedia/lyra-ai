@@ -55,12 +55,20 @@ CURRENT_CRON=$(crontab -l 2>/dev/null || true)
 CLEANED_CRON=$(echo "$CURRENT_CRON" | grep -v "$CRON_MARKER" | grep -v "$PRECHECK_MARKER" || true)
 
 # 5. Add the eval cron jobs
+STATUS_MARKER="# lyra-status-5min"
+COST_MARKER="# lyra-cost-daily"
+CLEANED_CRON=$(echo "$CLEANED_CRON" | grep -v "$STATUS_MARKER" | grep -v "$COST_MARKER" || true)
+
 NEW_CRON="$CLEANED_CRON
 # --- Lyra Daily Evals ---
 # Pre-check: verify gateway is running 10 min before evals
 50 3 * * * /bin/bash -c 'ss -tlnp | grep -q 18789 || (systemctl restart openclaw 2>/dev/null; sleep 10)' >> $LOG_FILE 2>&1 $PRECHECK_MARKER
-# Main eval run: daily at 4 AM UTC
-0 4 * * * /bin/bash -c 'echo \"=== Eval Run: \$(date -u) ===\" >> $LOG_FILE && cd /root/lyra-ai/evals && bash run-evals.sh >> $LOG_FILE 2>&1' $CRON_MARKER"
+# Main eval run: daily at 4 AM UTC (includes infra checks, recovery, status refresh)
+0 4 * * * /bin/bash -c 'echo \"=== Eval Run: \$(date -u) ===\" >> $LOG_FILE && cd /root/lyra-ai/evals && bash run-evals.sh >> $LOG_FILE 2>&1' $CRON_MARKER
+# Status dashboard: refresh every 5 minutes
+*/5 * * * * /bin/bash /root/lyra-ai/scripts/lyra-status.sh >> /var/log/lyra/health.log 2>&1 $STATUS_MARKER
+# Cost report: daily at 11 PM UTC
+0 23 * * * /bin/bash /root/lyra-ai/scripts/cost-tracker.sh --telegram >> /var/log/lyra/evals.log 2>&1 $COST_MARKER"
 
 # Remove leading/trailing blank lines
 NEW_CRON=$(echo "$NEW_CRON" | sed '/^$/N;/^\n$/d')
@@ -68,7 +76,9 @@ NEW_CRON=$(echo "$NEW_CRON" | sed '/^$/N;/^\n$/d')
 echo "$NEW_CRON" | crontab -
 echo "✅ Cron jobs installed:"
 echo "   - 3:50 AM UTC: Gateway pre-check"
-echo "   - 4:00 AM UTC: Full eval suite (run-evals.sh)"
+echo "   - 4:00 AM UTC: Full eval suite (run-evals.sh) + infra checks"
+echo "   - */5 min:     Status dashboard refresh"
+echo "   - 11:00 PM UTC: Daily cost report"
 
 # 6. Verify cron daemon is running
 if command -v systemctl &>/dev/null; then
