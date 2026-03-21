@@ -144,7 +144,7 @@ Every database has two IDs. Use the right one depending on what you're doing:
 
 ### Reminders - Akash
 - **database_id:** `95e1d0de-496f-478e-9fe4-2e2a356c7970`
-- **data_source_id:** `c80025d7-782d-4159-a10d-74bd9aa622ef`
+- **data_source_id:** `32678008-9100-8171-8940-000b30243ddd`
 - **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Done (checkbox), List (select: Personal, Work, Health, Finance, Travel, Relocation), Recurrence (select: Once, Daily, Weekly, Monthly), Assigned By (select: Akash, Abhigna, Lyra), Notes (rich_text)
 - **Who can access:** Akash only
 - **Purpose:** Akash's personal reminders and tasks.
