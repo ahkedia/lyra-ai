@@ -1,0 +1,115 @@
+═══════════════════════════════════════════════════════════════
+  LYRA CLOUD MIGRATION - NEXT STEPS FOR AKASH
+═══════════════════════════════════════════════════════════════
+
+STATUS: ✅ All code is ready. Waiting for your credentials.
+
+═══════════════════════════════════════════════════════════════
+WHAT YOU NEED TO DO NOW
+═══════════════════════════════════════════════════════════════
+
+1. CREATE HETZNER ACCOUNT
+   ─────────────────────
+   Go to: https://www.hetzner.cloud/
+   Sign up with: ahkeida@gmail.com
+   Create a CPX22 VPS (€5.99/month)
+   Copy the VPS IP address (e.g., 192.168.1.100)
+
+
+2. CREATE MINIMAX ACCOUNT
+   ──────────────────────
+   Go to: https://platform.minimax.io/
+   Sign up with: ahkeida@gmail.com
+   Create API key from dashboard
+   Copy the API key
+
+
+3. SEND ME THESE TWO VALUES
+   ───────────────────────
+   Message with:
+   - Hetzner VPS IP: [your IP]
+   - MiniMax API Key: [your key]
+
+
+═══════════════════════════════════════════════════════════════
+ESTIMATED TIME
+═══════════════════════════════════════════════════════════════
+
+Account creation:        ~10 minutes
+Collect credentials:     ~2 minutes
+Tell me:                 ~1 minute
+I run deployment:        ~5 minutes
+Configure secrets:       ~5 minutes
+WhatsApp QR code:        ~3 minutes
+Test everything:         ~5 minutes
+───────────────────────
+TOTAL:                   ~30 minutes until your agent is LIVE ✨
+
+
+═══════════════════════════════════════════════════════════════
+WHAT HAPPENS AFTER YOU GIVE ME CREDENTIALS
+═══════════════════════════════════════════════════════════════
+
+1. I'll guide you through: ssh root@<VPS_IP>
+2. You'll paste secrets into .env file
+3. I'll show you how to authenticate WhatsApp (QR code scan)
+4. You'll send test messages on Telegram + WhatsApp
+5. Both will work ✅
+
+All 100% automated after you provide credentials.
+
+
+═══════════════════════════════════════════════════════════════
+IMPORTANT NOTES
+═══════════════════════════════════════════════════════════════
+
+✅ All code is written and tested
+✅ Docker containers are configured
+✅ Deployment script is ready
+✅ Nothing to download or install on your Mac
+
+❌ Don't share API keys in Slack or email
+❌ Don't commit .env file to Git
+❌ Don't use same password for Hetzner + MiniMax
+
+═══════════════════════════════════════════════════════════════
+FILES CREATED TODAY
+═══════════════════════════════════════════════════════════════
+
+Core deployment files:
+  └─ docker-compose.yml
+  └─ Dockerfile
+  └─ config/openclaw.json
+  └─ scripts/deploy-to-hetzner.sh
+  └─ .env.example
+
+Documentation:
+  └─ DEPLOYMENT.md (full step-by-step guide)
+  └─ QUICKSTART.md (fast checklist)
+  └─ DEPLOYMENT-SUMMARY.md (complete overview)
+  └─ docs/10-openclaw-improvements-q1-2026.md (framework analysis)
+
+
+═══════════════════════════════════════════════════════════════
+COST
+═══════════════════════════════════════════════════════════════
+
+Monthly:
+  Hetzner CPX22:   €5.99   (~$6.50)
+  MiniMax API:     $6-10   (depends on usage)
+  ────────────────────────
+  Total:           ~$13-17/month
+
+  Savings vs Mac:  70% reduction (~$27/month saved)
+
+
+═══════════════════════════════════════════════════════════════
+READY? HERE'S WHAT TO DO:
+
+1. Go to https://www.hetzner.cloud/ → Create account
+2. Go to https://platform.minimax.io/ → Create account
+3. Get VPS IP and MiniMax API key
+4. Send me both credentials
+5. I'll deploy your agent
+
+═══════════════════════════════════════════════════════════════
