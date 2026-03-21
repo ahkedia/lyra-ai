@@ -21,6 +21,7 @@ Read `references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b
 - Anthropic spending limit hit March 20, 2026 — router v14 handles gracefully
 
 ## Operational Rules
+- NEVER modify /root/.openclaw/openclaw.json — adding unknown keys crashes the gateway permanently. If you need env vars, they are already in /root/.openclaw/.env and loaded automatically.
 - NEVER use the built-in `web_search` tool — use curl + Tavily
 - NEVER add eval/test crons as OpenClaw crons — use system crontab
 - Environment variables are loaded from `/root/.openclaw/.env` via systemd EnvironmentFile
