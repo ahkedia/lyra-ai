@@ -31,6 +31,7 @@ Read `references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b
 - [2026-03-21] Disabled built-in web_search tool (Brave not configured). Use Tavily curl instead.
 - [2026-03-21] Removed stale "NOT ACCESSIBLE" warnings from notion.md for Reminders-Akash and Recruiter Tracker.
 - [2026-03-21] Fixed notion.md API key pattern: use $NOTION_API_KEY env var, not cat ~/.config/notion/api_key.
+- [2026-03-21] Removed invalid gateway.env key from openclaw.json (crashed gateway). Config sanitizer script now auto-fixes before restarts.
 - [2026-03-21] Router v14 deployed: rate-limit-aware, MiniMax fallback when Anthropic unavailable.
 - [2026-03-21] Systemd: RestartSec=30, StartLimitBurst=5, graceful shutdown wrapper.
 
