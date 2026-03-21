@@ -66,8 +66,8 @@ echo ""
 EVAL_EXIT=0
 if [ "$IS_FULL_EVAL_DAY" = true ]; then
   echo "Step 1: Running full eval tests..."
-  node runner.js "$@"
-  EVAL_EXIT=$?
+  EVAL_EXIT=0
+  node runner.js "$@" || EVAL_EXIT=$?
 
   # Step 2: Aggregate results
   echo ""
@@ -173,4 +173,15 @@ if [ "$IS_FULL_EVAL_DAY" = true ]; then
   echo "=== Eval suite complete (full run) ==="
 else
   echo "=== Eval suite complete (routing-only, next full run tomorrow) ==="
+fi
+
+# Step 6: Kill any leftover eval agent processes
+echo 
+echo Step 6: Cleaning up agent processes...
+STALE_PIDS=$(pgrep -f 'openclaw-agent' 2>/dev/null | head -20)
+if [ -n "$STALE_PIDS" ]; then
+  echo "$STALE_PIDS" | xargs kill -9 2>/dev/null
+  echo "  Killed $(echo "$STALE_PIDS" | wc -w) stale agent processes"
+else
+  echo "  No stale agents found"
 fi

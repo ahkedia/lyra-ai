@@ -58,7 +58,7 @@ function sendToLyra(message, timeoutMs = 30000) {
   try {
     // Escape message for shell
     const escapedMessage = message.replace(/'/g, "'\\''");
-    const cmd = `timeout ${timeoutSec} openclaw agent --agent main -m '${escapedMessage}' --json 2>/dev/null`;
+    const cmd = `timeout --kill-after=5 --signal=KILL ${timeoutSec} openclaw agent --agent main -m '${escapedMessage}' --json 2>/dev/null`;
 
     const startTime = Date.now();
     const output = execSync(cmd, {
