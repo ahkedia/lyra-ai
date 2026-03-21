@@ -24,7 +24,7 @@ echo "ntn_your_key_here" > ~/.config/notion/api_key
 
 All requests need:
 ```bash
-NOTION_KEY=$(cat ~/.config/notion/api_key)
+NOTION_KEY=$NOTION_API_KEY
 curl -X GET "https://api.notion.com/v1/..." \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
