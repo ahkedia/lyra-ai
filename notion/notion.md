@@ -6,9 +6,7 @@ This file is your single reference for all Notion operations. Read it before any
 
 **Use environment variable:** `NOTION_API_KEY` (already set on server)
 
-**Cron Jobs**: Isolated cron sessions don't inherit env vars. For cron jobs needing Notion, either:
-1. Embed the API key directly in curl commands (NOTION_API_KEY value)
-2. Or use a wrapper script that sources the env first
+**Cron Jobs**: Environment variables (including NOTION_API_KEY) are loaded from `/root/.openclaw/.env` via systemd EnvironmentFile. Available in ALL sessions including isolated cron jobs.
 
 **Note:** Notion API uses 32-character IDs (no dashes) for block operations. 36-character IDs (with dashes) are for page URLs only.
 
@@ -27,7 +25,7 @@ This is your home in Akash's Notion. You can:
 
 ### Create a new sub-page inside Lyra Hub
 ```bash
-NOTION_KEY=$(cat ~/.config/notion/api_key)
+NOTION_KEY=$NOTION_API_KEY
 curl -s -X POST "https://api.notion.com/v1/pages" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
@@ -45,7 +43,7 @@ curl -s -X POST "https://api.notion.com/v1/pages" \
 
 ### Create a new database inside Lyra Hub
 ```bash
-NOTION_KEY=$(cat ~/.config/notion/api_key)
+NOTION_KEY=$NOTION_API_KEY
 curl -s -X POST "https://api.notion.com/v1/databases" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
@@ -88,12 +86,11 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Properties:** Update (title), Competitor (select), Update Type (select), Summary (rich_text), Date (date), Source (url), Link (url), Relevance (select), Notes (rich_text)
 - **Who can access:** Akash only
 
-### Recruiter Tracker ⚠️ NOT ACCESSIBLE
+### Recruiter Tracker
 - **database_id:** `31778008910080c09b6fec080955cf00`
 - **data_source_id:** `31778008-9100-8007-8b65-000b2abf7d15`
 - **Properties:** Contact Name (title), Company (rich_text), Status (select), Channel (select), Contact Type (select), Next Action (rich_text), Next Action Date (date), Last Action (rich_text), Notes (rich_text), AI Portfolio Sent (checkbox)
 - **Who can access:** Akash only
-- **Status:** NOT accessible to OpenClaw integration. Need to share with OpenClaw-Lyra in Notion.
 
 ### Content Ideas
 - **database_id:** `27fc8e00643a4b9390f7ce8b9a345c62`
@@ -145,13 +142,12 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Who can access:** Akash only
 - **Purpose:** Long-term thinking capture — voice notes, spontaneous ideas, key decisions, patterns. This is the core of the second brain.
 
-### Reminders - Akash ⚠️ NOT ACCESSIBLE
+### Reminders - Akash
 - **database_id:** `95e1d0de-496f-478e-9fe4-2e2a356c7970`
 - **data_source_id:** `c80025d7-782d-4159-a10d-74bd9aa622ef`
 - **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Done (checkbox), List (select: Personal, Work, Health, Finance, Travel, Relocation), Recurrence (select: Once, Daily, Weekly, Monthly), Assigned By (select: Akash, Abhigna, Lyra), Notes (rich_text)
 - **Who can access:** Akash only
 - **Purpose:** Akash's personal reminders and tasks.
-- **Status:** NOT accessible to OpenClaw integration. Need to share with OpenClaw-Lyra in Notion.
 
 ### Reminders - Shared
 - **database_id:** `2054e39c-3f09-431d-8821-0e6a7513913a`
@@ -173,7 +169,7 @@ Every database has two IDs. Use the right one depending on what you're doing:
 
 ### Create a new entry
 ```bash
-NOTION_KEY=$(cat ~/.config/notion/api_key)
+NOTION_KEY=$NOTION_API_KEY
 curl -s -X POST "https://api.notion.com/v1/pages" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
@@ -190,7 +186,7 @@ curl -s -X POST "https://api.notion.com/v1/pages" \
 
 ### Query / read entries
 ```bash
-NOTION_KEY=$(cat ~/.config/notion/api_key)
+NOTION_KEY=$NOTION_API_KEY
 curl -s -X POST "https://api.notion.com/v1/data_sources/DATA_SOURCE_ID_HERE/query" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
@@ -200,7 +196,7 @@ curl -s -X POST "https://api.notion.com/v1/data_sources/DATA_SOURCE_ID_HERE/quer
 
 ### Update an existing entry (by page_id)
 ```bash
-NOTION_KEY=$(cat ~/.config/notion/api_key)
+NOTION_KEY=$NOTION_API_KEY
 curl -s -X PATCH "https://api.notion.com/v1/pages/PAGE_ID_HERE" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
@@ -210,7 +206,7 @@ curl -s -X PATCH "https://api.notion.com/v1/pages/PAGE_ID_HERE" \
 
 ### Find a page by title (to get its page_id for updating)
 ```bash
-NOTION_KEY=$(cat ~/.config/notion/api_key)
+NOTION_KEY=$NOTION_API_KEY
 curl -s -X POST "https://api.notion.com/v1/data_sources/DATA_SOURCE_ID_HERE/query" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
@@ -227,7 +223,7 @@ curl -s -X POST "https://api.notion.com/v1/data_sources/DATA_SOURCE_ID_HERE/quer
 
 ## Example: Add a recruiter to Recruiter Tracker
 ```bash
-NOTION_KEY=$(cat ~/.config/notion/api_key)
+NOTION_KEY=$NOTION_API_KEY
 curl -s -X POST "https://api.notion.com/v1/pages" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
@@ -247,7 +243,7 @@ curl -s -X POST "https://api.notion.com/v1/pages" \
 ## Example: Mark a relocation task as In Progress
 ```bash
 # Step 1: Find the page_id by searching
-NOTION_KEY=$(cat ~/.config/notion/api_key)
+NOTION_KEY=$NOTION_API_KEY
 curl -s -X POST "https://api.notion.com/v1/data_sources/95a33b1d-4a91-41e4-8082-9aafa3f4f8e1/query" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
