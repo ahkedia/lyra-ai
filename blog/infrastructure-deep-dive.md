@@ -105,6 +105,20 @@ A full Google Calendar integration using the Calendar API v3:
 
 ---
 
+## The Outage That Validated Everything (March 21, 2026)
+
+Three days after building all of this, Lyra went completely dark. Gateway unreachable. No responses. My wife texted me asking why the shopping list wasn't updating.
+
+Root cause: Anthropic hit the spending limit on my account. Blocked until April 1. The router plugin (v13) had no fallback — it forced certain messages to Claude Haiku with no escape hatch. Haiku rejected every request. The error cascaded. The watchdog killed the gateway. Crash loop every 2 minutes.
+
+The fix was router v14: rate-limit-aware routing. It starts with Anthropic disabled, intercepts stderr for rate limit error strings, and falls back everything to MiniMax when Anthropic is unavailable. Auto re-checks every 30 minutes. Five minutes from diagnosis to fix deployed.
+
+The irony: every tool I'd just built — structured logging, auto-recovery, the graceful shutdown wrapper — would have caught this faster if they'd been deployed 24 hours earlier. The outage was the best validation that the infrastructure hardening was worth doing.
+
+**Lesson:** Your AI assistant is only as good as its worst failure mode. Every feature added after the outage was about making failures graceful, not preventing them.
+
+---
+
 ## What's Next
 
 - **Restaurant reservations** — Integrate with OpenTable/Resy APIs as a new skill
