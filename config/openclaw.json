@@ -1,0 +1,129 @@
+{
+  "agents": {
+    "defaults": {
+      "model": "minimax/minimax-m2-5",
+      "workspace": "~/.openclaw/workspace",
+      "compaction": {
+        "mode": "safeguard",
+        "memoryFlush": {}
+      },
+      "maxConcurrent": 2,
+      "subagents": {
+        "maxConcurrent": 4
+      },
+      "memorySearch": {
+        "enabled": true
+      }
+    }
+  },
+  "messages": {
+    "ackReactionScope": "group-mentions"
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "session-memory": { "enabled": true },
+        "boot-md": { "enabled": true },
+        "command-logger": { "enabled": true }
+      }
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "allowlist",
+      "botToken": "${TELEGRAM_BOT_TOKEN}",
+      "groupPolicy": "allowlist",
+      "groupAllowFrom": ["${TELEGRAM_USER_ID}", "${TELEGRAM_PARTNER_ID}"],
+      "allowFrom": ["${TELEGRAM_USER_ID}", "${TELEGRAM_PARTNER_ID}"],
+      "streaming": "off"
+    },
+    "whatsapp": {
+      "enabled": true,
+      "dmPolicy": "allowlist",
+      "evolutionApiUrl": "${EVOLUTION_API_URL}",
+      "allowFrom": ["${WHATSAPP_USER_PHONE}"],
+      "streaming": "off"
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "network",
+    "bind": "0.0.0.0",
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "nodes": {
+      "denyCommands": [
+        "camera.snap",
+        "camera.clip",
+        "screen.record",
+        "contacts.add"
+      ]
+    }
+  },
+  "providers": [
+    {
+      "id": "minimax",
+      "type": "openai-completions",
+      "apiKey": "${MINIMAX_API_KEY}",
+      "baseUrl": "https://api.minimax.io/v1"
+    },
+    {
+      "id": "anthropic",
+      "type": "anthropic-messages",
+      "apiKey": "${ANTHROPIC_API_KEY}",
+      "defaultModel": "claude-3-5-sonnet-20241022"
+    }
+  ],
+  "models": {
+    "primary": "minimax/minimax-m2-5",
+    "fallback": "anthropic/claude-3-5-sonnet-20241022",
+    "synthesis": "anthropic/claude-3-5-sonnet-20241022"
+  },
+  "plugins": {
+    "allow": ["openclaw-supermemory", "telegram", "whatsapp"],
+    "slots": {
+      "memory": "openclaw-supermemory"
+    },
+    "entries": {
+      "telegram": { "enabled": true },
+      "whatsapp": {
+        "enabled": true,
+        "config": {
+          "evolutionApiUrl": "${EVOLUTION_API_URL}"
+        }
+      },
+      "openclaw-supermemory": {
+        "enabled": true,
+        "config": {
+          "apiKey": "${SUPERMEMORY_API_KEY}",
+          "containerTag": "lyra_akash",
+          "autoRecall": true,
+          "autoCapture": true,
+          "maxRecallResults": 5,
+          "profileFrequency": 50,
+          "captureMode": "all",
+          "debug": false,
+          "enableCustomContainerTags": true,
+          "customContainers": [
+            { "tag": "work", "description": "Work memories: professional role, competitors, content strategy, job-related decisions" },
+            { "tag": "household", "description": "Shared household memories: trips, meals, health, shopping, joint decisions with partner" },
+            { "tag": "second-brain", "description": "Ideas, insights, decisions, patterns captured from voice and conversation" }
+          ],
+          "customContainerInstructions": "When the message is from the primary user about work topics — use 'work'. For household/shared topics — use 'household'. For insights/ideas/decisions — use 'second-brain'. When the message is from the partner — use 'household' only. Never mix containers."
+        }
+      }
+    }
+  }
+}
