@@ -5,24 +5,25 @@
  *
  * Triggered by GitHub Actions on every push to main.
  * 1. Reads git commit messages from the push
- * 2. Calls Claude to write a dev-log-style summary
+ * 2. Tries Claude to write a dev-log-style summary (falls back to commit-based entry)
  * 3. Appends it to the Lyra Dev Log Notion page
  *
  * Required env vars:
- *   ANTHROPIC_API_KEY - Claude API key
  *   NOTION_API_KEY    - Notion integration token
  *   NOTION_DEVLOG_PAGE_ID - The Notion page ID for the dev log
+ *
+ * Optional env vars:
+ *   ANTHROPIC_API_KEY - Claude API key (if available, generates richer entries)
  */
 
 import { execSync } from 'child_process';
-import Anthropic from '@anthropic-ai/sdk';
 
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 const NOTION_DEVLOG_PAGE_ID = process.env.NOTION_DEVLOG_PAGE_ID;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
-if (!NOTION_API_KEY || !NOTION_DEVLOG_PAGE_ID || !ANTHROPIC_API_KEY) {
-  console.error('Missing required env vars: ANTHROPIC_API_KEY, NOTION_API_KEY, NOTION_DEVLOG_PAGE_ID');
+if (!NOTION_API_KEY || !NOTION_DEVLOG_PAGE_ID) {
+  console.error('Missing required env vars: NOTION_API_KEY, NOTION_DEVLOG_PAGE_ID');
   process.exit(1);
 }
 
@@ -97,26 +98,50 @@ async function getCommitInfo() {
 }
 
 async function generateDevLogEntry(commitInfo) {
+  // Try Claude first, fall back to commit-based entry
+  if (ANTHROPIC_API_KEY) {
+    try {
+      const entry = await generateWithClaude(commitInfo);
+      if (entry) return entry;
+    } catch (err) {
+      console.log(`Claude unavailable (${err.message}), using commit-based entry`);
+    }
+  } else {
+    console.log('No ANTHROPIC_API_KEY set, using commit-based entry');
+  }
+
+  // Fallback: generate entry from commit messages directly
+  return generateFromCommits(commitInfo);
+}
+
+function generateFromCommits(commitInfo) {
+  const commits = commitInfo.commitMessages;
+  if (commits.length === 1) {
+    return commits[0].replace(/^(Add|Fix|Update|Improve|Refactor) /, (_, verb) => {
+      const openers = { Add: 'Added ', Fix: 'Fixed ', Update: 'Updated ', Improve: 'Improved ', Refactor: 'Refactored ' };
+      return openers[verb] || `${verb}ed `;
+    }) + `. [${commitInfo.filesChanged.length} file(s) changed]`;
+  }
+  const summary = commits.map(c => c.split('\n')[0]).join('; ');
+  return `${commits.length} changes shipped: ${summary}. [${commitInfo.filesChanged.length} file(s) changed]`;
+}
+
+async function generateWithClaude(commitInfo) {
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
   const systemPrompt = `You are writing a dev log entry for Akash Kedia's personal AI project called "Lyra."
 
 Lyra is a personal AI assistant built on OpenClaw that manages Akash's work life (news digests, competitor tracking, job search, content drafting) and household (shared reminders with wife Abhigna, health tracking, meal planning, trips). It runs on a Hetzner VPS, uses Telegram as interface, Notion as the database, and has a full eval system with a public dashboard.
 
-Write in Akash's voice — first person, conversational, like a builder's log. Think of it as a mix between:
-- A personal engineering blog (like Omar Knill's or Nikunj Kothari's — real talk, not corporate)
-- A ship log — what changed, why it matters, what you learned
+Write in Akash's voice — first person, conversational, like a builder's log.
 
 Rules:
 - 2-4 sentences max. Punchy, not verbose.
-- Start with a casual opener like "Shipped something neat today —", "Quick update:", "Been iterating on...", "So here's the thing —", "Small but important fix:"
+- Start with a casual opener like "Shipped something neat today —", "Quick update:", "Been iterating on..."
 - Mention what changed AND why it matters (the "so what")
 - Use 1 emoji max, at the end if at all
-- Don't use bullet points — this is a paragraph, not a changelog
-- Don't mention specific file paths or code details
-- Don't say "I" too much — vary sentence structure
-- If the changes are boring (config, deps), make the log about the broader goal they serve
-- If changes span multiple areas, pick the most interesting narrative thread`;
+- Don't use bullet points or mention specific file paths`;
 
   const userMessage = `Here are the commits from this push:
 
