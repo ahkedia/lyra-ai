@@ -11,8 +11,18 @@ Read `references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b
 - Use Tavily API via curl commands — see `references/web_search.md`
 - `$TAVILY_API_KEY` env var is available in all sessions
 
-## Schedules
-7am: morning digest | noon: content reminder | 9pm: daily activity log | Mon 9am: health check | Sun 9am: job review | Sun 6pm: competitor digest | Sun 8pm: brain brief
+
+## Cron Schedule (updated 2026-03-22)
+Infrastructure crons:
+- deploy-lyra.sh: Every 30 minutes (was 5 min) — syncs GitHub changes and Lyra self-edits
+- lyra-health-check.sh: Every 15 minutes — gateway health, memory, disk, agent cleanup
+- lyra-backup.sh: Daily 3am — workspace + config backup (7-day retention)
+- eval-precheck: Daily 3:50am — verify gateway before 4am eval run
+- eval-runner: Daily 4am — routing eval daily, full evals on odd days only
+
+Log rotation: Enabled for all /tmp/lyra-*.log and /var/log/lyra-evals.log (daily, 7-day retention, compressed)
+
+Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not infrastructure)
 
 ## Model Routing
 - Default: MiniMax M2.5 (all crons + DMs)
