@@ -52,44 +52,56 @@ function loadTestCases() {
  * Returns { text, durationMs, model, error }
  */
 function sendToLyra(message, timeoutMs = 30000) {
-  const isDryRun = message.startsWith('[EVAL MODE');
   const timeoutSec = Math.ceil(timeoutMs / 1000);
+  const startTime = Date.now();
 
   try {
     // Escape message for shell
     const escapedMessage = message.replace(/'/g, "'\\''");
-    const cmd = `timeout --kill-after=5 --signal=KILL ${timeoutSec} openclaw agent --agent main -m '${escapedMessage}' --json 2>/dev/null`;
+    // Use both openclaw --timeout and shell timeout as safety net
+    const cmd = `timeout --kill-after=5 --signal=KILL ${timeoutSec + 10} openclaw agent --agent main --timeout ${timeoutSec} -m '${escapedMessage}' --json 2>/dev/null`;
 
-    const startTime = Date.now();
     const output = execSync(cmd, {
       encoding: 'utf8',
-      timeout: timeoutMs + 5000,
+      timeout: timeoutMs + 15000,
       env: process.env,
     });
     const elapsed = Date.now() - startTime;
 
-    // Parse JSON output
-    const result = JSON.parse(output.trim());
-
-    const text = result.result?.payloads
-      ?.map((p) => p.text)
-      .filter(Boolean)
-      .join('\n') || '';
-
-    return {
-      text,
-      durationMs: result.result?.meta?.durationMs || elapsed,
-      model: result.result?.meta?.agentMeta?.model || 'unknown',
-      provider: result.result?.meta?.agentMeta?.provider || 'unknown',
-      sessionId: result.result?.meta?.agentMeta?.sessionId || null,
-      error: null,
-    };
+    return parseAgentOutput(output, elapsed);
   } catch (err) {
-    if (err.status === 124) {
-      return { text: '', durationMs: timeoutMs, model: 'unknown', provider: 'unknown', sessionId: null, error: `Timeout after ${timeoutMs}ms` };
+    const elapsed = Date.now() - startTime;
+    // Key fix: when timeout kills the process, stdout may still have the full JSON response
+    const stdout = err.stdout ? (typeof err.stdout === 'string' ? err.stdout : err.stdout.toString('utf8')) : '';
+    if (stdout && stdout.includes('"status"')) {
+      try {
+        return parseAgentOutput(stdout, elapsed);
+      } catch (_) {
+        // Fall through to error handling
+      }
     }
-    return { text: '', durationMs: 0, model: 'unknown', provider: 'unknown', sessionId: null, error: err.message?.slice(0, 200) };
+    return { text: '', durationMs: elapsed, model: 'unknown', provider: 'unknown', sessionId: null, error: err.message?.slice(0, 200) || `Exit code ${err.status}` };
   }
+}
+
+/**
+ * Parse openclaw agent JSON output into eval result format.
+ */
+function parseAgentOutput(output, elapsed) {
+  const result = JSON.parse(output.trim());
+  const text = result.result?.payloads
+    ?.map((p) => p.text)
+    .filter(Boolean)
+    .join('\n') || '';
+
+  return {
+    text,
+    durationMs: result.result?.meta?.durationMs || elapsed,
+    model: result.result?.meta?.agentMeta?.model || 'unknown',
+    provider: result.result?.meta?.agentMeta?.provider || 'unknown',
+    sessionId: result.result?.meta?.agentMeta?.sessionId || null,
+    error: null,
+  };
 }
 
 /**

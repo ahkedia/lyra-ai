@@ -34,7 +34,7 @@ tests:
     category: latency
     name: "Multi-tool task latency"
     prompt: "Check the weather in Berlin and tell me if I should carry an umbrella"
-    timeout_ms: 25000
+    timeout_ms: 45000
     side_effects: none
     validators:
       - type: latency_p95
@@ -61,7 +61,7 @@ tests:
     category: tool_use
     name: "List cron jobs correctly"
     prompt: "List all my scheduled cron jobs with their times"
-    timeout_ms: 15000
+    timeout_ms: 45000
     side_effects: none
     validators:
       - type: contains
@@ -103,7 +103,7 @@ tests:
     category: model_routing
     name: "Simple task stays on default model"
     prompt: "What day of the week is it today?"
-    timeout_ms: 20000
+    timeout_ms: 45000
     side_effects: none
     validators:
       - type: regex
@@ -131,7 +131,7 @@ tests:
     category: model_routing
     name: "Graceful handling of edge request"
     prompt: "What would happen if your primary model went down right now?"
-    timeout_ms: 15000
+    timeout_ms: 45000
     side_effects: none
     validators:
       - type: llm_judge

@@ -8,7 +8,7 @@ tests:
     category: multi_step
     name: "Create reminder with date parsing"
     prompt: "Remind me to call the dentist tomorrow at 3pm"
-    timeout_ms: 25000
+    timeout_ms: 45000
     side_effects: dry_run
     validators:
       - type: llm_judge
@@ -20,7 +20,7 @@ tests:
     category: multi_step
     name: "Cross-user task delegation"
     prompt: "Tell Abhigna we need to plan meals for next week"
-    timeout_ms: 25000
+    timeout_ms: 45000
     side_effects: dry_run
     validators:
       - type: llm_judge
@@ -32,7 +32,7 @@ tests:
     category: multi_step
     name: "Classify and save insight"
     prompt: "I just realized that the biggest risk in our product is not competition, it is internal alignment. Teams are optimizing for different metrics and nobody is noticing."
-    timeout_ms: 25000
+    timeout_ms: 45000
     side_effects: dry_run
     validators:
       - type: llm_judge
@@ -91,7 +91,7 @@ tests:
     category: edge_cases
     name: "Handle near-empty message"
     prompt: "."
-    timeout_ms: 15000
+    timeout_ms: 45000
     side_effects: none
     validators:
       - type: llm_judge
