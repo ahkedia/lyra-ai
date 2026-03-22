@@ -38,3 +38,9 @@ Read `references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b
 
 ## Session Log
 [2026-03-21 — Major fixes applied: web search, Notion access, memory persistence, router v14]
+
+## Eval Pipeline Config (updated 2026-03-22)
+- Anthropic API credits are available — use Anthropic (Haiku/Sonnet) for LLM judge evaluations
+- The ANTHROPIC_API_KEY in .env is active and funded
+- All eval runs should use LLM judge validators (requires Anthropic API) going forward
+- DO NOT skip LLM judge due to missing credits — credits are maintained
