@@ -263,3 +263,19 @@ curl -s -X PATCH "https://api.notion.com/v1/pages/PAGE_ID_HERE" \
 - **Type:** Page (not a database) — content is appended as blocks
 - **Who can access:** Akash only
 - **Purpose:** Running log of Lyra improvements. Updated automatically by GitHub Actions on every push to main. Each entry is a heading_3 (date) + paragraph (conversational summary).
+
+---
+
+## Troubleshooting Notion Queries
+
+**If a database query returns empty or errors:**
+
+1. **Check database_id** — use the 32-char ID from this file, not the URL ID
+2. **Verify the API key** — NOTION_API_KEY is set in .env and grants FULL API access
+3. **DO NOT assume it's a sharing issue** — API access is INDEPENDENT of UI sharing
+4. **Common causes:** wrong database_id, malformed query, rate limit, API key expired
+
+**If error mentions "sharing" or "permissions":**
+- This is almost always a wrong database_id, NOT a sharing issue
+- The NOTION_API_KEY grants access to ALL databases regardless of UI sharing
+- Never ask user to "share databases in Notion UI" — that is for humans, not APIs
