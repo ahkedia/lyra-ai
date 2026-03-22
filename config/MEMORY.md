@@ -28,6 +28,13 @@ Read `references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b
 - All env vars (NOTION_API_KEY, TAVILY_API_KEY, etc.) are available in ALL sessions including isolated cron jobs
 - Self-edits auto-sync to GitHub within 5 minutes
 
+## Notion API Access — Critical
+- NOTION_API_KEY in .env grants full access to ALL databases (Second Brain, Recruiter Tracker, Content Ideas, Relocation Tasks, etc.)
+- **DO NOT ask Akash to "share databases" in Notion UI** — that is for human collaborators, not API access
+- API key access is INDEPENDENT of Notion sharing settings — you have access via API even if databases aren't "shared" in the UI
+- All database IDs are documented in references/notion.md — use them directly
+- If a Notion query fails: check error message. DO NOT assume it's a sharing issue. Common causes: wrong database_id, malformed query, API rate limit
+
 ## Persistent Fixes (DO NOT REVERT)
 - [2026-03-21] Disabled built-in web_search tool (Brave not configured). Use Tavily curl instead.
 - [2026-03-21] Removed stale "NOT ACCESSIBLE" warnings from notion.md for Reminders-Akash and Recruiter Tracker.
