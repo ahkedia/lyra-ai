@@ -1,32 +1,32 @@
 {
-  "date": "2026-03-22",
-  "timestamp": "2026-03-22T09:08:29.459Z",
+  "date": "2026-03-23",
+  "timestamp": "2026-03-23T04:43:10.926Z",
   "total_tests": 46,
-  "passed": 14,
-  "failed": 32,
-  "pass_rate": 0.3,
-  "avg_latency_ms": 13023,
-  "p95_latency_ms": 35564,
+  "passed": 35,
+  "failed": 11,
+  "pass_rate": 0.76,
+  "avg_latency_ms": 7802,
+  "p95_latency_ms": 18202,
   "by_tier": {
     "core_capability": {
       "total": 12,
-      "passed": 10,
-      "pass_rate": 0.83
+      "passed": 12,
+      "pass_rate": 1
     },
     "architectural": {
       "total": 10,
-      "passed": 4,
-      "pass_rate": 0.4
+      "passed": 8,
+      "pass_rate": 0.8
     },
     "judgment": {
       "total": 16,
-      "passed": 0,
-      "pass_rate": 0
+      "passed": 12,
+      "pass_rate": 0.75
     },
     "showcase": {
       "total": 8,
-      "passed": 0,
-      "pass_rate": 0
+      "passed": 3,
+      "pass_rate": 0.38
     }
   },
   "by_category": {
@@ -37,13 +37,13 @@
     },
     "instruction_following": {
       "total": 4,
-      "passed": 3,
-      "pass_rate": 0.75
+      "passed": 4,
+      "pass_rate": 1
     },
     "retrieval_quality": {
       "total": 4,
-      "passed": 3,
-      "pass_rate": 0.75
+      "passed": 4,
+      "pass_rate": 1
     },
     "latency": {
       "total": 3,
@@ -52,13 +52,13 @@
     },
     "tool_use": {
       "total": 4,
-      "passed": 1,
-      "pass_rate": 0.25
+      "passed": 4,
+      "pass_rate": 1
     },
     "model_routing": {
       "total": 3,
-      "passed": 1,
-      "pass_rate": 0.33
+      "passed": 2,
+      "pass_rate": 0.67
     },
     "access_control": {
       "total": 3,
@@ -67,18 +67,18 @@
     },
     "safety": {
       "total": 10,
-      "passed": 0,
-      "pass_rate": 0
+      "passed": 9,
+      "pass_rate": 0.9
     },
     "graceful_degradation": {
       "total": 3,
-      "passed": 0,
-      "pass_rate": 0
+      "passed": 3,
+      "pass_rate": 1
     },
     "multi_step": {
       "total": 3,
-      "passed": 0,
-      "pass_rate": 0
+      "passed": 2,
+      "pass_rate": 0.67
     },
     "proactive_quality": {
       "total": 3,
@@ -87,8 +87,8 @@
     },
     "edge_cases": {
       "total": 2,
-      "passed": 0,
-      "pass_rate": 0
+      "passed": 1,
+      "pass_rate": 0.5
     }
   }
 }
