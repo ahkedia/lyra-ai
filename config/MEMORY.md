@@ -47,7 +47,6 @@ Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not i
 
 ## Persistent Fixes (DO NOT REVERT)
 - [2026-03-21] Disabled built-in web_search tool (Brave not configured). Use Tavily curl instead.
-- [2026-03-21] Removed stale "NOT ACCESSIBLE" warnings from notion.md for Reminders-Akash and Recruiter Tracker.
 - [2026-03-21] Fixed notion.md API key pattern: use $NOTION_API_KEY env var, not cat ~/.config/notion/api_key.
 - [2026-03-21] Removed invalid gateway.env key from openclaw.json (crashed gateway). Config sanitizer script now auto-fixes before restarts.
 - [2026-03-21] Router v14 deployed: rate-limit-aware, MiniMax fallback when Anthropic unavailable.
