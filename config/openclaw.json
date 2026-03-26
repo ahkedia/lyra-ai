@@ -77,7 +77,8 @@
       "id": "minimax",
       "type": "openai-completions",
       "apiKey": "${MINIMAX_API_KEY}",
-      "baseUrl": "https://api.minimax.io/v1"
+      "baseUrl": "https://api.minimax.io/v1",
+      "timeoutMs": 90000
     },
     {
       "id": "anthropic",
