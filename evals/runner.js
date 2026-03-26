@@ -104,6 +104,13 @@ function parseAgentOutput(output, elapsed) {
   };
 }
 
+const RATE_LIMIT_PATTERNS = ['rate limit', 'ratelimit', 'too many requests', '429'];
+
+function isRateLimitError(result) {
+  const haystack = ((result.error || '') + ' ' + (result.text || '')).toLowerCase();
+  return RATE_LIMIT_PATTERNS.some((p) => haystack.includes(p));
+}
+
 /**
  * Run a single test case against Lyra.
  */
@@ -122,7 +129,15 @@ async function runTest(testCase) {
     finalPrompt = `[EVAL MODE - DRY RUN] Describe what you WOULD do, including the exact tools and databases you would use, but do NOT execute any write operations. Show the plan without running it.\n\n${prompt}`;
   }
 
-  const result = sendToLyra(finalPrompt, timeout_ms);
+  let result = sendToLyra(finalPrompt, timeout_ms);
+
+  // Rate limit backoff: wait 10 min and retry once if MiniMax rate limits hit
+  if (isRateLimitError(result)) {
+    console.log(`    [rate-limit] MiniMax rate limit detected. Waiting 10 minutes before retry...`);
+    await new Promise((r) => setTimeout(r, 10 * 60 * 1000));
+    console.log(`    [rate-limit] Retrying [${id}]...`);
+    result = sendToLyra(finalPrompt, timeout_ms);
+  }
   const { text: response, durationMs: latencyMs, error } = result;
 
   if (error) {
@@ -234,8 +249,8 @@ async function main() {
       failed++;
     }
 
-    // Delay between tests (3s to avoid Notion rate limits)
-    await new Promise((r) => setTimeout(r, 3000));
+    // Delay between tests (60s to avoid MiniMax rate limits)
+    await new Promise((r) => setTimeout(r, 60000));
   }
 
   // Write results
