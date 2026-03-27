@@ -102,7 +102,7 @@ main() {
 
     # Start the gateway
     log_info "gateway" "Launching openclaw gateway..."
-    /usr/bin/openclaw gateway &
+    /usr/bin/openclaw gateway --allow-unconfigured &
     GATEWAY_PID=$!
     log_info "gateway" "Gateway started." "{\"pid\":$GATEWAY_PID,\"port\":$GATEWAY_PORT}"
 

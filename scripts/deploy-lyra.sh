@@ -32,13 +32,14 @@ for f in SOUL.md MEMORY.md HEARTBEAT.md; do
     fi
 done
 
-# Check skills
+# Check skills (use checksum comparison to avoid false positives from timestamp drift)
 if [ -d "$WORKSPACE/skills" ]; then
     for skill_dir in "$WORKSPACE/skills"/*/; do
         skill_name=$(basename "$skill_dir")
         if [ -d "$REPO_DIR/skills/$skill_name" ]; then
-            if find "$skill_dir" -newer "$REPO_DIR/skills/$skill_name" -name "*.md" | grep -q .; then
-                rsync -a "$skill_dir" "$REPO_DIR/skills/$skill_name/"
+            DIFF=$(rsync -a --checksum --dry-run --itemize-changes "$skill_dir" "$REPO_DIR/skills/$skill_name/" 2>/dev/null | grep -v '^\.' || true)
+            if [ -n "$DIFF" ]; then
+                rsync -a --checksum "$skill_dir" "$REPO_DIR/skills/$skill_name/"
                 git add "skills/$skill_name/"
                 PUSHED=true
                 log "  Local skill edit: $skill_name → pushing to GitHub"
@@ -103,19 +104,35 @@ if [ "$BEFORE" != "$AFTER" ]; then
         fi
     done
 
-    # Restart gateway to pick up changes
-    systemctl restart openclaw 2>/dev/null || {
-        log "WARNING: systemctl restart failed, trying manual restart"
-        pkill -9 -f 'openclaw gateway' 2>/dev/null || true
-        sleep 3
-        systemctl start openclaw
-    }
-    sleep 5
+    # Only restart gateway if code/config changed — not for content-only updates
+    # (SOUL.md, MEMORY.md, skills, notion refs are hot-loaded; no restart needed)
+    RESTART_PATHS="scripts/ plugins/ evals/ config/openclaw.json"
+    NEEDS_RESTART=false
+    for path in $RESTART_PATHS; do
+        if git diff --name-only "$BEFORE" "$AFTER" | grep -q "^$path"; then
+            NEEDS_RESTART=true
+            log "  Restart trigger: $path changed"
+            break
+        fi
+    done
 
-    if curl -s http://localhost:18789/health | grep -q '"ok":true'; then
-        log "Deploy complete. Gateway healthy."
+    if [ "$NEEDS_RESTART" = true ]; then
+        systemctl reset-failed openclaw 2>/dev/null || true
+        systemctl restart openclaw 2>/dev/null || {
+            log "WARNING: systemctl restart failed, trying manual restart"
+            pkill -9 -f 'openclaw gateway' 2>/dev/null || true
+            sleep 3
+            systemctl start openclaw
+        }
+        sleep 10
+
+        if curl -s http://localhost:18789/health | grep -q '"ok":true'; then
+            log "Deploy complete. Gateway healthy."
+        else
+            log "WARNING: Gateway may not be healthy after deploy!"
+        fi
     else
-        log "WARNING: Gateway may not be healthy after deploy!"
+        log "Deploy complete. Content-only changes — gateway restart skipped."
     fi
 
     # Ensure eval cron is installed (idempotent — only installs if missing)
