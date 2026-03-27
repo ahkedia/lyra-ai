@@ -44,16 +44,24 @@ else
 fi
 echo ""
 
-# Health check: is gateway running?
-if ! ss -tlnp | grep -q 18789; then
-  echo "ERROR: OpenClaw gateway not running on port 18789"
-  if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_USER_ID:-}" ]; then
-    curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-      -d "chat_id=${TELEGRAM_USER_ID}" \
-      -d "text=⚠️ Eval runner failed: gateway not running" > /dev/null 2>&1
+# Health check: wait for gateway to be healthy
+MAX_WAIT=120
+WAITED=0
+echo "Waiting for gateway to be healthy..."
+until curl -sf http://localhost:18789/health | grep -q '"ok":true'; do
+  if [ "$WAITED" -ge "$MAX_WAIT" ]; then
+    echo "ERROR: Gateway not healthy after ${MAX_WAIT}s -- aborting evals"
+    if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_USER_ID:-}" ]; then
+      curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+        -d "chat_id=${TELEGRAM_USER_ID}" \
+        -d "text=Eval runner failed: gateway not healthy after ${MAX_WAIT}s" > /dev/null 2>&1
+    fi
+    exit 1
   fi
-  exit 1
-fi
+  sleep 5
+  WAITED=$((WAITED + 5))
+done
+echo "Gateway healthy (waited ${WAITED}s)"
 
 # Step 0: Run routing accuracy eval (ALWAYS — offline, free, no API calls)
 echo "Step 0: Running routing accuracy eval..."
