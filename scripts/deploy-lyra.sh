@@ -18,19 +18,9 @@ cd "$REPO_DIR"
 # ──────────────────────────────────────────────
 PUSHED=false
 
-# Check if any workspace files were edited locally (newer than repo copies)
-for f in SOUL.md MEMORY.md HEARTBEAT.md; do
-    WORKSPACE_FILE="$WORKSPACE/$f"
-    REPO_FILE="$REPO_DIR/config/$f"
-    if [ -f "$WORKSPACE_FILE" ] && [ -f "$REPO_FILE" ]; then
-        if [ "$WORKSPACE_FILE" -nt "$REPO_FILE" ]; then
-            cp "$WORKSPACE_FILE" "$REPO_FILE"
-            git add "config/$f"
-            PUSHED=true
-            log "  Local edit detected: $f → pushing to GitHub"
-        fi
-    fi
-done
+# Memory files (SOUL.md, MEMORY.md, HEARTBEAT.md) are synced separately
+# by the daily memory-backup cron (3 AM) — not every 30 min.
+# Changes take effect on next session start; no restart or immediate sync needed.
 
 # Check skills (use checksum comparison to avoid false positives from timestamp drift)
 if [ -d "$WORKSPACE/skills" ]; then
@@ -134,13 +124,17 @@ if [ "$BEFORE" != "$AFTER" ]; then
             sleep 3
             systemctl start openclaw
         }
-        sleep 10
-
-        if curl -s http://localhost:18789/health | grep -q '"ok":true'; then
-            log "Deploy complete. Gateway healthy."
-        else
-            log "WARNING: Gateway may not be healthy after deploy!"
-        fi
+        MAX_WAIT=120
+        WAITED=0
+        until curl -sf http://localhost:18789/health 2>/dev/null | grep -q ok; do
+            if [ "$WAITED" -ge "$MAX_WAIT" ]; then
+                log "WARNING: Gateway not healthy after ${MAX_WAIT}s!"
+                break
+            fi
+            sleep 5
+            WAITED=$((WAITED + 5))
+        done
+        log "Deploy complete. Gateway healthy (${WAITED}s)."
     else
         log "Deploy complete. Content-only changes — gateway restart skipped."
     fi
