@@ -12,7 +12,7 @@
         "maxConcurrent": 4
       },
       "memorySearch": {
-        "enabled": true
+        "enabled": false
       }
     }
   },
@@ -67,13 +67,42 @@
         "screen.record",
         "contacts.add"
       ]
+    },
+    "remote": {
+      "url": "ws://127.0.0.1:18789"
     }
   },
   "plugins": {
-    "allow": ["telegram", "whatsapp"],
+    "allow": ["telegram", "whatsapp", "memory-core"],
     "entries": {
       "telegram": { "enabled": true },
-      "whatsapp": { "enabled": true }
+      "whatsapp": { "enabled": true },
+      "memory-core": { "enabled": true }
+    },
+    "slots": {
+      "memory": "memory-core"
+    }
+  },
+  "models": {
+    "providers": {
+      "minimax": {
+        "api": "anthropic-messages",
+        "apiKey": "${MINIMAX_API_KEY}",
+        "baseUrl": "https://api.minimax.io/anthropic",
+        "models": [
+          { "id": "MiniMax-M2.7", "name": "MiniMax M2.7", "input": ["text"] },
+          { "id": "MiniMax-M2.5", "name": "MiniMax M2.5", "input": ["text"] }
+        ]
+      },
+      "anthropic": {
+        "api": "anthropic-messages",
+        "apiKey": "${ANTHROPIC_API_KEY}",
+        "baseUrl": "https://api.anthropic.com",
+        "models": [
+          { "id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5", "input": ["text"] },
+          { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "input": ["text"] }
+        ]
+      }
     }
   }
 }
