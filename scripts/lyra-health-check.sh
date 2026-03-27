@@ -33,7 +33,9 @@ else
 
     if [ "$FAIL_COUNT" -eq 1 ] || [ $((FAIL_COUNT % 4)) -eq 0 ]; then
         send_alert "Lyra Health Alert: Gateway unreachable (HTTP $HTTP_CODE). Failure #$FAIL_COUNT. Restarting..."
-        systemctl restart openclaw 2>/dev/null
+        # Reset failed state first so systemd doesn't block restart after StartLimitBurst
+        systemctl reset-failed openclaw 2>/dev/null || true
+        systemctl restart openclaw 2>/dev/null || true
     fi
 fi
 
