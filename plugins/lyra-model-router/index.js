@@ -121,7 +121,7 @@ function patchRunner(runner) {
   }
   runner._lyraPatched = true;
   runner._lyraId = myPatchId;
-  process.stderr.write("[R] Patched #" + myPatchId + "!\n");
+  // process.stderr.write("[R] Patched #" + myPatchId + "!\n");
 }
 
 const HR_KEY = Symbol.for("openclaw.plugins.hook-runner-global-state");
@@ -190,7 +190,8 @@ const plugin = {
   description: "3-tier routing with rate-limit fallback: MiniMax (default) -> Haiku -> Sonnet",
   register(api) {
     api.on("before_model_resolve", (event, ctx) => routeQuery(event, ctx) || {});
-    api.logger.info("[lyra-model-router] v14 registered (Anthropic disabled - rate limited until April 1)");
+    // Registration logged via stderr only to avoid contaminating eval JSON output
+    process.stderr.write("[lyra-model-router] v14 registered\n");
   },
 };
 
