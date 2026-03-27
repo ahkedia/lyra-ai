@@ -24,6 +24,8 @@ if [ -f /root/.openclaw/.env ]; then
   set +a
 fi
 
+export NODE_OPTIONS='--max-old-space-size=384'
+
 # Determine if today is a full eval day (odd days: 1st, 3rd, 5th, ...)
 DAY_OF_MONTH=$(date -u +%-d)
 FORCE_FULL="${1:-}"

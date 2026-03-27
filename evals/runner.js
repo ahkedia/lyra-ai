@@ -249,8 +249,8 @@ async function main() {
       failed++;
     }
 
-    // Delay between tests (60s to avoid MiniMax rate limits)
-    await new Promise((r) => setTimeout(r, 60000));
+    // Delay between tests (10s — MiniMax rate limit buffer + gateway breathing room)
+    await new Promise((r) => setTimeout(r, 10000));
   }
 
   // Write results

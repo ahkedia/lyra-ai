@@ -19,7 +19,7 @@ confidence_threshold: 0.7
 tiers:
   minimax:
     description: "Fast, single-action commands. No reasoning required."
-    model: "minimax/minimax-m2-5"
+    model: "minimax/MiniMax-M2.7"
     max_tokens: 2048
     categories:
       notion_write:

@@ -42,7 +42,7 @@ try {
 
 // Models map
 const MODELS = {
-  minimax: 'minimax/minimax-m2-5',
+  minimax: 'minimax/MiniMax-M2.7',
   haiku: 'anthropic/claude-haiku-4-5',
   sonnet: 'anthropic/claude-sonnet-4-6',
 };
