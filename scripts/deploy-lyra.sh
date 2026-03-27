@@ -96,6 +96,16 @@ if [ "$BEFORE" != "$AFTER" ]; then
         log "  Synced notion references"
     fi
 
+    # Sync router plugin to live location
+    PLUGIN_SRC="$REPO_DIR/plugins/lyra-model-router"
+    PLUGIN_DEST="/root/lyra-model-router"
+    if [ -d "$PLUGIN_SRC" ]; then
+        if ! diff -rq "$PLUGIN_SRC" "$PLUGIN_DEST" > /dev/null 2>&1; then
+            rsync -a "$PLUGIN_SRC/" "$PLUGIN_DEST/"
+            log "  Router plugin synced"
+        fi
+    fi
+
     # Sync workspace markdown files
     for f in SOUL.md MEMORY.md HEARTBEAT.md; do
         if [ -f "$REPO_DIR/config/$f" ]; then
