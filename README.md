@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/ahkedia/lyra-ai/actions/workflows/ci.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Built with OpenClaw](https://img.shields.io/badge/Built%20with-OpenClaw-blue)
 
-> Built on [OpenClaw](https://openclaw.ai) · Powered by MiniMax M2.5 + Claude · Lives in Telegram · Thinks in Notion · Runs 24/7 on Hetzner
+> Built on [OpenClaw](https://openclaw.ai) · Powered by MiniMax M2.7 + Claude · Lives in Telegram · Thinks in Notion · Runs 24/7 on Hetzner
 
 ---
 
@@ -48,14 +48,16 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 | Layer | Tool |
 |-------|------|
 | Agent framework | [OpenClaw](https://openclaw.ai) v2026.3.13 |
-| Default AI model | MiniMax M2.5 (fast, cost-effective) |
-| Escalation models | Claude Haiku 4.5 (fallback) + Claude Sonnet 4.6 (synthesis) |
+| Tier 0 (CRUD bypass) | Python scripts — deterministic ops at $0/call, ~100ms |
+| Default AI model | MiniMax M2.7 (fast, cost-effective — 87% of LLM calls) |
+| Escalation models | Claude Haiku 4.5 (fallback, 9%) + Claude Sonnet 4.6 (synthesis, 4%) |
 | Messaging interface | Telegram Bot |
 | Databases | Notion (13 databases) |
 | Email | [himalaya](https://himalaya.cli.rs) CLI (Gmail IMAP/SMTP) |
 | Calendar | Google Calendar API v3 (OAuth2) |
 | News & RSS | [blogwatcher](https://github.com/openclaw-ai/blogwatcher) CLI |
 | Web search | Tavily API |
+| Memory | SQLite (persistent semantic memory, local) |
 | Scheduled tasks | OpenClaw cron (7 jobs, Europe/Berlin timezone) |
 | Hosting | Hetzner VPS (Ubuntu 24.04, 4GB RAM, €5.99/mo) |
 | Persistence | systemd service + PostgreSQL (Docker) |
@@ -82,11 +84,24 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
               │    (OpenClaw Gateway)   │
               │    Hetzner VPS 24/7     │
               │                         │
-              │  ┌───────┐ ┌─────────┐  │
-              │  │MiniMax│ │ Claude   │  │
-              │  │ M2.5  │ │Haiku/   │  │
-              │  │default│ │Sonnet   │  │
-              │  └───────┘ └─────────┘  │
+              │  ┌─────────────────┐    │
+              │  │ Tier 0: Python  │    │
+              │  │ CRUD bypass     │    │
+              │  │ $0/call ~100ms  │    │
+              │  └────────┬────────┘    │
+              │           │ (LLM calls) │
+              │  ┌────────▼────────┐    │
+              │  │MiniMax M2.7    │    │
+              │  │87% of LLM calls│    │
+              │  └────────┬────────┘    │
+              │  ┌────────▼────────┐    │
+              │  │ Claude Haiku   │    │
+              │  │ 4.5  · 9%      │    │
+              │  └────────┬────────┘    │
+              │  ┌────────▼────────┐    │
+              │  │ Claude Sonnet  │    │
+              │  │ 4.6  · 4%      │    │
+              │  └─────────────────┘    │
               └────────────┬────────────┘
                            │
        ┌───────────────────┼────────────────────┐
@@ -99,7 +114,7 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 │ News       │    │ Sun  reviews  │    │ Tavily (search)  │
 │ Competitors│    │ Sun  brain    │    │ wttr.in (weather)│
 │ Recruiters │    │ Mon  health   │    │ IFTTT (reminders)│
-│ Content    │    │ 9pm  log      │    │                  │
+│ Content    │    │ 9pm  log      │    │ SQLite Memory    │
 │ Health     │    │               │    │                  │
 │ Meals      │    │ All Europe/   │    │                  │
 │ Trips      │    │ Berlin tz     │    │                  │
@@ -118,7 +133,7 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
        │ Daily backup 3am (7-day retention)       │
        │ Bidirectional GitHub sync (5 min)         │
        │ Cron failure alerting                    │
-       │ Model fallback: MiniMax → Haiku → alert  │
+       │ Model fallback: Tier0 → MiniMax → Haiku  │
        │ Notion failure: describe intent, retry    │
        │ Auto-recovery playbook (5 failure modes)  │
        │ Status dashboard (updates every 5 min)    │
@@ -143,9 +158,9 @@ This setup originally ran on my Mac as a LaunchAgent daemon. I migrated it to a 
 - `mlx-whisper` (local transcription) → Planned: OpenAI Whisper API (not yet migrated)
 - `himalaya` (macOS Keychain auth) → `himalaya` (Gmail App Password auth)
 - LaunchAgent → systemd service
-- Local LanceDB + Ollama memory → Disabled (rate limit optimisation; may re-enable with cloud embeddings)
-- Default model: Claude Haiku → MiniMax M2.5 (cost reduction + speed)
-- Added: bidirectional GitHub sync, daily activity log, cron failure alerting, Postgres persistence
+- Local LanceDB + Ollama memory → SQLite Memory (local, persistent, no external dependency)
+- Default model: Claude Haiku → MiniMax M2.7 (cost reduction + speed)
+- Added: Tier 0 Python CRUD bypass ($0/call for deterministic ops), bidirectional GitHub sync, daily activity log, cron failure alerting, Postgres persistence
 
 **What stayed the same:**
 - SOUL.md personality and rules
@@ -161,9 +176,9 @@ See [`blog/building-lyra.md`](blog/building-lyra.md) for the full journey from i
 
 ## What makes this different
 
-**1. Three-tier model routing**
+**1. Four-tier model routing**
 
-MiniMax M2.5 handles 90% of tasks (cheap, fast). Claude Haiku catches MiniMax failures as automatic fallback. Claude Sonnet runs only for synthesis jobs (digests, analysis, complex drafts) via one-shot cron. This keeps the monthly API cost under €10 while maintaining quality where it matters.
+Tier 0 handles deterministic operations (list reminders, mark done, add to shopping list) as Python scripts — $0/call in ~100ms, no LLM involved. Of the remaining LLM calls, MiniMax M2.7 handles 87% (cheap, fast). Claude Haiku 4.5 catches MiniMax failures as automatic fallback (9%). Claude Sonnet 4.6 runs only for synthesis jobs — digests, analysis, complex drafts (4%). Monthly API cost stays under €10 while quality holds where it matters.
 
 **2. Notion as cockpit, not storage**
 
@@ -193,7 +208,8 @@ When MiniMax fails → auto-retry → fall back to Haiku → inform user. When N
 lyra-ai/
 ├── README.md                          ← you are here
 ├── blog/
-│   └── building-lyra.md              ← full write-up of why and how
+│   ├── building-lyra.md              ← full write-up of why and how
+│   └── infrastructure-deep-dive.md   ← engineering deep-dive: production hardening
 ├── docs/
 │   ├── 1-setup.md                    ← prerequisites + full install walkthrough
 │   ├── 2-architecture.md             ← system design decisions
@@ -203,7 +219,7 @@ lyra-ai/
 │   ├── 6-heartbeats.md               ← all scheduled tasks + rationale
 │   ├── 7-security.md                 ← access control + safety model
 │   ├── 8-performance.md              ← token optimisation
-│   └── 9-supermemory.md              ← persistent semantic memory
+│   └── 9-sqlite-memory.md            ← persistent local memory
 ├── config/
 │   ├── openclaw-template.json        ← OpenClaw config (secrets removed)
 │   ├── SOUL-template.md              ← personality + rules template
@@ -222,7 +238,7 @@ lyra-ai/
 │   ├── openclaw-wrapper.sh           ← graceful gateway shutdown
 │   ├── rotate-secret.sh              ← secret rotation utility
 │   ├── setup-auto-updates.sh         ← security auto-updates
-│   ├── model-router.js               ← 3-tier message classifier
+│   ├── model-router.js               ← 4-tier message classifier
 │   ├── gcal-auth.js                  ← Google Calendar OAuth2
 │   ├── gcal-helper.js                ← Google Calendar CLI
 │   └── openclaw.service              ← systemd service definition
@@ -234,7 +250,7 @@ lyra-ai/
 │   ├── weather/SKILL.md              ← weather via wttr.in
 │   ├── self-edit/SKILL.md            ← Lyra editing her own files
 │   ├── voice-capture/SKILL.md        ← voice → Second Brain pipeline
-│   ├── model-router/SKILL.md         ← 3-tier routing logic
+│   ├── model-router/SKILL.md         ← 4-tier routing logic
 │   └── _template/SKILL.md            ← template for new skills
 ├── notion/
 │   ├── notion.md                     ← live database IDs (auto-synced)
@@ -320,7 +336,7 @@ cd ~/my-agent/
 # Deploy: openclaw gateway
 ```
 
-The template gives you a 2-tier model router, one example skill, and 5 starter eval cases. See [`templates/minimal-agent/README.md`](templates/minimal-agent/README.md) for the full guide.
+The template gives you a 4-tier model router (Tier 0 Python CRUD + MiniMax M2.7 + Claude Haiku 4.5 + Claude Sonnet 4.6), one example skill, and 5 starter eval cases. See [`templates/minimal-agent/README.md`](templates/minimal-agent/README.md) for the full guide.
 
 For a full fork with all features:
 
