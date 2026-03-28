@@ -279,3 +279,31 @@ curl -s -X PATCH "https://api.notion.com/v1/pages/PAGE_ID_HERE" \
 - This is almost always a wrong database_id, NOT a sharing issue
 - The NOTION_API_KEY grants access to ALL databases regardless of UI sharing
 - Never ask user to "share databases in Notion UI" — that is for humans, not APIs
+
+### Daily Log (Health Coach)
+- **database_id:** `53f53768-6e94-493a-9508-42cc41973ba5`
+- **data_source_id:** `53f53768-6e94-493a-9508-42cc41973ba5`
+- **Properties:** Date (date), Weight kg (number), Steps (number), Active Calories (number), Sleep Hours (number), Sleep Quality (select: Poor/Fair/Good/Great), Resting Heart Rate (number), Energy Level (select: Low/Medium/High), Workout Done (checkbox), Notes (rich_text), Data Source (select: Apple Health/Manual/Lyra), Logged At (rich_text)
+- **Who can access:** Akash only
+- **Purpose:** One row per day, auto-filled by Apple Health Shortcut or manual Telegram commands
+
+### Food Log (Health Coach)
+- **database_id:** `7072c178-d7f1-42f9-8d76-0acea82a93d2`
+- **data_source_id:** `7072c178-d7f1-42f9-8d76-0acea82a93d2`
+- **Properties:** Date (date), Meal Type (select: Breakfast/Lunch/Dinner/Snack), Description (rich_text), Calories est (number), Protein g (number), Notes (rich_text)
+- **Who can access:** Akash only
+- **Purpose:** One row per meal, logged via Telegram commands
+
+### Workout Log (Health Coach)
+- **database_id:** `e72572d2-f201-4cb1-9460-5b636ba07ad6`
+- **data_source_id:** `e72572d2-f201-4cb1-9460-5b636ba07ad6`
+- **Properties:** Date (date), Type (select: Run/Gym/Cycling/Walk/Yoga/Other), Duration min (number), Exercises (rich_text), Muscle Groups (multi_select), Effort (select: Easy/Moderate/Hard), Calories Burned (number), Notes (rich_text)
+- **Who can access:** Akash only
+- **Purpose:** One row per workout session, logged via Telegram commands
+
+### Progress Snapshots (Health Coach)
+- **database_id:** `eee245a6-f17b-4bc9-ad70-9a79d3be4cb8`
+- **data_source_id:** `eee245a6-f17b-4bc9-ad70-9a79d3be4cb8`
+- **Properties:** Date (date), Weight kg (number), Body Fat pct (number), Waist cm (number), Notes (rich_text), Source (select: Manual/Lab/DXA), Photo (files)
+- **Who can access:** Akash only
+- **Purpose:** Monthly body measurements and lab result snapshots
