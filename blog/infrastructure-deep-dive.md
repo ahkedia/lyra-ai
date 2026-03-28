@@ -1,5 +1,7 @@
 # Turning a Personal AI Agent into Production Infrastructure
 
+*Technical companion to: [I Built My Own Chief of Staff](./building-lyra.md) — engineering deep-dive for builders who want to go further.*
+
 *From "it works on my server" to "this is how you'd build it if it mattered."*
 
 ---
@@ -59,7 +61,7 @@ A full Google Calendar integration using the Calendar API v3:
 - **OAuth2 token manager** (`scripts/gcal-auth.js`) — First run walks you through the OAuth flow and saves the refresh token. Subsequent calls auto-refresh the access token.
 - **CLI helper** (`scripts/gcal-helper.js`) — List events, create events, check free/busy slots, update, delete. All operations output clean JSON for agent parsing.
 - **Smart calendar routing** — Personal events go to the primary calendar. Joint events with my wife go to the shared calendar. Work events go to the work calendar. The agent figures this out from context.
-- **Routing rules** — "What's on my calendar?" routes to MiniMax (cheap, fast read). "Schedule a meeting at 3pm" routes to Haiku (needs reasoning for time/calendar selection).
+- **Routing rules** — "What's on my calendar today?" is a deterministic read — it hits Tier 0 (Python CRUD, $0/call, ~100ms). "What do I have free this week?" routes to MiniMax M2.7 (fast reasoning, cheap). "Schedule a meeting at 3pm with the team" routes to Claude Haiku 4.5 (needs multi-step reasoning for conflict checks and calendar selection).
 
 ### Layer 4: Open-Source Readiness
 
@@ -71,7 +73,7 @@ A full Google Calendar integration using the Calendar API v3:
 
 **Contributing guide** (`CONTRIBUTING.md`) — How to add skills (step-by-step with template), how to add eval cases, how to run tests, PR process, code conventions.
 
-**Fork template** (`templates/minimal-agent/`) — A stripped-down version of Lyra that anyone can deploy in 30 minutes. Includes: 2-tier routing config, one example skill, 5 starter eval cases, and a generic SOUL.md without my personal details.
+**Fork template** (`templates/minimal-agent/`) — A stripped-down version of Lyra that anyone can deploy in 30 minutes. Includes: 4-tier routing config (Tier 0 Python CRUD bypass + MiniMax M2.7 + Claude Haiku 4.5 + Claude Sonnet 4.6), one example skill, 5 starter eval cases, and a generic SOUL.md without my personal details.
 
 **Skill template** (`skills/_template/SKILL.md`) — Copy-paste template for creating new skills. Frontmatter, operations, decision logic, examples, error handling.
 
@@ -83,7 +85,7 @@ A full Google Calendar integration using the Calendar API v3:
 
 **2. Recovery scripts pay for themselves.** The gateway crashed 3 times in two weeks. Each time, the health check detected it within 15 minutes and restarted it. But the recovery script also cleans up stale PIDs, which the health check didn't do — leading to 204 consecutive restart failures one time.
 
-**3. Cost tracking changes behavior.** Before tracking, I assumed Claude Sonnet was expensive. Turns out 96% of my messages hit MiniMax at $0.0001 each. The entire AI layer costs less than a cup of coffee per month. Knowing this made me less anxious about adding features.
+**3. Cost tracking changes behavior.** Before tracking, I assumed Claude Sonnet was expensive. Then I added Tier 0 — a Python CRUD layer that handles deterministic operations (list reminders, mark done, add to shopping list) at $0/call in ~100ms. Of the remaining LLM calls, 87% hit MiniMax M2.7 at $0.0001 each. The entire AI layer costs about $0.03/day. Knowing this made me less anxious about adding features — and it came from the same discipline that made the fallback design rigorous: measure first, then decide.
 
 **4. Fork templates are harder than they look.** The main challenge is separating "my personal context" from "the framework." SOUL.md has my wife's name, my Telegram IDs, my Notion databases. The template needs to be generic but still functional. I solved this by creating a separate `templates/minimal-agent/` with placeholder configs.
 
@@ -111,7 +113,7 @@ Three days after building all of this, Lyra went completely dark. Gateway unreac
 
 Root cause: Anthropic hit the spending limit on my account. Blocked until April 1. The router plugin (v13) had no fallback — it forced certain messages to Claude Haiku with no escape hatch. Haiku rejected every request. The error cascaded. The watchdog killed the gateway. Crash loop every 2 minutes.
 
-The fix was router v14: rate-limit-aware routing. It starts with Anthropic disabled, intercepts stderr for rate limit error strings, and falls back everything to MiniMax when Anthropic is unavailable. Auto re-checks every 30 minutes. Five minutes from diagnosis to fix deployed.
+The fix was router v14: rate-limit-aware routing. It starts with Anthropic disabled, intercepts stderr for rate limit error strings, and falls back everything to MiniMax M2.7 when Anthropic is unavailable. Auto re-checks every 30 minutes. Five minutes from diagnosis to fix deployed.
 
 The irony: every tool I'd just built — structured logging, auto-recovery, the graceful shutdown wrapper — would have caught this faster if they'd been deployed 24 hours earlier. The outage was the best validation that the infrastructure hardening was worth doing.
 
