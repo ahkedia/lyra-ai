@@ -305,3 +305,29 @@ overrides:
     - "synthesize .*(week|month)"
     - "summarize .*(my |the )?(week|month|quarter)"
     - "what pattern"
+
+      health_logging:
+        patterns:
+          - "weight[: ]+[0-9]"
+          - "slept? [0-9]"
+          - "sleep[: ]+[0-9]"
+          - "walked [0-9]+ steps"
+          - "steps[: ]+[0-9]"
+          - "workout[: ]+"
+          - "ran [0-9]+ min"
+          - "cycled [0-9]+ min"
+          - "ate .+ for (breakfast|lunch|dinner|snack)"
+          - "had .+ for (breakfast|lunch|dinner|snack)"
+          - "resting h"
+          - "heart rate"
+          - "energy level"
+          - "body fat"
+          - "monthly check"
+        keywords: ["weight:", "slept", "steps", "workout:", "ran ", "cycled", "calories burned", "resting hr"]
+        examples:
+          - "weight: 91.5"
+          - "slept 7.5 hours"
+          - "workout: run 30"
+          - "ate dal rice for lunch"
+          - "resting HR: 62"
+        skill: "health-coach"
