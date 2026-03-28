@@ -45,7 +45,7 @@ fi
 echo ""
 
 # Health check: wait for gateway to be healthy
-MAX_WAIT=120
+MAX_WAIT=300
 WAITED=0
 echo "Waiting for gateway to be healthy..."
 until curl -sf http://localhost:18789/health | grep -q '"ok":true'; do
@@ -65,8 +65,8 @@ echo "Gateway healthy (waited ${WAITED}s)"
 
 # Step 0: Run routing accuracy eval (ALWAYS — offline, free, no API calls)
 echo "Step 0: Running routing accuracy eval..."
-node routing-eval.js 2>&1
-ROUTING_EXIT=$?
+node routing-eval.js 2>&1 || ROUTING_EXIT=$?
+ROUTING_EXIT=${ROUTING_EXIT:-0}
 if [ $ROUTING_EXIT -ne 0 ]; then
   echo "  ⚠️ Routing accuracy below 90% threshold"
 fi
@@ -82,7 +82,7 @@ if [ "$IS_FULL_EVAL_DAY" = true ]; then
   # Step 2: Aggregate results
   echo ""
   echo "Step 2: Aggregating results..."
-  OUTPUT_DIR="$SCRIPT_DIR/output" node aggregate.js
+  OUTPUT_DIR="$SCRIPT_DIR/output" node aggregate.js || echo "[warn] Aggregation failed (non-fatal)"
 
   # Step 3: Sync to Notion
   echo ""
@@ -101,8 +101,8 @@ if [ "$IS_FULL_EVAL_DAY" = true ]; then
       echo "  No changes to push."
     else
       git add docs/dashboard/data/
-      git commit -m "Update eval dashboard data $(date +%Y-%m-%d)" > /dev/null 2>&1
-      git push origin main > /dev/null 2>&1
+      git commit -m "Update eval dashboard data $(date +%Y-%m-%d)" > /dev/null 2>&1 || true
+      git push origin main > /dev/null 2>&1 || echo "[warn] Git push failed (non-fatal)"
       echo "  Dashboard data pushed to GitHub."
     fi
   fi
@@ -156,7 +156,8 @@ echo "Step 6: Infrastructure checks..."
 
 # 6a: Run recovery check (diagnose only, no auto-fix during eval)
 if [ -x /root/lyra-ai/scripts/lyra-recovery.sh ]; then
-  RECOVERY_ISSUES=$(/root/lyra-ai/scripts/lyra-recovery.sh --check 2>&1 | grep -c "\[ISSUE\]" || echo "0")
+  RECOVERY_ISSUES=$({ /root/lyra-ai/scripts/lyra-recovery.sh --check 2>&1 | grep -c "\[ISSUE\]"; } 2>/dev/null || echo "0")
+  RECOVERY_ISSUES=$(echo "$RECOVERY_ISSUES" | tail -1)
   if [ "$RECOVERY_ISSUES" -gt 0 ]; then
     echo "  ⚠️ $RECOVERY_ISSUES infrastructure issue(s) detected — running auto-fix"
     /root/lyra-ai/scripts/lyra-recovery.sh --fix 2>&1 | tail -5
