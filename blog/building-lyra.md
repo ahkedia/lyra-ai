@@ -188,6 +188,27 @@ Environment variables go in `.env`, not in your shell. Always.
 
 ---
 
+## Giving Lyra a memory (March 28, 2026)
+
+Lyra had a memory problem that I kept avoiding. Every session loaded SOUL.md and MEMORY.md in full — about 4,000 tokens of context, every single time — regardless of whether any of it was relevant. Ask about the weather: load everything. Ask about a complex project decision: also load everything. And past conversations? Gone. Every session started from zero.
+
+I knew about ByteRover, a native OpenClaw memory plugin with a Three-Layer Memory architecture — Context Engine, Workspace Memory, Daily Memory. It claims 92.2% retrieval accuracy on long-memory benchmarks. But I kept putting it off because the setup looked complicated.
+
+The key insight before installing it: Lyra's primary interface is Telegram. Most messages are transactional — add a reminder, check the schedule, shopping list. ByteRover's daily knowledge mining assumes rich, long conversation logs. Mining shallow Telegram messages would fill the Context Tree with noise, not knowledge. So I skipped daily mining entirely and focused on two things that actually matter for Lyra's usage pattern.
+
+What I enabled:
+
+- **Context Engine**: before every response, `brv query` runs against the context tree and injects only relevant knowledge as a system prompt addition. The 10-second deadline means it never adds latency users notice.
+- **Auto-curation after every turn**: `afterTurn` runs `brv curate --detach` asynchronously after each substantive exchange. Greetings, one-word replies, and transactional messages are filtered out. Only content with lasting value — decisions, facts, technical context — gets curated.
+- **/remember skill**: a manual curation trigger. After any project deep-dive or decision session, invoking `/remember` writes a structured summary and runs `brv curate` on it. Lyra can also self-invoke and ask "want me to remember this?" after complex tasks.
+
+Bootstrap was immediate. I curated MEMORY.md and SOUL.md into the context tree on day one. Within minutes, `brv query "what is Lyra?"` was returning a rich, accurate answer from the tree — citing model routing tiers, cron schedules, access control rules, and communication style. All without loading a single full markdown file.
+
+The value is additive and grows over time. SOUL.md and MEMORY.md still load in full on every session — ByteRover is on top of that, not replacing it. Day one, the tree has 4 entries. In 30 days, it should have every project decision, debugging session, and technical deep-dive from the past month, automatically searchable. The things Lyra used to forget because there was no session persistence — those get curated now.
+
+---
+
+
 ## The honest numbers
 
 - **Uptime since migration:** 99.7% (one config crash loop, auto-recovered)
