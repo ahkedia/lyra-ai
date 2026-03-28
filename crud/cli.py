@@ -126,6 +126,119 @@ def cmd_parse(args):
     print(f'Could not parse health command: {" ".join(args)}')
     sys.exit(1)
 
+def cmd_daily_summary(args):
+    """Query yesterday's food log + recent workouts for morning digest."""
+    import sys
+    sys.path.insert(0, '/root/lyra-ai/crud')
+    import os, json, urllib.request, urllib.error
+    from datetime import datetime, timedelta, timezone
+
+    env = {}
+    with open('/root/.openclaw/.env') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                k, v = line.split('=', 1)
+                env[k] = v.strip()
+    key = env.get('NOTION_API_KEY', os.environ.get('NOTION_API_KEY', ''))
+
+    def notion_query(db_id, filter_obj=None):
+        payload = {'page_size': 20}
+        if filter_obj:
+            payload['filter'] = filter_obj
+        req = urllib.request.Request(
+            f'https://api.notion.com/v1/databases/{db_id}/query',
+            data=json.dumps(payload).encode(),
+            headers={'Authorization': 'Bearer ' + key,
+                     'Notion-Version': '2022-06-28',
+                     'Content-Type': 'application/json'},
+            method='POST'
+        )
+        r = json.loads(urllib.request.urlopen(req).read())
+        return r.get('results', [])
+
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    # --- Nutrition: yesterday's food log ---
+    FOOD_DB = '7072c178-d7f1-42f9-8d76-0acea82a93d2'
+    food_rows = notion_query(FOOD_DB, {
+        'property': 'Date', 'date': {'equals': yesterday}
+    })
+
+    total_cal = 0
+    total_protein = 0
+    meals = []
+    for row in food_rows:
+        props = row.get('properties', {})
+        meal_type = props.get('Meal Type', {}).get('select', {})
+        meal_name = meal_type.get('name', '?') if meal_type else '?'
+        desc_rt = props.get('Description', {}).get('rich_text', [])
+        desc = ''.join(t.get('plain_text', '') for t in desc_rt)
+        cal = props.get('Calories est', {}).get('number') or 0
+        protein = props.get('Protein g', {}).get('number') or 0
+        total_cal += cal
+        total_protein += protein
+        meals.append(f'{meal_name}: {desc[:60]}' + (f' (~{int(cal)} cal, {int(protein)}g protein)' if cal else ''))
+
+    # --- Workouts: last 7 days ---
+    WORKOUT_DB = 'e72572d2-f201-4cb1-9460-5b636ba07ad6'
+    workout_rows = notion_query(WORKOUT_DB)
+    # Sort by date desc, take last 7
+    def get_date(row):
+        d = row.get('properties', {}).get('Date', {}).get('date', {})
+        return d.get('start', '') if d else ''
+    workout_rows.sort(key=get_date, reverse=True)
+    recent_workouts = []
+    for row in workout_rows[:7]:
+        props = row.get('properties', {})
+        wdate = get_date(row)
+        wtype = props.get('Type', {}).get('select', {})
+        wtype_name = wtype.get('name', '?') if wtype else '?'
+        notes_rt = props.get('Notes', {}).get('rich_text', [])
+        notes = ''.join(t.get('plain_text', '') for t in notes_rt)
+        recent_workouts.append({'date': wdate, 'type': wtype_name, 'notes': notes})
+
+    # --- Workout rotation logic ---
+    # Push/Pull/Legs cycle + rest day logic
+    ROTATION = ['Push', 'Pull', 'Legs', 'Rest']
+    last_workout_type = None
+    if recent_workouts:
+        last_notes = recent_workouts[0].get('notes', '').lower()
+        last_type = recent_workouts[0].get('type', '')
+        # Determine last named day
+        if 'push' in last_notes: last_workout_type = 'Push'
+        elif 'pull' in last_notes: last_workout_type = 'Pull'
+        elif 'leg' in last_notes: last_workout_type = 'Legs'
+        elif last_type == 'Gym': last_workout_type = 'Gym'
+        elif last_type == 'Run': last_workout_type = 'Cardio'
+
+    # Simple rotation suggestion
+    rotation_map = {
+        'Push': 'Pull Day (Back + Biceps)',
+        'Pull': 'Legs Day (Squats, RDL, Lunges, Calves)',
+        'Legs': 'Rest or Light Cardio (30 min walk/bike)',
+        'Rest': 'Push Day (Chest + Triceps + Shoulders)',
+        'Gym': 'Rest or Cardio',
+        'Cardio': 'Gym Day',
+    }
+    today_suggestion = rotation_map.get(last_workout_type, 'Push Day (Chest + Triceps + Shoulders)')
+
+    # --- Output ---
+    out = {
+        'date': yesterday,
+        'nutrition': {
+            'meals': meals,
+            'total_calories': total_cal,
+            'total_protein_g': total_protein,
+            'meal_count': len(meals),
+        },
+        'recent_workouts': recent_workouts[:3],
+        'today_workout': today_suggestion,
+    }
+    print(json.dumps(out, indent=2))
+
+
 COMMANDS = {
     'weight': cmd_weight,
     'sleep': cmd_sleep,
@@ -137,6 +250,7 @@ COMMANDS = {
     'food': cmd_food,
     'snapshot': cmd_snapshot,
     'parse': cmd_parse,
+    'daily-summary': cmd_daily_summary,
 }
 
 if __name__ == '__main__':
