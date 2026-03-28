@@ -20,6 +20,12 @@ FOOD_LOG_DB      = '7072c178-d7f1-42f9-8d76-0acea82a93d2'
 WORKOUT_LOG_DB   = 'e72572d2-f201-4cb1-9460-5b636ba07ad6'
 SNAPSHOTS_DB     = 'eee245a6-f17b-4bc9-ad70-9a79d3be4cb8'
 
+# Data source IDs (for querying — different from database_id in Notion API 2025-09-03)
+DAILY_LOG_DS   = '283145e2-9f75-4e0d-a89f-4f5af1e8c481'
+FOOD_LOG_DS    = '8ad99c8a-c677-4f6d-b9ad-493c740cbf4b'
+WORKOUT_LOG_DS = '2bcfcea7-56d8-48c3-bde9-776f037994cb'
+SNAPSHOTS_DS   = '5349c83c-3e3f-4907-8945-fe24ae09cc3b'
+
 
 def _req(method, path, data=None):
     """Make a Notion API request. Raises ValueError on API error."""
@@ -49,9 +55,9 @@ def _query_daily_log_by_date(date_str):
     Query Daily Log for a specific date. Returns page_id or None.
     Used for upsert logic (query-before-write pattern).
     """
-    r = _req('POST', f'/databases/{DAILY_LOG_DB}/query', {
+    r = _req('POST', f'/data_sources/{DAILY_LOG_DS}/query', {
         'filter': {
-            'property': 'Date',
+            'property': 'Name',
             'title': {'equals': date_str}
         },
         'page_size': 1
@@ -89,13 +95,14 @@ def health_daily_log_upsert(date_str=None, **kwargs):
         date_str = datetime.now().strftime('%Y-%m-%d')
 
     props = {
-        'Date': {'title': _rt(date_str)},
+        'Name': {'title': _rt(date_str)},
+        'Date': {'date': {'start': date_str}},
         'Logged At': {'rich_text': _rt(_now_iso())},
         'Data Source': {'select': {'name': kwargs.get('data_source', 'Lyra')}}
     }
 
     if 'weight' in kwargs:
-        props['Weight (kg)'] = {'number': float(kwargs['weight'])}
+        props['Weight kg'] = {'number': float(kwargs['weight'])}
     if 'steps' in kwargs:
         props['Steps'] = {'number': int(kwargs['steps'])}
     if 'active_calories' in kwargs:
@@ -133,7 +140,10 @@ def health_workout_add(date_str=None, workout_type=None, duration_min=None, **kw
     if not date_str:
         date_str = datetime.now().strftime('%Y-%m-%d')
 
-    props = {'Date': {'title': _rt(date_str)}}
+    props = {
+        'Name': {'title': _rt(f"{date_str} {workout_type or 'workout'}")},
+        'Date': {'date': {'start': date_str}}
+    }
 
     if workout_type:
         # Normalise type to match select options
@@ -148,7 +158,7 @@ def health_workout_add(date_str=None, workout_type=None, duration_min=None, **kw
         props['Type'] = {'select': {'name': normalised}}
 
     if duration_min:
-        props['Duration (min)'] = {'number': int(duration_min)}
+        props['Duration min'] = {'number': int(duration_min)}
     if 'exercises' in kwargs:
         props['Exercises'] = {'rich_text': _rt(kwargs['exercises'])}
     if 'muscle_groups' in kwargs:
@@ -184,15 +194,16 @@ def health_food_add(date_str=None, meal_type=None, description=None, **kwargs):
     meal_normalised = meal_map.get((meal_type or '').lower(), 'Snack')
 
     props = {
-        'Date': {'title': _rt(date_str)},
+        'Name': {'title': _rt(f"{date_str} {meal_normalised}")},
+        'Date': {'date': {'start': date_str}},
         'Meal Type': {'select': {'name': meal_normalised}},
     }
     if description:
         props['Description'] = {'rich_text': _rt(description)}
     if 'calories' in kwargs:
-        props['Calories (est)'] = {'number': int(kwargs['calories'])}
+        props['Calories est'] = {'number': int(kwargs['calories'])}
     if 'protein' in kwargs:
-        props['Protein (g)'] = {'number': float(kwargs['protein'])}
+        props['Protein g'] = {'number': float(kwargs['protein'])}
     if 'notes' in kwargs:
         props['Notes'] = {'rich_text': _rt(kwargs['notes'])}
 
@@ -209,13 +220,16 @@ def health_snapshot_add(date_str=None, **kwargs):
     if not date_str:
         date_str = datetime.now().strftime('%Y-%m-%d')
 
-    props = {'Date': {'title': _rt(date_str)}}
+    props = {
+        'Name': {'title': _rt(date_str)},
+        'Date': {'date': {'start': date_str}}
+    }
     if 'weight' in kwargs:
-        props['Weight (kg)'] = {'number': float(kwargs['weight'])}
+        props['Weight kg'] = {'number': float(kwargs['weight'])}
     if 'body_fat' in kwargs:
-        props['Body Fat (%)'] = {'number': float(kwargs['body_fat'])}
+        props['Body Fat pct'] = {'number': float(kwargs['body_fat'])}
     if 'waist' in kwargs:
-        props['Waist (cm)'] = {'number': float(kwargs['waist'])}
+        props['Waist cm'] = {'number': float(kwargs['waist'])}
     if 'notes' in kwargs:
         props['Notes'] = {'rich_text': _rt(kwargs['notes'])}
     if 'source' in kwargs:
