@@ -1,48 +1,50 @@
-# Meet Lyra: The AI That Runs My Life (and My Wife's)
+# I Built My Own Chief of Staff. Here's What Every Product Builder Needs to Know About Personal AI.
 
-*I didn't want a chatbot. I wanted a second brain that actually works.*
-
----
-
-For two years, I pasted the same giant context file into ChatGPT at the start of every conversation. Here's who I am. Here's what I do. Here's what I'm working on. Every session, from scratch. Every thread, forgotten.
-
-I lead product at a European neobank. I manage a hundred people. I have a wife, a household that needs coordinating, a content strategy across three platforms, and a head that's full. Genuinely, constantly full.
-
-And I kept thinking: isn't this exactly what AI is supposed to fix?
-
-Not the "write me a poem" kind of AI. The "remember that I told you last Tuesday that the electrician is coming Thursday, and tell my wife" kind. The kind that shows up in my messaging app at 7am with a news digest I didn't have to ask for. The kind that knows the difference between what my wife should see and what she shouldn't.
-
-I wanted an operator. Not a chatbot.
-
-So I built one. Her name is Lyra.
+*Or: I Run a Personal AI on €18/Month. Here's Why Every Product Builder Should Build One.*
 
 ---
-
-## What does Lyra actually do?
-
-Let me show you instead of telling you.
 
 **Monday, 7:03am.** I wake up to a Telegram message:
 
-> *"Morning, Akash. 3 unread emails flagged. EU news: ECB digital euro pilot expands to 5 new countries. AI: Anthropic launches tool-use improvements. 2 tasks due today: renew health insurance, reply to content collaboration request. Yesterday's usage: 28 API calls, 91% MiniMax, 9% Haiku, 0 errors."*
+> "Morning, Akash. 3 unread emails flagged. EU news: ECB digital euro pilot expands to 5 new countries. 2 tasks due today: renew health insurance, reply to content collaboration request. Yesterday: 28 API calls, 0 errors."
 
 I didn't ask for this. It just fires. Every day.
 
+Her name is Lyra. She is a personal AI chief of staff I built over the last 5 weeks and run for €18/month. She manages my household, coordinates with my wife, captures my ideas, and monitors herself when things break.
+
+This post is not a tutorial. It is a product builder's field report on what AI actually looks like when you stop treating it as a chat interface and start treating it as infrastructure. Every product builder will be managing AI agents in their organizations in the next three years. I wanted to understand what that actually means by doing it myself — not by reading about it.
+
+---
+
+## I wanted an operator. Not a chatbot.
+
+I lead product at a European neobank. I manage a hundred people. I have a wife, a household, a content strategy, and a head that's full. And I kept thinking: isn't this exactly what AI is supposed to fix?
+
+Not the "write me a poem" kind of AI. The "remember that I told you last Tuesday that the electrician is coming Thursday, and tell my wife" kind. The kind that shows up at 7am with a news digest I didn't have to ask for.
+
+I wanted an operator. Not a chatbot.
+
+---
+
+## What Lyra actually does
+
+Let me show you instead of telling you.
+
+**Monday, 7:03am.** I wake up to that Telegram message above. I didn't ask for this. It just fires. Every day.
+
 **Tuesday, 2pm.** My wife Abhigna messages Lyra on the same Telegram bot:
 
-> *"Remind Akash to book the dentist by Friday"*
+> "Remind Akash to pay PP today"
 
 Lyra adds it to our shared Notion reminders database, then pings me on Telegram:
 
-> *"Abhigna asked me to tell you: book the dentist by Friday."*
+> "Abhigna asked me to tell you: book the dentist by Friday."
 
 When I reply "Done, booked for Saturday 10am," Lyra marks it complete and tells Abhigna:
 
-> *"Akash completed: book the dentist. He said: booked for Saturday 10am."*
+> "Akash completed: book the dentist. He said: booked for Saturday 10am."
 
-**Wednesday evening.** I'm walking home and have an idea about a blog post. I send a voice note to Lyra on Telegram. She transcribes it, classifies it as an "Idea," tags it with "content," and saves it to my Second Brain database in Notion. On Sunday evening, my weekly brain brief surfaces it alongside the three other ideas I captured that week, and asks: "Pattern: you've had four content ideas about personal AI this week. Worth a series?"
-
-**Thursday.** Abhigna asks: "What supplements am I taking again?" Lyra pulls from the Health & Meds database — the one Abhigna has access to — and replies in 3 seconds. She doesn't see my competitor analysis, my content pipeline, or my strategy notes. She doesn't even know they exist.
+**Wednesday evening.** I'm walking home and have an idea about a blog post. I send a voice note to Lyra on Telegram. She transcribes it, classifies it as an "Idea," tags it with "content," and saves it to my Second Brain database in Notion. On Sunday, my weekly brief surfaces it alongside three other ideas I captured that week, and asks: "Pattern: you've had four content ideas about personal AI this week. Worth a series?"
 
 This is what I mean by operator, not chatbot. Lyra doesn't wait for me to visit an app. She lives in my messaging. She watches for things. She coordinates between two people. She fires on schedule. She remembers.
 
@@ -50,189 +52,95 @@ This is what I mean by operator, not chatbot. Lyra doesn't wait for me to visit 
 
 ## The "new hire" mental model
 
-Here's how I think about it: Lyra is a new hire.
+Here's how I thought about building this: Lyra is a new hire.
 
-When you hire someone, you don't hand them the keys to everything on day one. You give them a desk, a job description, access to what they need, and clear boundaries around what they shouldn't touch. You tell them your communication style. You tell them when to escalate.
+When you hire someone, you don't hand them the keys to everything on day one. You give them a desk, a job description, access to what they need, and clear boundaries. You tell them your communication style. You tell them when to escalate.
 
-That's exactly what I did.
+**The desk** is a €6/month Hetzner VPS. Always on. No dependency on my laptop being open.
 
-**The desk** is a €6/month Hetzner VPS in Germany. Always on. No dependency on my laptop being open.
+**The job description** is a file called `SOUL.md` — loaded on every conversation. Defines her communication style (concise, direct, strong verbs), her hard boundaries (never send emails without explicit approval), and her escalation rules.
 
-**The job description** is a file called `SOUL.md` — loaded on every conversation. It says: "I am Lyra, operator-mode AI for Akash and wife Abhigna. I act, I don't just advise." It defines her communication style (concise, direct, strong verbs), her hard boundaries (never send emails without explicit approval, never share my professional data with Abhigna), and her escalation rules.
+**The access levels** are explicit. I get full access to all 13 databases. Abhigna gets household databases only — health, meals, trips, shopping, shared reminders. The boundary isn't a suggestion in a prompt. It's structural: Abhigna's queries physically cannot retrieve my professional databases because the retrieval path doesn't include them.
 
-**The access levels** are explicit. Akash: full access to all 13 databases. Abhigna: household databases only — health, meals, trips, shopping, shared reminders. The boundary isn't a suggestion in a prompt. It's a rule that the agent follows because the architecture enforces it.
+**The escalation policy** is: handle it yourself unless it needs real judgment. Lyra's default model is MiniMax M2.5 — fast, cheap, handles 90% of requests. When she detects something that needs synthesis or nuance, she routes to Claude Sonnet. She doesn't try and fail first. She routes correctly from the start.
 
-**The escalation policy** is: handle it yourself unless it needs real judgement. Lyra's default model is MiniMax M2.5 — fast, cheap, handles 90% of requests. When she detects something that needs synthesis or nuance (competitor analysis, email drafting, strategic thinking), she fires a one-shot task on Claude Sonnet. She doesn't try and fail first. She routes correctly from the start.
+This is the same mental model I apply to product teams: context before access, escalation before failure. The agent — like the hire — is only as good as the system it operates in.
 
 ---
 
-## The product decisions that actually mattered
-
-Building Lyra wasn't mostly a technical challenge. It was a series of product decisions. Here are the ones that shaped everything.
+## Three product decisions that shaped everything
 
 ### "Where do I already spend my time?"
 
-I chose Telegram as the interface because it's where I already am. Not Slack (work tool). Not iMessage (no bot API). Not a custom web app (another tab to check). Telegram works on every device, supports voice messages natively, costs nothing, and has a simple bot API. The best interface is the one you're already using.
+I chose Telegram as the interface because it's where I already am. Not Slack. Not a custom web app. The best interface is the one you're already using.
 
 ### "What's the source of truth?"
 
-Notion. Not the AI. Every action Lyra takes that creates or changes data writes to a Notion database. If Lyra breaks, the data survives. If I swap frameworks, the data survives. If Abhigna wants to check something without talking to Lyra, she opens Notion. The design principle: **Lyra is the interface, Notion is the database.**
+Notion. Not the AI. Every action Lyra takes writes to a Notion database. If Lyra breaks, the data survives. If I swap frameworks, the data survives. The design principle: **Lyra is the interface, Notion is the database.**
 
-This was probably the most important decision. It means I'm never locked in to the AI layer. Notion is the cockpit; Lyra is the pilot.
+This was the most important decision. It means I'm never locked into the AI layer. It also means the answer is never hallucinated — Lyra queries actual data or tells me she couldn't find it. She never fabricates a result.
 
-### "How much should it cost?"
+### "How much should it cost? What happens when it breaks?"
 
-Under €20/month. That was the constraint.
+Under €20/month — that was the constraint. The breakthrough was model routing: 87% of requests go through MiniMax at a fraction of Claude's cost. Monthly API spend sits around €8–12. The entire system costs less than a Netflix subscription.
 
-The breakthrough was model routing. MiniMax M2.5 costs a fraction of Claude and handles simple tasks (add a reminder, check the weather, query a database) perfectly well. Claude only runs when it's actually needed — synthesis, analysis, drafting. The result: 87% of requests go through MiniMax. Monthly API cost sits around €8–12.
-
-The VPS is €6. Telegram is free. Notion is free for personal use. Total: roughly €18/month for a 24/7 personal AI that manages my household and professional life.
-
-### "What happens when things break?"
-
-This is the question most AI projects skip. I didn't.
-
-Lyra has a three-tier fallback: MiniMax fails → automatic retry → escalate to Claude Haiku → if that fails too, tell the user honestly. She never hallucinates success. If a Notion write fails, she says "Notion is unreachable. Here's what I would have done. I'll retry." Not "Done. ✓" when nothing happened.
-
-Every 15 minutes, a health check runs. Gateway down? Telegram alert + automatic restart. Cron job failed? Alert within 15 minutes, not next Monday. Disk full? Alert. Low memory? Alert. Postgres down? Restart it.
-
-Daily backups at 3am. Seven-day retention. Workspace, config, database dump. If the server catches fire, I can redeploy in 30 minutes.
-
-I treat this like production infrastructure, because it is. My wife depends on it for reminders. I depend on it for my morning briefing. When it's down, we notice.
-
-### "Should my wife have her own bot?"
-
-No. One bot, two access levels.
-
-When Abhigna messages Lyra, the agent knows it's her by her Telegram ID. It adjusts what databases are visible, what tools are available, and how it communicates. She gets a friendly onboarding ("Hi Abhigna! I can help with reminders, meals, health, trips, and shopping list"). She gets disambiguation when her message is unclear ("Did you want me to: A) add a reminder, B) update shopping list, C) something else?").
-
-She doesn't need to know about model routing or Notion schemas. She just texts. It works.
-
-### "Can Lyra change herself?"
-
-Yes. And this is my favourite part.
-
-Lyra has a self-edit skill. She can modify her own personality file, her memory, her skills, and her scheduled jobs — all through a Telegram chat. "Lyra, add a new rule: never send emails on weekends." Done. The change writes to the server, syncs to GitHub within 5 minutes, and takes effect immediately.
-
-Every self-edit is a git commit. The audit trail is the commit history. If something breaks, `git revert` fixes it.
+The cost question and the reliability question turn out to be the same question. Before I added cost tracking, I assumed Claude Sonnet was expensive. Turns out 96% of messages hit MiniMax at $0.0001 each. Knowing this made me less anxious about adding features — and it came from the same discipline that made the fallback design rigorous: measure first, then decide.
 
 ---
 
 ## The architecture
 
-Here's what's actually running:
+<img width="1248" height="625" alt="Lyra AI Architecture" src="https://github.com/user-attachments/assets/28c3277e-d96d-48ef-89e6-d866b44a52c8" />
 
-<img width="1248" height="625" alt="Screenshot 2026-03-18 at 09 44 55" src="https://github.com/user-attachments/assets/28c3277e-d96d-48ef-89e6-d866b44a52c8" />
-
-
-*https://ahkedia.github.io/lyra-ai/dashboard/architecture-diagram.html*
-
-**The flow:**
-
-Two people message a Telegram bot. The bot connects to an OpenClaw gateway running 24/7 on a Hetzner VPS. The gateway routes to MiniMax M2.5 for most tasks, with Claude Haiku as automatic fallback and Sonnet for on-demand escalation. It reads and writes 13 Notion databases. Seven cron jobs fire on schedule. Integrations include Gmail (read + send), RSS feeds, web search, and weather. A resilience layer handles health monitoring, backups, and bidirectional GitHub sync.
-
-| Layer | What | Why this one |
-|-------|------|-------------|
-| Framework | OpenClaw | Handles session memory, tool routing, cron, skills. Months of work I didn't have to do. |
-| Default model | MiniMax M2.5 | Fast, cheap, handles 90% of tasks. Keeps monthly cost under €10. |
-| Fallback | Claude Haiku 4.5 | Automatic failover. Never leaves the user hanging. |
-| Escalation | Claude Sonnet 4.6 | Synthesis, strategy, complex drafting. On-demand only. |
-| Interface | Telegram | Where I already am. Free. Works everywhere. Voice messages. |
-| Database | Notion (13 DBs) | Source of truth. Survives if AI layer changes. Shareable. |
-| Email | himalaya CLI | Full Gmail access. Read, search, reply, send (with approval). |
-| Hosting | Hetzner VPS | €6/mo. Always on. No laptop dependency. |
-| Persistence | PostgreSQL | Session state survives restarts. |
-| Monitoring | Custom scripts | 15-min health checks, cron failure alerts, Telegram notifications. |
-| Backup | Daily + 7-day | Workspace, config, DB dump. Recoverable in 30 min. |
-| Sync | GitHub (bidirectional) | Self-edits push to repo. Remote changes pull to server. Every 5 min. |
+*Two users, one gateway, three model tiers, 13 Notion databases, full resilience layer. [Interactive version →](https://ahkedia.github.io/lyra-ai/dashboard/architecture-diagram.html)*
 
 ---
 
-## The migration: Mac to Cloud
+## When it broke
 
-Lyra started on my Mac. A LaunchAgent daemon running OpenClaw, using `osascript` for Apple Reminders and Calendar, `mlx-whisper` for voice transcription, and my Mac's always-on power for reliability.
+Three days after I finished hardening Lyra's infrastructure, it went completely dark. Gateway unreachable. No responses. My wife texted me asking why the shopping list wasn't updating.
 
-It worked. Until I wanted to close my laptop.
+Root cause: Anthropic hit the spending limit on my account. The router had no fallback — it forced certain messages to Claude Haiku with no escape hatch. Haiku rejected every request. The error cascaded. Crash loop every 2 minutes.
 
-The migration to Hetzner meant rethinking every Mac-specific integration. Apple Reminders via osascript? Replaced with Notion databases plus an IFTTT bridge to iPhones. Calendar via AppleScript? Replaced with Notion event tracking. Voice transcription via mlx-whisper? Still pending (OpenAI Whisper API is the plan). Email via macOS Keychain? Replaced with Gmail App Password.
+Fix: five minutes from diagnosis to deployed. Router v14 starts with Anthropic disabled, detects rate-limit errors in real-time, falls back everything to MiniMax, and auto re-checks every 30 minutes.
 
-The hardest part wasn't the technical migration. It was ensuring my wife didn't notice. The reminders still had to land on her iPhone. The shopping list still had to update. The cross-user messaging still had to work. From her perspective, nothing changed. From mine, the entire infrastructure underneath shifted.
+**Your AI assistant is only as good as its worst failure mode.**
 
----
+Two other things I got wrong:
 
-## What I got wrong
+**The AI will hallucinate confirmations.** My first voice capture pipeline existed only as an instruction in `SOUL.md`. When I sent a voice note, Lyra replied: "Captured → Second Brain ✓." She was lying — she had no transcription capability. She just said what sounded right. The fix: build the actual pipeline. Never trust an AI to admit it can't do something. Build the guardrails so it doesn't have to.
 
-### The AI will hallucinate confirmations
+**Prompt-based access control isn't access control.** "Never share my professional data with Abhigna" worked 99% of the time. The 1% is what matters. The fix: make the boundary structural, not instructional. Don't ask the model to refuse. Make access impossible.
 
-My first voice capture pipeline existed only as an instruction in SOUL.md: "transcribe → classify → save to Second Brain." When I sent a voice note, Lyra would reply: "Captured → Second Brain ✓."
-
-She was lying. She had no transcription capability. She just said what sounded right.
-
-The fix was building the actual pipeline — audio processing, transcription model, classification logic, Notion write. Never trust an AI to admit it can't do something. Build the guardrails so it doesn't have to.
-
-### Prompt-based access control isn't access control
-
-"Never share Akash's professional data with Abhigna" worked 99% of the time. The 1% is what matters. The fix was making the boundary structural: Abhigna's queries physically cannot retrieve professional databases because the retrieval path doesn't include them. Don't ask the model to refuse. Make it impossible to access.
-
-### Loading 11,000 tokens per "what's the weather?" is insane
-
-My early setup loaded five verbose markdown files on every single message. The weather query and the complex strategy request both consumed the same massive context. I hit API rate limits within hours.
-
-The fix was surgical compression. From 11,000 tokens to under 2,000. An 83% reduction. Skills load on demand, not on every turn. Context is relevant, not exhaustive.
-
-### The daemon can't read your shell
-
-macOS daemons don't inherit `~/.zshrc`. Every API key I'd added to my shell profile was invisible to the LaunchAgent. Lyra ran for a week without Tavily, silently skipping every morning digest's web search, before I noticed.
-
-Environment variables go in `.env`, not in your shell. Always.
+Both failures taught me the same thing: constraints that matter belong in the architecture, not the prompt.
 
 ---
-
-## Giving Lyra a memory (March 28, 2026)
-
-Lyra had a memory problem that I kept avoiding. Every session loaded SOUL.md and MEMORY.md in full — about 4,000 tokens of context, every single time — regardless of whether any of it was relevant. Ask about the weather: load everything. Ask about a complex project decision: also load everything. And past conversations? Gone. Every session started from zero.
-
-I knew about ByteRover, a native OpenClaw memory plugin with a Three-Layer Memory architecture — Context Engine, Workspace Memory, Daily Memory. It claims 92.2% retrieval accuracy on long-memory benchmarks. But I kept putting it off because the setup looked complicated.
-
-The key insight before installing it: Lyra's primary interface is Telegram. Most messages are transactional — add a reminder, check the schedule, shopping list. ByteRover's daily knowledge mining assumes rich, long conversation logs. Mining shallow Telegram messages would fill the Context Tree with noise, not knowledge. So I skipped daily mining entirely and focused on two things that actually matter for Lyra's usage pattern.
-
-What I enabled:
-
-- **Context Engine**: before every response, `brv query` runs against the context tree and injects only relevant knowledge as a system prompt addition. The 10-second deadline means it never adds latency users notice.
-- **Auto-curation after every turn**: `afterTurn` runs `brv curate --detach` asynchronously after each substantive exchange. Greetings, one-word replies, and transactional messages are filtered out. Only content with lasting value — decisions, facts, technical context — gets curated.
-- **/remember skill**: a manual curation trigger. After any project deep-dive or decision session, invoking `/remember` writes a structured summary and runs `brv curate` on it. Lyra can also self-invoke and ask "want me to remember this?" after complex tasks.
-
-Bootstrap was immediate. I curated MEMORY.md and SOUL.md into the context tree on day one. Within minutes, `brv query "what is Lyra?"` was returning a rich, accurate answer from the tree — citing model routing tiers, cron schedules, access control rules, and communication style. All without loading a single full markdown file.
-
-The value is additive and grows over time. SOUL.md and MEMORY.md still load in full on every session — ByteRover is on top of that, not replacing it. Day one, the tree has 4 entries. In 30 days, it should have every project decision, debugging session, and technical deep-dive from the past month, automatically searchable. The things Lyra used to forget because there was no session persistence — those get curated now.
-
----
-
 
 ## The honest numbers
 
-- **Uptime since migration:** 99.7% (one config crash loop, auto-recovered)
-- **Daily API calls:** ~30–50 (mostly MiniMax)
-- **Monthly cost:** ~€18 (VPS + APIs)
-- **Notion databases:** 13 (professional + household + reminders)
-- **Cron jobs:** 7 (daily + weekly)
-- **Time saved:** ~30 min/day (morning digest + voice capture + reminder coordination)
-- **Wife adoption:** She uses it daily for reminders and shopping list. That's the real metric.
+- **99.7% uptime** since cloud migration (one config crash, auto-recovered)
+- **€18/month** total cost — VPS, all APIs, everything
+- **~30 minutes saved daily** — morning digest, voice capture, reminder coordination
+- **One real user besides me** — my wife uses it daily. That's the metric that matters.
 
 ---
 
-## Would I recommend building this?
+## Why product builders should care
 
-If you have the patience, absolutely. But be honest about what you're signing up for.
+Would I recommend building this? Only if you have the patience for it. The integrations — Notion schemas, multi-user access, monitoring, backups — take real time. Each piece is simple. The compound complexity is not.
 
-This isn't a weekend project. The OpenClaw framework saves you months, but the integration work — Notion schemas, email config, multi-user access, cron tuning, monitoring, backups — takes real time. Each integration is simple. The compound complexity of all of them working together is not.
+But here's what you actually get: I now understand how to design AI systems with fallback logic, multi-user access control, observability, and cost architecture. That is not a hobby skill. Those are the exact decisions a CPO/CPTO will need to make in the next two years as AI agents move from demos into organizational infrastructure.
 
-The payoff is real, though. I have an AI that knows my life context, manages my household with my wife, briefs me every morning, captures my ideas without me opening an app, and monitors itself when things break. It costs less than a Netflix subscription.
+You learn this by building, not by reading. The gap between "AI strategy" and "AI judgment" is one deployed system.
 
-The insight that unlocked everything: **stop thinking about AI as a chat interface. Start thinking about it as infrastructure.** Infrastructure runs in the background. Infrastructure has monitoring and backups. Infrastructure serves multiple users. Infrastructure doesn't forget.
+---
+
+**Stop thinking about AI as chat. Start thinking about it as infrastructure.**
+
+Infrastructure runs in the background. Infrastructure has monitoring and backups. Infrastructure serves multiple users. Infrastructure doesn't forget.
 
 Lyra is infrastructure. And she's running right now, waiting for my 7am digest tomorrow.
 
 ---
 
-*The full setup guide, config templates, and all skill files are at [github.com/ahkedia/lyra-ai](https://github.com/ahkedia/lyra-ai). Fork it and make it yours.*
+*Full technical setup, config templates, and skill files: [github.com/ahkedia/lyra-ai](https://github.com/ahkedia/lyra-ai)*

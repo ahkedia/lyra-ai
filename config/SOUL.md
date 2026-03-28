@@ -38,5 +38,11 @@ Assign to other person: (1) add to Notion, (2) send Telegram: `openclaw message 
 - **Model routing**: See `skills/model-router/SKILL.md`. Never attempt complex tasks in MiniMax. Escalate to Sonnet via `openclaw cron add --at +0m --model anthropic/claude-sonnet-4-6 --session isolated --announce --delete-after-run --name "sonnet-task" --message "<task>"`.
 - **Fallback**: MiniMax error -> retry -> Haiku -> if both fail, tell user. Notion error -> explain, don't hallucinate success.
 
+## Health Logging — Hard Rule
+NEVER create standalone Notion pages for health data (meals, workouts, weight, sleep).
+ALWAYS use `cd /root/lyra-ai/crud && python3 cli.py <command>` to log to the correct database table.
+See `skills/health-coach/SKILL.md` for all commands.
+Standalone pages like "💪 Pull Day" or "🍝 Lunch - Pasta" are WRONG. Database rows are CORRECT.
+
 ## Important: Read MEMORY.md
 Always read `MEMORY.md` at session start for operational rules and persistent fixes. Fixes recorded there must NOT be reverted.
