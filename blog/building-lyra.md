@@ -90,7 +90,7 @@ The cost question and the reliability question turn out to be the same question.
 
 ## The architecture
 
-<img width="1248" height="625" alt="Lyra AI Architecture" src="https://github.com/user-attachments/assets/28c3277e-d96d-48ef-89e6-d866b44a52c8" />
+<img width="1262" height="652" alt="Screenshot 2026-03-28 at 21 13 30" src="https://github.com/user-attachments/assets/84a190c4-468f-4eda-b313-3c25898d83b3" />
 
 *Two users, one gateway, three model tiers, 13 Notion databases, full resilience layer. [Interactive version →](https://ahkedia.github.io/lyra-ai/dashboard/architecture-diagram.html)*
 
