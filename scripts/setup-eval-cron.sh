@@ -62,7 +62,7 @@ CLEANED_CRON=$(echo "$CLEANED_CRON" | grep -v "$STATUS_MARKER" | grep -v "$COST_
 NEW_CRON="$CLEANED_CRON
 # --- Lyra Daily Evals ---
 # Pre-check: verify gateway is running 10 min before evals
-50 3 * * * /bin/bash -c 'systemctl restart openclaw 2>/dev/null && sleep 20' >> $LOG_FILE 2>&1 $PRECHECK_MARKER
+50 3 * * * /bin/bash -c 'curl -sf http://localhost:18789/health > /dev/null 2>&1 || (systemctl restart openclaw 2>/dev/null && sleep 30)' >> $LOG_FILE 2>&1 $PRECHECK_MARKER
 # Main eval run: daily at 4 AM UTC (includes infra checks, recovery, status refresh)
 0 4 * * * /bin/bash -c 'echo \"=== Eval Run: \$(date -u) ===\" >> $LOG_FILE && cd /root/lyra-ai/evals && bash run-evals.sh >> $LOG_FILE 2>&1' $CRON_MARKER
 # Status dashboard: refresh every 5 minutes

@@ -45,26 +45,18 @@ async function main() {
   const body = {
     parent: { database_id: EVALS_DB_ID },
     properties: {
-      Name: {
-        title: [{ text: { content: `Eval Run ${latest.date}` } }],
-      },
+      // DB uses "Date" as the title field (not "Name")
       Date: {
-        date: { start: latest.date },
+        title: [{ text: { content: `Eval Run ${latest.date}` } }],
       },
       'Pass Rate': {
         number: latest.pass_rate,
-      },
-      Total: {
-        number: latest.total,
       },
       Passed: {
         number: latest.passed,
       },
       Failed: {
         number: latest.failed,
-      },
-      'Avg Latency': {
-        number: latest.avg_latency_ms,
       },
     },
     children: [
