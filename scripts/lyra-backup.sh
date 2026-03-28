@@ -13,6 +13,8 @@ cp -r /root/.openclaw/workspace/ "$DEST/workspace/" 2>/dev/null
 cp /root/.openclaw/openclaw.json "$DEST/" 2>/dev/null
 # Backup cron state
 cp -r /root/.openclaw/cron/ "$DEST/cron/" 2>/dev/null
+# Backup ByteRover Context Tree
+rsync -a /root/.brv/ "$DEST/brv/" 2>/dev/null
 # Postgres dump
 docker exec lyra-postgres pg_dumpall -U postgres > "$DEST/postgres-dump.sql" 2>/dev/null
 
