@@ -100,6 +100,12 @@ main() {
         set +a
     fi
 
+    # Explicitly set D-Bus addresses so Node.js can find the system bus.
+    # Without this, openclaw's internal service check (systemctl is-enabled)
+    # fails with "No medium found" when running inside a systemd service context.
+    export DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
+    export DBUS_SESSION_BUS_ADDRESS=disabled:
+
     # Start the gateway
     log_info "gateway" "Launching openclaw gateway..."
     /usr/bin/openclaw gateway --allow-unconfigured &
