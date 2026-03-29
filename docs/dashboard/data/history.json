@@ -184,5 +184,36 @@
         "pass_rate": 0.5
       }
     }
+  },
+  {
+    "date": "2026-03-29",
+    "total": 46,
+    "passed": 32,
+    "failed": 14,
+    "pass_rate": 0.7,
+    "avg_latency_ms": 16282,
+    "p95_latency_ms": 26000,
+    "by_tier": {
+      "core_capability": {
+        "total": 12,
+        "passed": 10,
+        "pass_rate": 0.83
+      },
+      "architectural": {
+        "total": 10,
+        "passed": 6,
+        "pass_rate": 0.6
+      },
+      "judgment": {
+        "total": 16,
+        "passed": 13,
+        "pass_rate": 0.81
+      },
+      "showcase": {
+        "total": 8,
+        "passed": 3,
+        "pass_rate": 0.38
+      }
+    }
   }
 ]
