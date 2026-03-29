@@ -1,16 +1,17 @@
 /**
  * Lyra Eval Runner — Main orchestrator.
- * Uses `openclaw agent` CLI to send real messages to Lyra,
- * validates responses, and writes JSONL results.
+ * Uses WebSocket client (ws-client.js) for persistent session to Lyra gateway.
+ * Validates responses and writes JSONL results.
  */
 
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import https from 'https';
 import YAML from 'yaml';
 import { runValidators } from './validators.js';
 import { judgeResponse } from './llm-judge.js';
+import { OpenClawClient } from './ws-client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = join(__dirname, 'results');
@@ -18,6 +19,19 @@ const CASES_DIR = process.env.CASES_DIR || join(__dirname, 'cases');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 
 if (!existsSync(RESULTS_DIR)) mkdirSync(RESULTS_DIR, { recursive: true });
+
+// WebSocket client — shared across all tests for persistent session
+let wsClient = null;
+
+async function ensureConnected() {
+  if (wsClient && wsClient.connected) return;
+  wsClient = new OpenClawClient(
+    'ws://localhost:18789',
+    process.env.OPENCLAW_GATEWAY_TOKEN
+  );
+  await wsClient.connect();
+  console.log('[ws] Connected to gateway.');
+}
 
 /**
  * Load all test cases from YAML files.
@@ -29,6 +43,7 @@ function loadTestCases() {
     'tier2-architectural.yaml',
     'tier3-judgment.yaml',
     'tier4-showcase.yaml',
+    'tier5-production-gaps.yaml',
   ];
 
   for (const file of files) {
@@ -48,60 +63,91 @@ function loadTestCases() {
 }
 
 /**
- * Send a message to Lyra via openclaw agent CLI.
- * Returns { text, durationMs, model, error }
+ * Send a message to Lyra via persistent WebSocket session.
+ * Returns { text, durationMs, ttftMs, model, provider, sessionId, error }
  */
-function sendToLyra(message, timeoutMs = 30000) {
-  const timeoutSec = Math.ceil(timeoutMs / 1000);
+async function sendToLyra(message, timeoutMs = 30000, sessionKey = null) {
+  await ensureConnected(); // reconnects if gateway restarted mid-run
   const startTime = Date.now();
-
   try {
-    // Escape message for shell
-    const escapedMessage = message.replace(/'/g, "'\\''");
-    // Use both openclaw --timeout and shell timeout as safety net
-    const cmd = `timeout --kill-after=5 --signal=KILL ${timeoutSec + 10} openclaw agent --agent main --timeout ${timeoutSec} -m '${escapedMessage}' --json 2>/dev/null`;
-
-    const output = execSync(cmd, {
-      encoding: 'utf8',
-      timeout: timeoutMs + 15000,
-      env: process.env,
-    });
-    const elapsed = Date.now() - startTime;
-
-    return parseAgentOutput(output, elapsed);
+    const opts = { timeout: timeoutMs };
+    if (sessionKey) opts.sessionKey = sessionKey;
+    const result = await wsClient.chat(message, opts);
+    return {
+      text: result.text,
+      durationMs: result.latencyMs,
+      ttftMs: result.ttftMs,
+      model: 'unknown',
+      provider: 'unknown',
+      sessionId: null,
+      error: null,
+    };
   } catch (err) {
-    const elapsed = Date.now() - startTime;
-    // Key fix: when timeout kills the process, stdout may still have the full JSON response
-    const stdout = err.stdout ? (typeof err.stdout === 'string' ? err.stdout : err.stdout.toString('utf8')) : '';
-    if (stdout && stdout.includes('"status"')) {
-      try {
-        return parseAgentOutput(stdout, elapsed);
-      } catch (_) {
-        // Fall through to error handling
-      }
+    // Mark disconnected so ensureConnected() reconnects on next test
+    if (err.message?.includes('Connection closed') || err.message?.includes('Not connected')) {
+      if (wsClient) wsClient.connected = false;
     }
-    return { text: '', durationMs: elapsed, model: 'unknown', provider: 'unknown', sessionId: null, error: err.message?.slice(0, 200) || `Exit code ${err.status}` };
+    return {
+      text: '',
+      durationMs: Date.now() - startTime,
+      ttftMs: 0,
+      model: 'unknown',
+      provider: 'unknown',
+      sessionId: null,
+      error: err.message?.slice(0, 200) || 'error',
+    };
   }
 }
 
 /**
- * Parse openclaw agent JSON output into eval result format.
+ * Minimal Notion API helper for cleanup operations.
  */
-function parseAgentOutput(output, elapsed) {
-  const result = JSON.parse(output.trim());
-  const text = result.result?.payloads
-    ?.map((p) => p.text)
-    .filter(Boolean)
-    .join('\n') || '';
+function notionRequest(method, path, body = null) {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: 'api.notion.com',
+      path,
+      method,
+      headers: {
+        'Authorization': `Bearer ${process.env.NOTION_API_KEY}`,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json',
+      },
+    };
+    const req = https.request(opts, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); } catch { resolve({}); }
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(JSON.stringify(body));
+    req.end();
+  });
+}
 
-  return {
-    text,
-    durationMs: result.result?.meta?.durationMs || elapsed,
-    model: result.result?.meta?.agentMeta?.model || 'unknown',
-    provider: result.result?.meta?.agentMeta?.provider || 'unknown',
-    sessionId: result.result?.meta?.agentMeta?.sessionId || null,
-    error: null,
-  };
+/**
+ * Post-test cleanup hook for write+cleanup tests.
+ * Archives Notion pages matching title_contains (reversible soft-delete).
+ */
+async function runCleanup(cleanupConfig) {
+  if (!cleanupConfig) return;
+  if (cleanupConfig.action === 'notion_delete_matching') {
+    const { database, title_contains } = cleanupConfig;
+    try {
+      const result = await notionRequest('POST', `/v1/databases/${database}/query`, {
+        filter: { property: 'Name', title: { contains: title_contains } },
+      });
+      if (!result.results?.length) return;
+      for (const page of result.results) {
+        await notionRequest('PATCH', `/v1/pages/${page.id}`, { archived: true });
+        console.log(`    [cleanup] Archived: ${page.id} (matched: "${title_contains}")`);
+      }
+    } catch (err) {
+      console.warn(`    [cleanup] Failed (non-fatal): ${err.message}`);
+    }
+  }
 }
 
 const RATE_LIMIT_PATTERNS = ['rate limit', 'ratelimit', 'too many requests', '429'];
@@ -115,31 +161,63 @@ function isRateLimitError(result) {
  * Run a single test case against Lyra.
  */
 async function runTest(testCase) {
-  const { id, prompt, timeout_ms = 30000, side_effects = 'none', validators: validatorConfigs = [] } = testCase;
-  const isDryRun = side_effects === 'dry_run';
+  const {
+    id,
+    prompt,
+    timeout_ms = 30000,
+    side_effects = 'none',
+    validators: validatorConfigs = [],
+    cleanup,
+    multi_turn,
+    turns,
+  } = testCase;
 
   console.log(`  [${id}] ${(prompt || '(empty)').slice(0, 60)}...`);
 
-  // Prepend dry-run instruction if needed
-  // Handle empty prompt edge case
-  let finalPrompt = prompt;
-  if (!prompt || prompt.trim() === '') {
-    finalPrompt = ' ';  // Send a single space — tests Lyra's handling of empty-like input
-  } else if (isDryRun) {
-    finalPrompt = `[EVAL MODE - DRY RUN] Describe what you WOULD do, including the exact tools and databases you would use, but do NOT execute any write operations. Show the plan without running it.\n\n${prompt}`;
+  let response = '';
+  let latencyMs = 0;
+  let ttftMs = 0;
+  let resultMeta = { model: 'unknown', provider: 'unknown', error: null };
+
+  if (multi_turn && Array.isArray(turns) && turns.length > 0) {
+    // Multi-turn: send each user turn, validate only the final response.
+    // All turns share the same sessionKey so context carries through.
+    for (const turn of turns) {
+      if (turn.role === 'user') {
+        const turnResult = await sendToLyra(turn.message, timeout_ms, `eval-${id}`);
+        response = turnResult.text;
+        latencyMs = turnResult.durationMs;
+        ttftMs = turnResult.ttftMs;
+        resultMeta = { model: turnResult.model, provider: turnResult.provider, error: turnResult.error };
+        if (turnResult.error) break; // stop on error
+        await new Promise(r => setTimeout(r, 1000)); // pacing between turns
+      }
+    }
+  } else {
+    // Single-turn path
+    let finalPrompt = prompt;
+    if (!prompt || prompt.trim() === '') {
+      finalPrompt = ' '; // tests Lyra's handling of empty-like input
+    }
+    // Note: EVAL MODE dry-run prefix removed — tests now use natural prompts
+
+    let result = await sendToLyra(finalPrompt, timeout_ms, `eval-${id}`);
+
+    // Rate limit backoff: wait 10 min and retry once if MiniMax rate limits hit
+    if (isRateLimitError(result)) {
+      console.log(`    [rate-limit] MiniMax rate limit detected. Waiting 10 minutes before retry...`);
+      await new Promise((r) => setTimeout(r, 10 * 60 * 1000));
+      console.log(`    [rate-limit] Retrying [${id}]...`);
+      result = await sendToLyra(finalPrompt, timeout_ms, `eval-${id}`);
+    }
+
+    response = result.text;
+    latencyMs = result.durationMs;
+    ttftMs = result.ttftMs;
+    resultMeta = { model: result.model, provider: result.provider, error: result.error };
   }
 
-  let result = sendToLyra(finalPrompt, timeout_ms);
-
-  // Rate limit backoff: wait 10 min and retry once if MiniMax rate limits hit
-  if (isRateLimitError(result)) {
-    console.log(`    [rate-limit] MiniMax rate limit detected. Waiting 10 minutes before retry...`);
-    await new Promise((r) => setTimeout(r, 10 * 60 * 1000));
-    console.log(`    [rate-limit] Retrying [${id}]...`);
-    result = sendToLyra(finalPrompt, timeout_ms);
-  }
-  const { text: response, durationMs: latencyMs, error } = result;
-
+  const { error } = resultMeta;
   if (error) {
     console.log(`    ERROR: ${error}`);
   }
@@ -164,13 +242,16 @@ async function runTest(testCase) {
   }
 
   // Run validators
-  const meta = { latencyMs, ttftMs: 0, llmJudgeResults };
+  const meta = { latencyMs, ttftMs, llmJudgeResults };
   const validation = error
     ? { passed: false, results: [{ type: 'error', passed: false, detail: error }] }
     : runValidators(response, validatorConfigs, meta);
 
   const status = validation.passed ? 'PASS' : 'FAIL';
-  console.log(`    ${status} (${latencyMs}ms, ${result.model})`);
+  console.log(`    ${status} (${latencyMs}ms ttft:${ttftMs}ms, ${resultMeta.model})`);
+
+  // Post-test cleanup (write+cleanup tests only)
+  if (cleanup) await runCleanup(cleanup);
 
   // Anti-throttle: prevent MiniMax rate-limit spikes on rapid sequential calls
   await new Promise(r => setTimeout(r, 2000));
@@ -184,11 +265,11 @@ async function runTest(testCase) {
     timestamp: new Date().toISOString(),
     passed: validation.passed,
     latency_ms: latencyMs,
-    ttft_ms: 0,
+    ttft_ms: ttftMs,
     response_length: response.length,
     response_preview: response.slice(0, 300),
-    model: result.model,
-    provider: result.provider,
+    model: resultMeta.model,
+    provider: resultMeta.provider,
     validators: validation.results,
     error,
     side_effects,
@@ -210,10 +291,16 @@ async function main() {
   }
   console.log(`Loaded ${testCases.length} test cases.\n`);
 
-  // Filter by CLI arg
+  // Filter by CLI arg (--only id1,id2 or tier name)
   const filterArg = process.argv[2];
   const filteredCases = filterArg
-    ? testCases.filter((tc) => tc.tier?.includes(filterArg) || tc.id?.includes(filterArg))
+    ? testCases.filter((tc) => {
+        if (filterArg.startsWith('--only')) {
+          const ids = (process.argv[3] || '').split(',').map(s => s.trim());
+          return ids.some(id => tc.id === id || tc.id?.includes(id));
+        }
+        return tc.tier?.includes(filterArg) || tc.id?.includes(filterArg);
+      })
     : testCases;
 
   console.log(`Running ${filteredCases.length} tests...\n`);
@@ -222,38 +309,44 @@ async function main() {
   let passed = 0;
   let failed = 0;
 
-  for (const testCase of filteredCases) {
-    try {
-      const result = await runTest(testCase);
-      results.push(result);
-      if (result.passed) passed++;
-      else failed++;
-    } catch (err) {
-      console.error(`  [${testCase.id}] Unexpected error: ${err.message}`);
-      results.push({
-        id: testCase.id,
-        tier: testCase.tier,
-        category: testCase.category,
-        name: testCase.name || testCase.id,
-        prompt: testCase.prompt?.slice(0, 200),
-        timestamp: new Date().toISOString(),
-        passed: false,
-        latency_ms: 0,
-        ttft_ms: 0,
-        response_length: 0,
-        response_preview: '',
-        model: 'unknown',
-        provider: 'unknown',
-        validators: [{ type: 'error', passed: false, detail: err.message }],
-        error: err.message,
-        side_effects: testCase.side_effects || 'none',
-        tags: testCase.tags || [],
-      });
-      failed++;
-    }
+  try {
+    await ensureConnected();
 
-    // Delay between tests (10s — MiniMax rate limit buffer + gateway breathing room)
-    await new Promise((r) => setTimeout(r, 10000));
+    for (const testCase of filteredCases) {
+      try {
+        const result = await runTest(testCase);
+        results.push(result);
+        if (result.passed) passed++;
+        else failed++;
+      } catch (err) {
+        console.error(`  [${testCase.id}] Unexpected error: ${err.message}`);
+        results.push({
+          id: testCase.id,
+          tier: testCase.tier,
+          category: testCase.category,
+          name: testCase.name || testCase.id,
+          prompt: testCase.prompt?.slice(0, 200),
+          timestamp: new Date().toISOString(),
+          passed: false,
+          latency_ms: 0,
+          ttft_ms: 0,
+          response_length: 0,
+          response_preview: '',
+          model: 'unknown',
+          provider: 'unknown',
+          validators: [{ type: 'error', passed: false, detail: err.message }],
+          error: err.message,
+          side_effects: testCase.side_effects || 'none',
+          tags: testCase.tags || [],
+        });
+        failed++;
+      }
+
+      // Delay between tests (10s — MiniMax rate limit buffer + gateway breathing room)
+      await new Promise((r) => setTimeout(r, 10000));
+    }
+  } finally {
+    if (wsClient) wsClient.disconnect();
   }
 
   // Write results
