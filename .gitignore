@@ -21,3 +21,4 @@ evals/results/*.jsonl
 evals/results/*-summary.json
 evals/results/*-routing.json
 logs/
+.gstack/

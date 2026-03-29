@@ -12,13 +12,14 @@ Read `references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b
 - `$TAVILY_API_KEY` env var is available in all sessions
 
 
-## Cron Schedule (updated 2026-03-22)
+## Cron Schedule (updated 2026-03-29)
 Infrastructure crons:
 - deploy-lyra.sh: Every 30 minutes (was 5 min) — syncs GitHub changes and Lyra self-edits
 - lyra-health-check.sh: Every 15 minutes — gateway health, memory, disk, agent cleanup
 - lyra-backup.sh: Daily 3am — workspace + config backup (7-day retention)
 - eval-precheck: Daily 3:50am — verify gateway before 4am eval run
 - eval-runner: Daily 4am — routing eval daily, full evals on odd days only
+- openclaw-version-check.sh: Every Sunday 9am UTC — checks npm for new version, auto-upgrades with rollback, then triggers Sonnet capability analysis sent to Telegram
 
 Log rotation: Enabled for all /tmp/lyra-*.log and /var/log/lyra-evals.log (daily, 7-day retention, compressed)
 
