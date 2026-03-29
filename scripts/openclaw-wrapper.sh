@@ -54,6 +54,10 @@ if [ -f /root/.openclaw/.env ]; then
     set -a; source /root/.openclaw/.env; set +a
 fi
 
+# V8 heap: default ~257MB triggers OOM on regex compilation at startup (v14 model-router).
+# 512MB gives the regex compiler room. Server has 4GB RAM, systemd allows 1.2GB.
+export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=512"
+
 # D-Bus addresses required for openclaw's internal systemctl is-enabled check.
 # Without these, Node.js D-Bus bindings fail with "No medium found" inside systemd.
 export DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
