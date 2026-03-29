@@ -1,8 +1,12 @@
 /**
- * Lyra Model Router v14 — OpenClaw Plugin
+ * Lyra Model Router v15 — OpenClaw Plugin
  *
  * This is the server-side routing plugin that runs inside OpenClaw on Hetzner.
  * It intercepts model resolution and routes to the appropriate provider/model.
+ *
+ * v15: Tier 0 Python bypass. Pure CRUD operations (list reminders, add item,
+ * mark done, etc.) are executed via Python scripts directly — zero LLM tokens.
+ * Exits before model resolution if matched.
  *
  * v14: Rate-limit aware routing. When Anthropic API is rate-limited,
  * all requests fall back to MiniMax instead of failing.
@@ -16,7 +20,50 @@
  * into OpenClaw's model resolution pipeline.
  */
 
+import { execFileSync } from "child_process";
+import { existsSync } from "fs";
+
 const ABHIGNA_ID = "5003298152";
+
+// --- Tier 0: Python CRUD bypass ---
+// These patterns skip the LLM entirely and execute Python scripts directly.
+const TIER0_PATTERNS = [
+  /^(?:list|show|what(?:'s| is| are)(?: in| on)?) (?:my |the )?(?:reminders?|tasks?)/i,
+  /^(?:show|list) (?:me )?(?:my )?(?:reminders?|tasks?)$/i,
+  /^(?:what'?s?|show|list)(?: in| on)?(?: my)?(?: the)? meal (?:plan|planning)$/i,
+  /^(?:show|list) (?:me )?(?:my )?meals?$/i,
+  /^(?:what'?s?|show|list)(?: my)?(?: upcoming)? trips?$/i,
+  /^remind me (?:to |about )?/i,
+  /^set (?:a )?reminder (?:to |for |about )?/i,
+  /^add .+? to (?:(?:my |the )?(?:shopping|grocery|groceries|meal|task|todo|reminder|trip|content|idea)s? (?:list|plan|db|database)?|(?:my )?reminders?)$/i,
+  /^mark .+? (?:as )?(?:done|complete|finished)$/i,
+  /^(?:done|complete|finished)[:\s]+.+$/i,
+];
+
+const CRUD_CLI = "/root/lyra-ai/crud/cli.py";
+
+function tryTier0(prompt) {
+  const trimmed = prompt.trim();
+  const matched = TIER0_PATTERNS.some((p) => p.test(trimmed));
+  if (!matched) return null;
+  if (!existsSync(CRUD_CLI)) return null;
+
+  try {
+    const result = execFileSync("python3", [CRUD_CLI, "parse", trimmed], {
+      timeout: 8000,
+      env: { ...process.env },
+    });
+    return result.toString().trim();
+  } catch (e) {
+    // exit code 1 = no match, pass through to LLM
+    // exit code other = script error, log and fall through
+    if (e.status !== 1) {
+      process.stderr.write(`[R] Tier0 script error: ${e.message}\n`);
+    }
+    return null;
+  }
+}
+// --- End Tier 0 ---
 
 // Track Anthropic availability — START DISABLED (rate limited until April 1)
 let anthropicAvailable = false;
@@ -58,6 +105,9 @@ const HAIKU_PATTERNS = [
   /\b(?:summarize|summary of|brief me|give me (?:a |the )?(?:rundown|overview|highlights?))\b/i,
 ];
 
+// tier0Result is set when a CRUD bypass executes before model resolution
+let _tier0Result = null;
+
 function routeQuery(event, ctx) {
   const prompt = event?.prompt || "";
   const sessionKey = ctx?.sessionKey || "";
@@ -65,6 +115,17 @@ function routeQuery(event, ctx) {
 
   // Crons use their own model config
   if (trigger === "cron" || trigger === "scheduled") return undefined;
+
+  // Tier 0: CRUD Python bypass — check before any model routing
+  // If matched, store result and signal "use noop model" (will be intercepted post-hook)
+  const tier0 = tryTier0(prompt);
+  if (tier0 !== null) {
+    _tier0Result = tier0;
+    process.stderr.write(`[R] Tier0 hit — bypassing LLM\n`);
+    // Return a special marker; the response hook below will short-circuit
+    return { __tier0: true, directResponse: tier0 };
+  }
+  _tier0Result = null;
 
   // If Anthropic is unavailable, everything stays on MiniMax (default)
   if (!isAnthropicAvailable()) {
@@ -187,11 +248,25 @@ process.stderr.write = function(chunk, ...args) {
 const plugin = {
   id: "lyra-model-router",
   name: "Lyra Model Router",
-  description: "3-tier routing with rate-limit fallback: MiniMax (default) -> Haiku -> Sonnet",
+  description: "Tier 0 Python bypass + 3-tier routing: Python (0 tokens) -> MiniMax -> Haiku -> Sonnet",
   register(api) {
-    api.on("before_model_resolve", (event, ctx) => routeQuery(event, ctx) || {});
+    api.on("before_model_resolve", (event, ctx) => {
+      const result = routeQuery(event, ctx);
+      if (result?.__tier0) {
+        // Inject direct response — bypass model call entirely
+        if (typeof api.respondDirect === "function") {
+          api.respondDirect(result.directResponse);
+          return { __skip: true };
+        }
+        // Fallback: if OpenClaw doesn't support respondDirect, let MiniMax handle it
+        // but prepend the Python result so the model just echoes/formats it
+        event.prompt = `[CRUD result — format nicely for Telegram]\n${result.directResponse}`;
+        return undefined;
+      }
+      return result || {};
+    });
     // Registration logged via stderr only to avoid contaminating eval JSON output
-    process.stderr.write("[lyra-model-router] v14 registered\n");
+    process.stderr.write("[lyra-model-router] v15 registered (Tier 0 active)\n");
   },
 };
 

@@ -15,6 +15,66 @@ version: 1
 default_model: minimax
 confidence_threshold: 0.7
 
+# --- TIER 0: Python CRUD bypass (0 tokens, ~100ms) ---
+# These operations are executed directly via lyra-ai/crud/cli.py.
+# No model is invoked. Patterns are regex-matched before any routing.
+# To add a new operation: add pattern here AND implement in crud/cli.py.
+tier0_python_jobs:
+  description: "Pure CRUD — deterministic, no reasoning needed. Python script handles end-to-end."
+  script: "/root/lyra-ai/crud/cli.py"
+  operations:
+    list_reminders:
+      patterns:
+        - "^(list|show|what('s| is| are)(?: in| on)?) (?:my |the )?(?:reminders?|tasks?)"
+        - "^(show|list) (?:me )?(?:my )?(?:reminders?|tasks?)$"
+      command: "notion list-reminders"
+      examples:
+        - "List my reminders"
+        - "Show my tasks"
+        - "What's in my reminders?"
+    list_meals:
+      patterns:
+        - "^(?:what'?s?|show|list)(?: in| on)?(?: my)?(?: the)? meal (?:plan|planning)$"
+        - "^(?:show|list) (?:me )?(?:my )?meals?$"
+      command: "notion list-db meals"
+      examples:
+        - "What's in my meal plan?"
+        - "Show my meals"
+    list_trips:
+      patterns:
+        - "^(?:what'?s?|show|list)(?: my)?(?: upcoming)? trips?$"
+      command: "notion list-db trips"
+      examples:
+        - "Show my upcoming trips"
+        - "List trips"
+    add_reminder:
+      patterns:
+        - "^remind me (?:to |about )?(.+)"
+        - "^set (?:a )?reminder (?:to |for |about )?(.+)"
+      command: "notion add-reminder"
+      examples:
+        - "Remind me to call the dentist tomorrow"
+        - "Set a reminder for the dentist on Friday"
+    add_item:
+      patterns:
+        - "^add (.+?) to (?:(?:my |the )?(?:shopping|grocery|groceries|meal|task|todo|trip|content|idea)s? (?:list|plan)?|(?:my )?reminders?)$"
+      command: "notion add-item"
+      examples:
+        - "Add milk to shopping list"
+        - "Add yoga to my tasks"
+    mark_done:
+      patterns:
+        - "^mark (.+?) (?:as )?(?:done|complete|finished)$"
+        - "^(?:done|complete|finished)[:\\s]+(.+)$"
+      command: "notion mark-done"
+      examples:
+        - "Mark dentist call done"
+        - "Mark the visa task as complete"
+
+# RULE: When adding new CRUD operations to Lyra, always ask:
+#   1. Is this deterministic given the input? → add to tier0_python_jobs
+#   2. Does it need NL understanding/reasoning? → add to tier1 (minimax) or higher
+
 # --- TIER 1: MiniMax (simple, single-action) ---
 tiers:
   minimax:

@@ -1,6 +1,9 @@
 # Turning a Personal AI Agent into Production Infrastructure
 
-*Technical companion to: [I Built My Own Chief of Staff](./building-lyra.md) — engineering deep-dive for builders who want to go further.*
+
+*Technical companion to: [I Built My Own Chief of Staff](./building-lyra-v2.md) — engineering deep-dive for builders who want to go further.*
+
+---
 
 *From "it works on my server" to "this is how you'd build it if it mattered."*
 
