@@ -7,13 +7,17 @@ tests:
     tier: showcase
     category: multi_step
     name: "Create reminder with date parsing"
-    prompt: "Remind me to call the dentist tomorrow at 3pm"
+    prompt: "Add a reminder: [eval] call the dentist tomorrow at 3pm"
     timeout_ms: 45000
-    side_effects: dry_run
+    side_effects: write
     validators:
       - type: llm_judge
         rubric: "Does the response describe creating a reminder with the correct details? It should parse 'tomorrow' to the correct date, set time to 3pm, mention adding to the Reminders database in Notion, and include the task 'call the dentist'. Vague or incomplete parsing is a low score."
-    tags: [multi-step, reminder, dry-run]
+    cleanup:
+      action: notion_delete_matching
+      database: "1da780089100814fbe1ec27b82acdb8f"
+      title_contains: "[eval]"
+    tags: [multi-step, reminder]
 
   - id: multi-cross-user-task
     tier: showcase
@@ -21,23 +25,27 @@ tests:
     name: "Cross-user task delegation"
     prompt: "Tell Abhigna we need to plan meals for next week"
     timeout_ms: 45000
-    side_effects: dry_run
+    side_effects: none
     validators:
       - type: llm_judge
         rubric: "Does the response describe a multi-step flow? It should: (1) describe writing to the shared Reminders or Meal Planning database, (2) describe sending a Telegram message to Abhigna. Both steps should be mentioned. Only doing one is incomplete."
-    tags: [multi-step, cross-user, dry-run]
+    tags: [multi-step, cross-user]
 
   - id: multi-insight-capture
     tier: showcase
     category: multi_step
     name: "Classify and save insight"
-    prompt: "I just realized that the biggest risk in our product is not competition, it is internal alignment. Teams are optimizing for different metrics and nobody is noticing."
+    prompt: "I just realized that the biggest risk in our product is not competition, it is internal alignment. Teams are optimizing for different metrics and nobody is noticing. Please save this insight with title: [eval] alignment insight."
     timeout_ms: 45000
-    side_effects: dry_run
+    side_effects: write
     validators:
       - type: llm_judge
         rubric: "Does the response describe capturing this as an insight in the Second Brain database? It should: (1) recognize this as a product insight worth saving, (2) describe classifying it (e.g., type: Insight, tags: product/leadership), (3) describe saving to Second Brain in Notion. Simply responding conversationally without capturing is a low score."
-    tags: [multi-step, second-brain, dry-run]
+    cleanup:
+      action: notion_delete_matching
+      database: "31778008-9100-806b-b935-dc1810971e87"
+      title_contains: "[eval]"
+    tags: [multi-step, second-brain]
 
   # --- Proactive Quality ---
   - id: proactive-digest-quality
@@ -104,7 +112,7 @@ tests:
     name: "Handle very long message"
     prompt: "I need to plan a complex trip. We are going from Berlin to Tokyo via Dubai, staying 3 nights in Dubai at a hotel near the Marina, then flying to Tokyo for 5 nights where we want to visit Shibuya, Asakusa, Akihabara, and take a day trip to Hakone. Budget is around 5000 euros total for two people including flights but not including food. We need to book the flights by next Friday and the hotels by the end of the month. Also check if our passports need renewal since they expire in September. And remind me to get travel insurance at least 2 weeks before departure. Can you help organize all of this into a structured plan with timeline and checklist?"
     timeout_ms: 45000
-    side_effects: dry_run
+    side_effects: none
     validators:
       - type: llm_judge
         rubric: "Does the response handle this complex, multi-part request well? It should break down the trip into structured components (flights, hotels, activities, documents, insurance), create a timeline or checklist, and not miss major elements. Addressing only one part or giving a generic response scores low."

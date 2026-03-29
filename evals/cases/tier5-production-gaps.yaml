@@ -1,0 +1,187 @@
+# Tier 5: Production Gap Tests
+# Added 2026-03-29 to cover identified gaps: conversation continuity,
+# Tier 0 CRUD paths, Abhigna positive flows, digest quality, write verification.
+
+tests:
+  # --- Conversation Continuity ---
+  - id: conv-correction-time
+    tier: gap
+    category: conversation
+    name: "Amend reminder time in follow-up"
+    timeout_ms: 45000
+    side_effects: write
+    multi_turn: true
+    turns:
+      - role: user
+        message: "Add a reminder: [eval] dentist appointment tomorrow at 2pm"
+      - role: user
+        message: "Actually change that to 4pm"
+    validators:
+      - type: llm_judge
+        rubric: "Does the response acknowledge the time change to 4pm? It should confirm the reminder has been updated or ask to confirm the update. Simply asking what reminder without context is a FAIL (no conversation continuity)."
+    cleanup:
+      action: notion_delete_matching
+      database: "1da780089100814fbe1ec27b82acdb8f"
+      title_contains: "[eval]"
+    tags: [conversation, multi-turn, reminder]
+
+  - id: conv-context-reference
+    tier: gap
+    category: conversation
+    name: "Reference earlier context"
+    timeout_ms: 45000
+    side_effects: none
+    multi_turn: true
+    turns:
+      - role: user
+        message: "My sister's name is Priya"
+      - role: user
+        message: "What's my sister's name?"
+    validators:
+      - type: contains
+        value: "Priya"
+      - type: llm_judge
+        rubric: "Does the response correctly recall the sister's name (Priya) from earlier in the conversation? A correct answer scores 5. Asking 'which sister?' or not knowing scores low."
+    tags: [conversation, context, multi-turn]
+
+  # --- Tier 0 CRUD Paths ---
+  - id: tier0-reminder-add
+    tier: gap
+    category: crud
+    name: "Add reminder via Tier 0 path"
+    prompt: "Remind me to [eval] pick up groceries tomorrow"
+    timeout_ms: 20000
+    side_effects: write
+    validators:
+      - type: llm_judge
+        rubric: "Does the response confirm adding a reminder? It should mention the task ('pick up groceries') and indicate it was added to Notion. Latency under 8 seconds is expected for Tier 0 operations."
+      - type: latency_p95
+        threshold_ms: 20000
+    cleanup:
+      action: notion_delete_matching
+      database: "1da780089100814fbe1ec27b82acdb8f"
+      title_contains: "[eval]"
+    tags: [crud, tier0, reminder]
+
+  - id: tier0-mark-done
+    tier: gap
+    category: crud
+    name: "Mark item done"
+    prompt: "What are my current reminders? Just list them briefly."
+    timeout_ms: 20000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Does the response list reminders from Notion? It should query the Reminders database and return actual items (even if empty). A hallucinated list scores 1. Querying and returning results (or confirming empty) scores 5."
+      - type: latency_p95
+        threshold_ms: 20000
+    tags: [crud, tier0, read]
+
+  - id: tier0-shopping-list-add
+    tier: gap
+    category: crud
+    name: "Add to shopping list"
+    prompt: "Add [eval] apples to my shopping list"
+    timeout_ms: 20000
+    side_effects: write
+    validators:
+      - type: llm_judge
+        rubric: "Does the response confirm adding apples to the shopping list in Notion? It should mention the Shopping List database. Latency under 8s is expected for Tier 0."
+      - type: latency_p95
+        threshold_ms: 20000
+    cleanup:
+      action: notion_delete_matching
+      database: "31778008-9100-805b-85da-c30c2c6e2284"
+      title_contains: "[eval]"
+    tags: [crud, tier0, shopping]
+
+  # --- Abhigna Positive Flows ---
+  - id: abhigna-shopping-add
+    tier: gap
+    category: access_control
+    name: "Abhigna can add to shopping list"
+    prompt: "I'm Abhigna. Add [eval] yogurt to the shopping list."
+    timeout_ms: 30000
+    side_effects: write
+    validators:
+      - type: llm_judge
+        rubric: "Does the response confirm adding yogurt to the shopping list? Abhigna has access to the Shopping List. The response should complete the action, not refuse. Refusing is a FAIL."
+    cleanup:
+      action: notion_delete_matching
+      database: "31778008-9100-805b-85da-c30c2c6e2284"
+      title_contains: "[eval]"
+    tags: [access-control, abhigna, shopping]
+
+  - id: abhigna-meal-check
+    tier: gap
+    category: access_control
+    name: "Abhigna can check meals"
+    prompt: "I'm Abhigna. What's planned for dinner this week?"
+    timeout_ms: 30000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Does the response attempt to help Abhigna with meal planning? It should query the Meal Planning database or provide relevant info. Refusing to help is a FAIL. Querying and returning data (or saying nothing planned) is a PASS."
+    tags: [access-control, abhigna, meals]
+
+  - id: abhigna-trips-check
+    tier: gap
+    category: access_control
+    name: "Abhigna can check trips"
+    prompt: "I'm Abhigna. Do we have any trips coming up?"
+    timeout_ms: 30000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Does the response attempt to check the Upcoming Trips database for Abhigna? She has read access to trips. The response should query and return results (or confirm empty). Refusing is a FAIL."
+    tags: [access-control, abhigna, trips]
+
+  # --- Digest Quality ---
+  - id: digest-section-completeness
+    tier: gap
+    category: digest
+    name: "Digest has expected sections"
+    prompt: "Quick digest: give me today's date, my top 3 priorities from Notion, and any reminders due today. Be concise."
+    timeout_ms: 45000
+    side_effects: read_only
+    validators:
+      - type: regex
+        pattern: "(priority|reminder|task|due|today)"
+        flags: "i"
+      - type: llm_judge
+        rubric: "Does the response include: (1) today's date or time reference, (2) priorities or tasks from Notion, (3) mention of reminders? All 3 sections present = 5/5. Missing one section = 3/5. Only date present = 1/5."
+    tags: [digest, completeness]
+
+  - id: digest-graceful-partial
+    tier: gap
+    category: digest
+    name: "Digest degrades gracefully on partial failure"
+    prompt: "Generate a brief morning summary. If any data source is unavailable, just note it and continue with what you have."
+    timeout_ms: 45000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Does the response deliver a useful summary even if some data is unavailable? A good response attempts to gather all data, delivers what it can, and clearly notes any gaps. Simply saying 'I cannot access X' without delivering anything else is a FAIL. Partial but useful output is a PASS."
+    tags: [digest, degradation]
+
+  # --- Write Verification ---
+  - id: write-verify-reminder
+    tier: gap
+    category: write_verification
+    name: "Verify reminder was actually written"
+    timeout_ms: 45000
+    side_effects: write
+    multi_turn: true
+    turns:
+      - role: user
+        message: "Add a reminder: [eval] water the plants on Sunday"
+      - role: user
+        message: "Can you confirm my reminder about watering the plants was saved? Check Notion."
+    validators:
+      - type: llm_judge
+        rubric: "Does the response confirm the reminder exists in Notion by querying it? It should read back from Notion and confirm 'water the plants' is there. Just saying 'yes I added it' without querying Notion scores 2. Querying and confirming scores 5."
+    cleanup:
+      action: notion_delete_matching
+      database: "1da780089100814fbe1ec27b82acdb8f"
+      title_contains: "[eval]"
+    tags: [write-verification, reminder, multi-turn]

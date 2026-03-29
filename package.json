@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@supermemory/tools": "^1.4.0",
+    "ws": "^8.20.0",
     "yaml": "^2.8.2"
   }
 }
