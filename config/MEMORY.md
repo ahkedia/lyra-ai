@@ -53,6 +53,9 @@ Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not i
 - [2026-03-21] Router v14 deployed: rate-limit-aware, MiniMax fallback when Anthropic unavailable.
 - [2026-03-21] Systemd: RestartSec=30, StartLimitBurst=5, graceful shutdown wrapper.
 
+## Personal Context
+- Akash's sister is named Priya
+
 ## Session Log
 [2026-03-21 — Major fixes applied: web search, Notion access, memory persistence, router v14]
 
