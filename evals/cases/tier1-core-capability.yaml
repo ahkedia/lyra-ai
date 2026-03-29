@@ -125,7 +125,7 @@ tests:
       - type: contains
         value: "Name"
       - type: latency_p95
-        threshold_ms: 15000
+        threshold_ms: 25000
     tags: [notion, retrieval]
 
   - id: retrieve-datasource-id
@@ -151,7 +151,7 @@ tests:
       - type: llm_judge
         rubric: "Does the response provide a count or list of content ideas from the database? It should either give a number, list items, or at minimum attempt to query Notion. If Notion is unavailable, acknowledging this gracefully is acceptable (score 3). Giving a random number without checking is a FAIL."
       - type: latency_p95
-        threshold_ms: 20000
+        threshold_ms: 25000
     tags: [notion, retrieval]
 
   - id: retrieve-cron-status

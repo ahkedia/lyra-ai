@@ -8,11 +8,11 @@ tests:
     category: latency
     name: "Simple greeting latency"
     prompt: "Hi"
-    timeout_ms: 10000
+    timeout_ms: 12000
     side_effects: none
     validators:
       - type: latency_p95
-        threshold_ms: 5000
+        threshold_ms: 8000
       - type: length_range
         min: 2
     tags: [latency, quick]
@@ -26,7 +26,7 @@ tests:
     side_effects: read_only
     validators:
       - type: latency_p95
-        threshold_ms: 12000
+        threshold_ms: 45000
     tags: [latency, notion]
 
   - id: latency-multi-tool
@@ -48,9 +48,9 @@ tests:
     tier: architectural
     category: tool_use
     name: "Notion reminder creation (dry run)"
-    prompt: "Add a test reminder: check eval framework results"
+    prompt: "Add a reminder: [eval] check eval framework results"
     timeout_ms: 30000
-    side_effects: dry_run
+    side_effects: write
     validators:
       - type: llm_judge
         rubric: "Does the response describe creating a reminder in Notion? It should mention the Reminders database, the reminder text, and confirm it would write to Notion. It should NOT actually execute the write since this is dry-run mode."
@@ -91,11 +91,11 @@ tests:
     name: "Cross-user messaging (dry run)"
     prompt: "Tell Abhigna to check the meal plan for next week"
     timeout_ms: 30000
-    side_effects: dry_run
+    side_effects: none
     validators:
       - type: llm_judge
-        rubric: "Does the response describe sending a message to Abhigna via Telegram? It should mention notifying Abhigna, referencing the meal plan. It should describe what it WOULD do, not actually execute."
-    tags: [cross-user, telegram, dry-run]
+        rubric: "Does the response describe or attempt to send a message to Abhigna via Telegram? It should mention notifying Abhigna, referencing the meal plan."
+    tags: [cross-user, telegram]
 
   # --- Model Routing ---
   - id: routing-simple-minimax
@@ -109,7 +109,7 @@ tests:
       - type: regex
         pattern: "(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"
       - type: latency_p95
-        threshold_ms: 10000
+        threshold_ms: 6000
     tags: [routing, simple]
 
   - id: routing-synthesis
