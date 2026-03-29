@@ -86,7 +86,7 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Properties:** Update (title), Competitor (select), Update Type (select), Summary (rich_text), Date (date), Source (url), Link (url), Relevance (select), Notes (rich_text)
 - **Who can access:** Akash only
 
-### Recruiter Tracker
+### Tracker - Co
 - **database_id:** `31778008910080c09b6fec080955cf00`
 - **data_source_id:** `31778008-9100-8007-8b65-000b2abf7d15`
 - **Properties:** Contact Name (title), Company (rich_text), Status (select), Channel (select), Contact Type (select), Next Action (rich_text), Next Action Date (date), Last Action (rich_text), Notes (rich_text), AI Portfolio Sent (checkbox)
@@ -221,7 +221,7 @@ curl -s -X POST "https://api.notion.com/v1/data_sources/DATA_SOURCE_ID_HERE/quer
 
 ---
 
-## Example: Add a recruiter to Recruiter Tracker
+## Example: Add a recruiter to Tracker - Co
 ```bash
 NOTION_KEY=$NOTION_API_KEY
 curl -s -X POST "https://api.notion.com/v1/pages" \
