@@ -172,6 +172,9 @@ async function runTest(testCase) {
   const status = validation.passed ? 'PASS' : 'FAIL';
   console.log(`    ${status} (${latencyMs}ms, ${result.model})`);
 
+  // Anti-throttle: prevent MiniMax rate-limit spikes on rapid sequential calls
+  await new Promise(r => setTimeout(r, 2000));
+
   return {
     id,
     tier: testCase.tier,
