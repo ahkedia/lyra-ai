@@ -44,18 +44,18 @@ setInterval(() => {
 }, 60 * 1000);
 
 const SONNET_PATTERNS = [
-  /\b(brain brief|weekly brief|digest quality|content suggest|analyze themes?|synthesize|synthesis)\b/i,
-  /\b(draft (a |an )?(blog|article|essay|report|strategy|plan|proposal))\b/i,
-  /\b(compare and contrast|pros and cons|strategic analysis|deep dive|comprehensive review)\b/i,
-  /\b(across (all |my )?databases|connect the dots|find patterns?|what themes)\b/i,
-  /\b(write me a|compose a|create a detailed|elaborate on)\b/i,
+  /\b(?:brain brief|weekly brief|digest quality|content suggest|analyze themes?|synthesize|synthesis)\b/i,
+  /\bdraft (?:a |an )?(?:blog|article|essay|report|strategy|plan|proposal)\b/i,
+  /\b(?:compare and contrast|pros and cons|strategic analysis|deep dive|comprehensive review)\b/i,
+  /\b(?:across (?:all |my )?databases|connect the dots|find patterns?|what themes)\b/i,
+  /\b(?:write me a|compose a|create a detailed|elaborate on)\b/i,
 ];
 const HAIKU_PATTERNS = [
-  /\b(exactly \d+ (bullet|point|item|sentence|word)|format (as|it as)|in (a )?table|markdown format)\b/i,
-  /\b(draft (a |an )?email|reply to|respond to .* email|write back to)\b/i,
-  /\b(what (can|do) (i|you) have access|show me .* database|list .* databases?|what databases?)\b/i,
-  /\b(search (the web|google|online)|find (me |)(articles?|news|information) about)\b/i,
-  /\b(summarize|summary of|brief me|give me (a |the )?(rundown|overview|highlights?))\b/i,
+  /\b(?:exactly \d+ (?:bullet|point|item|sentence|word)|format (?:as|it as)|in (?:a )?table|markdown format)\b/i,
+  /\b(?:draft (?:a |an )?email|reply to|respond to .{0,40}email|write back to)\b/i,
+  /\b(?:what (?:can|do) (?:i|you) have access|show me .{0,40}database|list .{0,40}databases?|what databases?)\b/i,
+  /\b(?:search (?:the web|google|online)|find (?:me )?(?:articles?|news|information) about)\b/i,
+  /\b(?:summarize|summary of|brief me|give me (?:a |the )?(?:rundown|overview|highlights?))\b/i,
 ];
 
 function routeQuery(event, ctx) {
