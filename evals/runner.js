@@ -13,6 +13,8 @@ import { runValidators } from './validators.js';
 import { judgeResponse } from './llm-judge.js';
 import { OpenClawClient } from './ws-client.js';
 
+const RUN_ID = Date.now().toString(36);
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = join(__dirname, 'results');
 const CASES_DIR = process.env.CASES_DIR || join(__dirname, 'cases');
@@ -184,7 +186,7 @@ async function runTest(testCase) {
     // All turns share the same sessionKey so context carries through.
     for (const turn of turns) {
       if (turn.role === 'user') {
-        const turnResult = await sendToLyra(turn.message, timeout_ms, `eval-${id}`);
+        const turnResult = await sendToLyra(turn.message, timeout_ms, `eval-${RUN_ID}-${id}`);
         response = turnResult.text;
         latencyMs = turnResult.durationMs;
         ttftMs = turnResult.ttftMs;
@@ -201,14 +203,14 @@ async function runTest(testCase) {
     }
     // Note: EVAL MODE dry-run prefix removed — tests now use natural prompts
 
-    let result = await sendToLyra(finalPrompt, timeout_ms, `eval-${id}`);
+    let result = await sendToLyra(finalPrompt, timeout_ms, `eval-${RUN_ID}-${id}`);
 
     // Rate limit backoff: wait 10 min and retry once if MiniMax rate limits hit
     if (isRateLimitError(result)) {
       console.log(`    [rate-limit] MiniMax rate limit detected. Waiting 10 minutes before retry...`);
       await new Promise((r) => setTimeout(r, 10 * 60 * 1000));
       console.log(`    [rate-limit] Retrying [${id}]...`);
-      result = await sendToLyra(finalPrompt, timeout_ms, `eval-${id}`);
+      result = await sendToLyra(finalPrompt, timeout_ms, `eval-${RUN_ID}-${id}`);
     }
 
     response = result.text;
