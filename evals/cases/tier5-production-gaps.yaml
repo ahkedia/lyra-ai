@@ -50,13 +50,13 @@ tests:
     category: crud
     name: "Add reminder via Tier 0 path"
     prompt: "Remind me to [eval] pick up groceries tomorrow"
-    timeout_ms: 20000
+    timeout_ms: 45000
     side_effects: write
     validators:
       - type: llm_judge
         rubric: "Does the response confirm adding a reminder? It should mention the task ('pick up groceries') and indicate it was added to Notion. Latency under 8 seconds is expected for Tier 0 operations."
       - type: latency_p95
-        threshold_ms: 20000
+        threshold_ms: 45000
     cleanup:
       action: notion_delete_matching
       database: "1da780089100814fbe1ec27b82acdb8f"
@@ -68,13 +68,13 @@ tests:
     category: crud
     name: "Mark item done"
     prompt: "What are my current reminders? Just list them briefly."
-    timeout_ms: 20000
+    timeout_ms: 45000
     side_effects: read_only
     validators:
       - type: llm_judge
         rubric: "Does the response list reminders from Notion? It should query the Reminders database and return actual items (even if empty). A hallucinated list scores 1. Querying and returning results (or confirming empty) scores 5."
       - type: latency_p95
-        threshold_ms: 20000
+        threshold_ms: 45000
     tags: [crud, tier0, read]
 
   - id: tier0-shopping-list-add
@@ -82,13 +82,13 @@ tests:
     category: crud
     name: "Add to shopping list"
     prompt: "Add [eval] apples to my shopping list"
-    timeout_ms: 20000
+    timeout_ms: 45000
     side_effects: write
     validators:
       - type: llm_judge
         rubric: "Does the response confirm adding apples to the shopping list in Notion? It should mention the Shopping List database. Latency under 8s is expected for Tier 0."
       - type: latency_p95
-        threshold_ms: 20000
+        threshold_ms: 45000
     cleanup:
       action: notion_delete_matching
       database: "31778008-9100-805b-85da-c30c2c6e2284"

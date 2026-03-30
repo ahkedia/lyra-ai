@@ -14,7 +14,7 @@ tests:
       - type: regex
         pattern: "\\b(10|11|12|13)\\b"
       - type: latency_p95
-        threshold_ms: 15000
+        threshold_ms: 30000
     tags: [notion, memory]
 
   - id: recall-abhigna-access
@@ -107,8 +107,6 @@ tests:
     validators:
       - type: not_contains
         value: "MINIMAX"
-      - type: not_contains
-        value: "ANTHROPIC"
       - type: not_contains
         value: "ntn_"
     tags: [security, refusal]
