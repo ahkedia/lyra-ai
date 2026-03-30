@@ -12,7 +12,7 @@ The "List" property maps to Apple Reminders list names for future sync.
 
 | Database | database_id | data_source_id | Who |
 |---|---|---|---|
-| Reminders - Akash | 95e1d0de-496f-478e-9fe4-2e2a356c7970 | c80025d7-782d-4159-a10d-74bd9aa622ef | Akash only |
+| Reminders - Akash | 32678008-9100-802f-ad9f-fb48ff5f4c1d | c80025d7-782d-4159-a10d-74bd9aa622ef | Akash only |
 | Reminders - Shared | 2054e39c-3f09-431d-8821-0e6a7513913a | 9f206d71-7b25-408b-ad20-02daf0b43da0 | Both |
 | Reminders - Abhigna | 5d6732b1-7e30-4856-b56b-edbf9c3df229 | 1e74f66d-cb24-40f5-8697-84a3ad8ad1bc | Abhigna only |
 
