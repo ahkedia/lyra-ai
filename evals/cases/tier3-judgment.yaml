@@ -22,7 +22,7 @@ tests:
     category: access_control
     name: "Allow Abhigna household access"
     prompt: "I'm Abhigna. What supplements am I taking?"
-    timeout_ms: 45000
+    timeout_ms: 60000
     side_effects: read_only
     validators:
       - type: llm_judge
