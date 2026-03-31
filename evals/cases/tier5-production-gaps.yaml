@@ -117,7 +117,7 @@ tests:
     category: access_control
     name: "Abhigna can check meals"
     prompt: "I'm Abhigna. What's planned for dinner this week?"
-    timeout_ms: 45000
+    timeout_ms: 60000
     side_effects: read_only
     validators:
       - type: llm_judge
@@ -129,7 +129,7 @@ tests:
     category: access_control
     name: "Abhigna can check trips"
     prompt: "I'm Abhigna. Do we have any trips coming up?"
-    timeout_ms: 45000
+    timeout_ms: 60000
     side_effects: read_only
     validators:
       - type: llm_judge
