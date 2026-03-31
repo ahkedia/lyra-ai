@@ -1,94 +1,94 @@
 [
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "degrade-impossible-task",
     "name": "Acknowledge impossible tasks",
     "tier": "judgment",
     "category": "graceful_degradation",
     "prompt": "Book me a flight to Tokyo for next weekend",
-    "response_preview": "<final>\nI can't book flights directly — no flight booking integration. Here's what I can do:\n\n**Next weekend = April 4–5, 2026**\n\n**Quick search links (open in browser):**\n- [Google Flights: SFO → Tok",
+    "response_preview": "\n\nNext weekend is April 4-5 (Sat-Sun). A few Qs:\n\n1. **Departure city?** (Delhi, Mumbai, etc.)\n2. **One-way or round-trip?** If round-trip, when return?\n3. **Passengers?**",
     "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
-    "latency_ms": 26795
+    "latency_ms": 10002
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "multi-reminder-flow",
     "name": "Create reminder with date parsing",
     "tier": "showcase",
     "category": "multi_step",
     "prompt": "Add a reminder: [eval] call the dentist tomorrow at 3pm",
-    "response_preview": "",
-    "error": "Chat timeout after 45000ms",
-    "latency_ms": 45004
+    "response_preview": "\n\nDone. Added reminder: **call the dentist** — tomorrow (Apr 1) at 3pm UTC, under Appointments.",
+    "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
+    "latency_ms": 19757
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "multi-cross-user-task",
     "name": "Cross-user task delegation",
     "tier": "showcase",
     "category": "multi_step",
     "prompt": "Tell Abhigna we need to plan meals for next week",
-    "response_preview": "Done. Sent to Abhigna on Telegram.",
+    "response_preview": "\n\nDone. Sent to Abhigna on Telegram.",
     "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
-    "latency_ms": 9299
+    "latency_ms": 7818
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "multi-insight-capture",
     "name": "Classify and save insight",
     "tier": "showcase",
     "category": "multi_step",
     "prompt": "I just realized that the biggest risk in our product is not competition, it is internal alignment. Teams are optimizing for different metrics and nobody is noticing. Please save this insight with titl",
-    "response_preview": "Done. Saved to `memory/2026-03-29.md`:\n\n> **[eval] alignment insight** — The biggest risk in our product is not competition, it is internal alignment. Teams are optimizing for different metrics and no",
+    "response_preview": "\n\nSaved! Created `/memory/insights/alignment-insight.md` with your insight. (Cloud sync blocked by auth — saved locally instead.)",
     "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
-    "latency_ms": 30398
+    "latency_ms": 27675
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "proactive-digest-quality",
     "name": "Morning digest quality",
     "tier": "showcase",
     "category": "proactive_quality",
     "prompt": "Generate my morning digest for today. Include news, tasks due, and any important reminders.",
-    "response_preview": "**☀️ Morning Digest — Sun Mar 29, 2026**\n\n---\n\n**📰 Top Tech News**\n- *Meta the Defendant, Nvidia's iron grip on AI* — WSJ Tech (Mar 29)\n- Samsung named top TV brand by Consumer Reports 2026\n- Gold st",
+    "response_preview": "\n\n# ☀️ Good Morning — March 31, 2026\n\n## 📅 Today\n- No calendar events scheduled\n\n## ✅ Tasks Due Today\n- **Call dentist** — 3:00 PM | Priority: High | List: Bills\n\n## 📰 Tech Highlights\n\n**AI**\n- **Ya",
     "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
-    "latency_ms": 37800
+    "latency_ms": 37453
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "proactive-brain-brief",
     "name": "Weekly brain brief quality",
     "tier": "showcase",
     "category": "proactive_quality",
     "prompt": "Generate my weekly brain brief. Synthesize patterns from the past week across my Second Brain, content ideas, and any recurring themes.",
-    "response_preview": "",
-    "error": "Chat timeout after 45000ms",
-    "latency_ms": 45000
+    "response_preview": "\n\n# 🧠 Weekly Brain Brief — March 24-31, 2026\n\n## 🎯 Top Themes This Week\n\n### 1. Trip Planning — Action Needed\n- **Berlin → Dubai → Tokyo** (April 4 departure)\n- Budget: €5,000 for 2 (flights + hotel",
+    "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
+    "latency_ms": 37332
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "proactive-content-suggestion",
     "name": "Content suggestion quality",
     "tier": "showcase",
     "category": "proactive_quality",
     "prompt": "Based on my recent content ideas, suggest 3 posts I should write this week and explain why each would resonate with my audience.",
-    "response_preview": "Found 6 recent ideas. Here are 3 I'd prioritize this week:\n\n---\n\n**1. \"WebMCP: Google Is Making Every Website Agent-Ready — What This Means for Product\"**\n**Why:** Timely (Chrome launched it Feb 2026)",
-    "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
-    "latency_ms": 41305
+    "response_preview": "",
+    "error": "Chat timeout after 45000ms",
+    "latency_ms": 45029
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "edge-empty-message",
     "name": "Handle near-empty message",
     "tier": "showcase",
     "category": "edge_cases",
     "prompt": ".",
-    "response_preview": "NO_REPLY",
+    "response_preview": "\n\nHEARTBEAT_OK",
     "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
-    "latency_ms": 8080
+    "latency_ms": 6587
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "edge-long-message",
     "name": "Handle very long message",
     "tier": "showcase",
@@ -96,10 +96,10 @@
     "prompt": "I need to plan a complex trip. We are going from Berlin to Tokyo via Dubai, staying 3 nights in Dubai at a hotel near the Marina, then flying to Tokyo for 5 nights where we want to visit Shibuya, Asak",
     "response_preview": "",
     "error": "Chat timeout after 45000ms",
-    "latency_ms": 45012
+    "latency_ms": 45015
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "conv-correction-time",
     "name": "Amend reminder time in follow-up",
     "tier": "gap",
@@ -107,65 +107,65 @@
     "prompt": "",
     "response_preview": "",
     "error": "Chat timeout after 45000ms",
-    "latency_ms": 45001
+    "latency_ms": 45007
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "conv-context-reference",
     "name": "Reference earlier context",
     "tier": "gap",
     "category": "conversation",
     "prompt": "",
-    "response_preview": "Priya.",
+    "response_preview": "\n\nYour sister's name is Priya.",
     "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
-    "latency_ms": 3067
+    "latency_ms": 2251
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "tier0-reminder-add",
     "name": "Add reminder via Tier 0 path",
     "tier": "gap",
     "category": "crud",
     "prompt": "Remind me to [eval] pick up groceries tomorrow",
-    "response_preview": "",
-    "error": "Chat timeout after 20000ms",
-    "latency_ms": 20013
+    "response_preview": "\n\nDone. Added \"Pick up groceries\" to Shared → Groceries, due tomorrow (April 1). ✓",
+    "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
+    "latency_ms": 14521
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "tier0-mark-done",
     "name": "Mark item done",
     "tier": "gap",
     "category": "crud",
     "prompt": "What are my current reminders? Just list them briefly.",
-    "response_preview": "",
-    "error": "Chat timeout after 20000ms",
-    "latency_ms": 20003
+    "response_preview": "\n\n**Current reminders (Akash + Shared):**\n\n**Due today:**\n- Call dentist (3pm, High) — Shared\n- Call the dentist (3pm, Health) — Akash personal\n- [eval] check eval framework results (Work, Medium) — A",
+    "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
+    "latency_ms": 38270
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "tier0-shopping-list-add",
     "name": "Add to shopping list",
     "tier": "gap",
     "category": "crud",
     "prompt": "Add [eval] apples to my shopping list",
-    "response_preview": "",
-    "error": "Chat timeout after 20000ms",
-    "latency_ms": 20011
+    "response_preview": "\n\nDone. Added **apples** to your Shopping list.",
+    "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
+    "latency_ms": 12653
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "abhigna-shopping-add",
     "name": "Abhigna can add to shopping list",
     "tier": "gap",
     "category": "access_control",
     "prompt": "I'm Abhigna. Add [eval] yogurt to the shopping list.",
-    "response_preview": "Done. Added **yogurt** to the Shopping list in Reminders - Shared.",
+    "response_preview": "\n\nDone. Added yogurt to the shopping list (Groceries).",
     "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
-    "latency_ms": 25955
+    "latency_ms": 12377
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "abhigna-meal-check",
     "name": "Abhigna can check meals",
     "tier": "gap",
@@ -173,50 +173,50 @@
     "prompt": "I'm Abhigna. What's planned for dinner this week?",
     "response_preview": "",
     "error": "Chat timeout after 30000ms",
-    "latency_ms": 30010
+    "latency_ms": 30011
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "abhigna-trips-check",
     "name": "Abhigna can check trips",
     "tier": "gap",
     "category": "access_control",
     "prompt": "I'm Abhigna. Do we have any trips coming up?",
-    "response_preview": "\nNo upcoming trips found. The database shows two past trips (Gran Canaria, March 18–26), both now completed. Want me to add a new trip?",
-    "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
-    "latency_ms": 22097
+    "response_preview": "",
+    "error": "Chat timeout after 30000ms",
+    "latency_ms": 30003
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "digest-section-completeness",
     "name": "Digest has expected sections",
     "tier": "gap",
     "category": "digest",
     "prompt": "Quick digest: give me today's date, my top 3 priorities from Notion, and any reminders due today. Be concise.",
-    "response_preview": "",
-    "error": "Chat timeout after 45000ms",
-    "latency_ms": 45011
+    "response_preview": "\n\n**Tuesday, March 31, 2026**\n\n**📌 Top Priorities:**\n1. **Call the dentist** — High priority, due today\n2. **Check eval framework results** — Medium priority\n\n**📅 Reminders Due Today:**\n- Call the d",
+    "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
+    "latency_ms": 29206
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "digest-graceful-partial",
     "name": "Digest degrades gracefully on partial failure",
     "tier": "gap",
     "category": "digest",
     "prompt": "Generate a brief morning summary. If any data source is unavailable, just note it and continue with what you have.",
-    "response_preview": "",
-    "error": "Chat timeout after 45000ms",
-    "latency_ms": 45008
+    "response_preview": "\n\n**☀️ Morning Summary — Tue, Mar 31**\n\n**Weather (Delhi):** ⛅ +2°C feels -1°C\n\n**Calendar:** Unable to check (gcal-helper script unavailable)\n\n**Email:** Could not check\n\nNothing urgent in the worksp",
+    "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
+    "latency_ms": 13143
   },
   {
-    "date": "2026-03-29",
+    "date": "2026-03-31",
     "id": "write-verify-reminder",
     "name": "Verify reminder was actually written",
     "tier": "gap",
     "category": "write_verification",
     "prompt": "",
-    "response_preview": "Confirmed ✓\n\nYour reminder is saved in **Reminders - Shared**:\n\n- **Task:** Water the plants\n- **Due:** Sunday, March 30, 2026\n- **List:** Household\n\nIt's sitting there alongside pick up groceries and",
+    "response_preview": "\n\n<final>❌ Can't check — the Notion API key is still invalid (401 error). Same issue as before.\n\nThe reminder **was not saved** because the API call failed. You'll need to regenerate the token at [Not",
     "error": "LLM Judge error: You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.",
-    "latency_ms": 17678
+    "latency_ms": 21666
   }
 ]

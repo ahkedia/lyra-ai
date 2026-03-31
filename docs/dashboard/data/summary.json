@@ -1,17 +1,17 @@
 {
-  "date": "2026-03-29",
-  "timestamp": "2026-03-29T22:16:16.219Z",
+  "date": "2026-03-31",
+  "timestamp": "2026-03-31T04:30:01.825Z",
   "total_tests": 57,
-  "passed": 13,
-  "failed": 44,
-  "pass_rate": 0.23,
-  "avg_latency_ms": 19748,
+  "passed": 15,
+  "failed": 42,
+  "pass_rate": 0.26,
+  "avg_latency_ms": 18647,
   "p95_latency_ms": 45011,
   "by_tier": {
     "core_capability": {
       "total": 12,
-      "passed": 8,
-      "pass_rate": 0.67
+      "passed": 10,
+      "pass_rate": 0.83
     },
     "architectural": {
       "total": 10,
@@ -37,13 +37,13 @@
   "by_category": {
     "memory_recall": {
       "total": 4,
-      "passed": 3,
-      "pass_rate": 0.75
+      "passed": 4,
+      "pass_rate": 1
     },
     "instruction_following": {
       "total": 4,
-      "passed": 2,
-      "pass_rate": 0.5
+      "passed": 3,
+      "pass_rate": 0.75
     },
     "retrieval_quality": {
       "total": 4,

@@ -220,5 +220,62 @@
         "pass_rate": 0
       }
     }
+  },
+  {
+    "date": "2026-03-30",
+    "total": 4,
+    "passed": 0,
+    "failed": 4,
+    "pass_rate": 0,
+    "avg_latency_ms": 14003,
+    "p95_latency_ms": 20019,
+    "by_tier": {
+      "core_capability": {
+        "total": 1,
+        "passed": 0,
+        "pass_rate": 0
+      },
+      "judgment": {
+        "total": 3,
+        "passed": 0,
+        "pass_rate": 0
+      }
+    }
+  },
+  {
+    "date": "2026-03-31",
+    "total": 57,
+    "passed": 15,
+    "failed": 42,
+    "pass_rate": 0.26,
+    "avg_latency_ms": 18647,
+    "p95_latency_ms": 45011,
+    "by_tier": {
+      "core_capability": {
+        "total": 12,
+        "passed": 10,
+        "pass_rate": 0.83
+      },
+      "architectural": {
+        "total": 10,
+        "passed": 5,
+        "pass_rate": 0.5
+      },
+      "judgment": {
+        "total": 16,
+        "passed": 0,
+        "pass_rate": 0
+      },
+      "showcase": {
+        "total": 8,
+        "passed": 0,
+        "pass_rate": 0
+      },
+      "gap": {
+        "total": 11,
+        "passed": 0,
+        "pass_rate": 0
+      }
+    }
   }
 ]
