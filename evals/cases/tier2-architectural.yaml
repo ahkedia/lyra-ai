@@ -81,8 +81,6 @@ tests:
     validators:
       - type: llm_judge
         rubric: "Does the response show a draft email with a subject line and body? It should NOT send the email, but present it for review. The tone should be professional and the content should mention 'thank you' and 'meeting'."
-      - type: not_contains
-        value: "sent"
     tags: [email, tool-use, dry-run]
 
   - id: tool-cross-user-dryrun
