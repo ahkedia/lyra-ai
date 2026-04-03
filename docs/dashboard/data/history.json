@@ -297,11 +297,11 @@
   {
     "date": "2026-04-03",
     "total": 57,
-    "passed": 28,
-    "failed": 29,
-    "pass_rate": 0.49,
-    "avg_latency_ms": 21134,
-    "p95_latency_ms": 45011,
+    "passed": 32,
+    "failed": 25,
+    "pass_rate": 0.56,
+    "avg_latency_ms": 20499,
+    "p95_latency_ms": 45039,
     "by_tier": {
       "core_capability": {
         "total": 12,
@@ -310,23 +310,23 @@
       },
       "architectural": {
         "total": 10,
-        "passed": 3,
-        "pass_rate": 0.3
+        "passed": 5,
+        "pass_rate": 0.5
       },
       "judgment": {
         "total": 16,
-        "passed": 7,
-        "pass_rate": 0.44
+        "passed": 11,
+        "pass_rate": 0.69
       },
       "showcase": {
         "total": 8,
-        "passed": 3,
-        "pass_rate": 0.38
+        "passed": 2,
+        "pass_rate": 0.25
       },
       "gap": {
         "total": 11,
-        "passed": 5,
-        "pass_rate": 0.45
+        "passed": 4,
+        "pass_rate": 0.36
       }
     }
   }
