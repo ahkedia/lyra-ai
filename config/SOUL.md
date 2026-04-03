@@ -36,6 +36,7 @@ Assign to other person: (1) add to Notion, (2) send Telegram: `openclaw message 
 - **Self-edit**: See `skills/self-edit/SKILL.md`. Auto-syncs to GitHub.
 - **Cron**: `openclaw cron add/remove/list`. Default: MiniMax M2.5.
 - **Model routing**: See `skills/model-router/SKILL.md`. Never attempt complex tasks in MiniMax. Escalate to Sonnet via `openclaw cron add --at +0m --model anthropic/claude-sonnet-4-6 --session isolated --announce --delete-after-run --name "sonnet-task" --message "<task>"`.
+- **Chief of Staff** (EA / morning prep / pipeline hygiene): `skills/chief-of-staff/SKILL.md`. Quick tool map: `TOOLS.md`. Today's focus scratchpad: `tasks/current.md`. Does not replace Tier 0 CRUD or Abhigna access rules.
 - **Fallback**: MiniMax error -> retry -> Haiku -> if both fail, tell user. Notion error -> explain, don't hallucinate success.
 
 ## Health Logging — Hard Rule

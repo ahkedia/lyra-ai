@@ -25,6 +25,21 @@ for f in SOUL.md MEMORY.md HEARTBEAT.md; do
     fi
 done
 
+# Chief-of-staff workspace files (live under lyra-ai/workspace/ in repo)
+for rel in TOOLS.md tasks/current.md; do
+    WORKSPACE_FILE="$WORKSPACE/$rel"
+    REPO_FILE="$REPO_DIR/workspace/$rel"
+    if [ -f "$WORKSPACE_FILE" ]; then
+        mkdir -p "$(dirname "$REPO_FILE")"
+        if [ ! -f "$REPO_FILE" ] || ! diff -q "$WORKSPACE_FILE" "$REPO_FILE" > /dev/null 2>&1; then
+            cp "$WORKSPACE_FILE" "$REPO_FILE"
+            git add "workspace/$rel"
+            CHANGED=true
+            log "  Backed up: workspace/$rel"
+        fi
+    fi
+done
+
 if [ "$CHANGED" = true ]; then
     git commit -m "Daily memory backup: $(date -u +%Y-%m-%d)" || true
     git push origin main || log "WARNING: git push failed"
