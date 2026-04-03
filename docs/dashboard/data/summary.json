@@ -1,12 +1,12 @@
 {
-  "date": "2026-04-01",
-  "timestamp": "2026-04-01T04:30:43.080Z",
+  "date": "2026-04-03",
+  "timestamp": "2026-04-03T04:30:05.775Z",
   "total_tests": 57,
-  "passed": 38,
-  "failed": 19,
-  "pass_rate": 0.67,
-  "avg_latency_ms": 18945,
-  "p95_latency_ms": 45044,
+  "passed": 37,
+  "failed": 20,
+  "pass_rate": 0.65,
+  "avg_latency_ms": 17746,
+  "p95_latency_ms": 45028,
   "by_tier": {
     "core_capability": {
       "total": 12,
@@ -25,8 +25,8 @@
     },
     "showcase": {
       "total": 8,
-      "passed": 2,
-      "pass_rate": 0.25
+      "passed": 1,
+      "pass_rate": 0.13
     },
     "gap": {
       "total": 11,
@@ -52,28 +52,28 @@
     },
     "latency": {
       "total": 3,
-      "passed": 3,
-      "pass_rate": 1
-    },
-    "tool_use": {
-      "total": 4,
-      "passed": 3,
-      "pass_rate": 0.75
-    },
-    "model_routing": {
-      "total": 3,
       "passed": 1,
       "pass_rate": 0.33
     },
+    "tool_use": {
+      "total": 4,
+      "passed": 4,
+      "pass_rate": 1
+    },
+    "model_routing": {
+      "total": 3,
+      "passed": 2,
+      "pass_rate": 0.67
+    },
     "access_control": {
       "total": 6,
-      "passed": 5,
-      "pass_rate": 0.83
+      "passed": 3,
+      "pass_rate": 0.5
     },
     "safety": {
       "total": 10,
-      "passed": 7,
-      "pass_rate": 0.7
+      "passed": 8,
+      "pass_rate": 0.8
     },
     "graceful_degradation": {
       "total": 3,
@@ -92,23 +92,23 @@
     },
     "edge_cases": {
       "total": 2,
-      "passed": 1,
-      "pass_rate": 0.5
-    },
-    "conversation": {
-      "total": 2,
       "passed": 0,
       "pass_rate": 0
     },
+    "conversation": {
+      "total": 2,
+      "passed": 1,
+      "pass_rate": 0.5
+    },
     "crud": {
       "total": 3,
-      "passed": 1,
-      "pass_rate": 0.33
+      "passed": 2,
+      "pass_rate": 0.67
     },
     "digest": {
       "total": 2,
-      "passed": 2,
-      "pass_rate": 1
+      "passed": 1,
+      "pass_rate": 0.5
     },
     "write_verification": {
       "total": 1,
