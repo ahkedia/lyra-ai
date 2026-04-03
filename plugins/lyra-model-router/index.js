@@ -8,6 +8,9 @@
  * mark done, etc.) are executed via Python scripts directly — zero LLM tokens.
  * Exits before model resolution if matched.
  *
+ * v15.1: Normalize prompts (strip trailing "just list briefly") and relax list
+ * patterns ("current reminders", text after core phrase) so eval phrasing hits Tier 0.
+ *
  * v14: Rate-limit aware routing. When Anthropic API is rate-limited,
  * all requests fall back to MiniMax instead of failing.
  * Starts with Anthropic DISABLED (rate limited until April 1).
@@ -27,9 +30,21 @@ const ABHIGNA_ID = "5003298152";
 
 // --- Tier 0: Python CRUD bypass ---
 // These patterns skip the LLM entirely and execute Python scripts directly.
+// Must stay in sync with crud/parse.py (normalize + list_reminders patterns).
+
+function normalizeTier0Prompt(raw) {
+  let s = raw.trim();
+  s = s.replace(
+    /[\s?.!]*(?:just\s+)?(?:please\s+)?(?:list|show|tell me)\s+(?:them\s+)?(?:briefly|quickly|shortly|concisely)\s*[\s?.!]*$/i,
+    "",
+  );
+  return s.trim();
+}
+
 const TIER0_PATTERNS = [
-  /^(?:list|show|what(?:'s| is| are)(?: in| on)?) (?:my |the )?(?:reminders?|tasks?)/i,
-  /^(?:show|list) (?:me )?(?:my )?(?:reminders?|tasks?)$/i,
+  /^(?:list|show|what(?:'s| is| are)(?: in| on)?)\s+(?:my|the)\s+(?:current\s+)?(?:reminders?|tasks?)\b/i,
+  /^(?:show|list)(?:\s+me)?(?:\s+my)?\s+(?:current\s+)?(?:reminders?|tasks?)\b/i,
+  /^(?:list|show)\s+(?:my|the)\s+(?:current\s+)?(?:reminders?|tasks?)\b/i,
   /^(?:what'?s?|show|list)(?: in| on)?(?: my)?(?: the)? meal (?:plan|planning)$/i,
   /^(?:show|list) (?:me )?(?:my )?meals?$/i,
   /^(?:what'?s?|show|list)(?: my)?(?: upcoming)? trips?$/i,
@@ -43,13 +58,13 @@ const TIER0_PATTERNS = [
 const CRUD_CLI = "/root/lyra-ai/crud/cli.py";
 
 function tryTier0(prompt) {
-  const trimmed = prompt.trim();
+  const trimmed = normalizeTier0Prompt(prompt);
   const matched = TIER0_PATTERNS.some((p) => p.test(trimmed));
   if (!matched) return null;
   if (!existsSync(CRUD_CLI)) return null;
 
   try {
-    const result = execFileSync("python3", [CRUD_CLI, "parse", trimmed], {
+    const result = execFileSync("python3", [CRUD_CLI, "parse", prompt.trim()], {
       timeout: 8000,
       env: { ...process.env },
     });

@@ -25,13 +25,15 @@ tier0_python_jobs:
   operations:
     list_reminders:
       patterns:
-        - "^(list|show|what('s| is| are)(?: in| on)?) (?:my |the )?(?:reminders?|tasks?)"
-        - "^(show|list) (?:me )?(?:my )?(?:reminders?|tasks?)$"
+        # Aligned with crud/parse.py: optional "current", no end anchor; normalize strips "just list briefly"
+        - "^(list|show|what('s| is| are)(?: in| on)?)\\s+(?:my|the)\\s+(?:current\\s+)?(?:reminders?|tasks?)\\b"
+        - "^(?:show|list)(?:\\s+me)?(?:\\s+my)?\\s+(?:current\\s+)?(?:reminders?|tasks?)\\b"
       command: "notion list-reminders"
       examples:
         - "List my reminders"
         - "Show my tasks"
         - "What's in my reminders?"
+        - "What are my current reminders? Just list them briefly."
     list_meals:
       patterns:
         - "^(?:what'?s?|show|list)(?: in| on)?(?: my)?(?: the)? meal (?:plan|planning)$"

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Lyra CRUD CLI — dispatch layer for health logging commands."""
-import sys, re, os
+"""Lyra CRUD CLI — dispatch layer for health logging + Tier 0 Notion CRUD."""
+import sys, re, os, subprocess, shutil
+from typing import Optional
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 def usage():
@@ -83,9 +85,75 @@ def cmd_snapshot(args):
     health_snapshot_add(**kwargs)
     print('Snapshot logged')
 
+def _try_notion_shell(action: str) -> Optional[str]:
+    """Run `notion <subcommand>` if the wrapper exists on PATH (Hetzner deploy)."""
+    parts = action.split()
+    if len(parts) < 2 or parts[0] != "notion":
+        return None
+    exe = shutil.which("notion")
+    if not exe:
+        return None
+    sub = parts[1:]
+    try:
+        out = subprocess.check_output(
+            [exe] + sub,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=60,
+        )
+        return out.strip()
+    except (subprocess.CalledProcessError, OSError, subprocess.TimeoutExpired):
+        return None
+
+
 def cmd_parse(args):
-    """Parse a natural language health string and route to the right command."""
-    msg = ' '.join(args).lower().strip()
+    """Parse natural language: Tier 0 Notion CRUD first, then health logging."""
+    raw = " ".join(args).strip()
+    if not raw:
+        print("parse requires a message")
+        sys.exit(1)
+
+    from parse import (
+        detect_intent,
+        normalize_crud_message,
+        extract_reminder_args,
+        extract_add_item_args,
+        extract_mark_done_args,
+    )
+
+    crud = detect_intent(raw)
+    if crud:
+        intent = crud["intent"]
+        action = crud["action"]
+        norm = normalize_crud_message(raw)
+
+        try:
+            if intent == "list_reminders":
+                from reminders import list_reminders_text
+
+                print(list_reminders_text())
+                return
+
+            if intent == "add_reminder":
+                from reminders import add_reminder_text
+
+                ex = extract_reminder_args(norm)
+                print(add_reminder_text(ex["text"], ex.get("when") or ""))
+                return
+
+            if intent in ("list_meals", "list_trips", "add_item", "mark_done"):
+                out = _try_notion_shell(action)
+                if out:
+                    print(out)
+                    return
+                print(f"Could not run {action} (set up `notion` CLI on PATH or implement in crud/).")
+                sys.exit(1)
+
+        except ValueError as e:
+            print(f"CRUD error: {e}")
+            sys.exit(1)
+
+    msg = raw.lower().strip()
 
     # weight: 91.5 / weigh 91.5 kg / weight 91
     m = re.search(r'weight[:\s]+(\d+\.?\d*)', msg) or re.search(r'weigh[s]?\s+(\d+\.?\d*)', msg)
