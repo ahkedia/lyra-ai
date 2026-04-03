@@ -60,6 +60,10 @@ If your skill handles a new type of message, add patterns to `config/routing-rul
 
 Add at least 3 test cases to `evals/routing-eval.js` to verify your skill's messages route to the correct tier.
 
+### Chief of Staff (`skills/chief-of-staff/`)
+
+Operational workflows (morning prep, inbox/calendar discipline, `tasks/current.md`) live in **`skills/chief-of-staff/SKILL.md`**. Shared workspace assets: **`workspace/TOOLS.md`**, **`workspace/tasks/current.md`** — synced to `~/.openclaw/workspace/` by `scripts/deploy-lyra.sh` and backed up from the server by `scripts/memory-backup.sh`. Keep router/CRUD changes separate: CoS is orchestration only, not new Tier 0 patterns.
+
 ---
 
 ## Adding Eval Test Cases

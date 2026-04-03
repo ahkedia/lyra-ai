@@ -227,6 +227,9 @@ lyra-ai/
 │   ├── SOUL.md                       ← live config (auto-synced from Hetzner)
 │   ├── MEMORY.md                     ← live config (auto-synced from Hetzner)
 │   └── HEARTBEAT.md                  ← live cron context
+├── workspace/
+│   ├── TOOLS.md                      ← tool index (Chief of Staff; synced to VPS workspace)
+│   └── tasks/current.md              ← today focus scratchpad
 ├── scripts/
 │   ├── deploy-lyra.sh                ← bidirectional GitHub sync
 │   ├── lyra-backup.sh                ← daily backup with retention
@@ -251,6 +254,7 @@ lyra-ai/
 │   ├── self-edit/SKILL.md            ← Lyra editing her own files
 │   ├── voice-capture/SKILL.md        ← voice → Second Brain pipeline
 │   ├── model-router/SKILL.md         ← 4-tier routing logic
+│   ├── chief-of-staff/SKILL.md       ← EA / morning prep / pipeline hygiene
 │   └── _template/SKILL.md            ← template for new skills
 ├── notion/
 │   ├── notion.md                     ← live database IDs (auto-synced)

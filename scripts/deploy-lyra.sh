@@ -79,6 +79,19 @@ if [ "$BEFORE" != "$AFTER" ]; then
         log "  Synced skills"
     fi
 
+    # Sync workspace extras (TOOLS.md, tasks/current.md — chief-of-staff)
+    if [ -d "$REPO_DIR/workspace" ]; then
+        mkdir -p "$WORKSPACE/tasks"
+        if [ -f "$REPO_DIR/workspace/TOOLS.md" ]; then
+            cp "$REPO_DIR/workspace/TOOLS.md" "$WORKSPACE/TOOLS.md"
+            log "  Synced TOOLS.md"
+        fi
+        if [ -f "$REPO_DIR/workspace/tasks/current.md" ]; then
+            cp "$REPO_DIR/workspace/tasks/current.md" "$WORKSPACE/tasks/current.md"
+            log "  Synced tasks/current.md"
+        fi
+    fi
+
     # Sync notion references
     if [ -d "$REPO_DIR/notion" ]; then
         mkdir -p "$WORKSPACE/references"
