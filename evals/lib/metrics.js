@@ -8,7 +8,19 @@
  * - capability_pass_rate can be gamed by tagging everything unstable — gates also check run_valid.
  */
 
-/** @typedef {'ok'|'timeout'|'transport'|'error'} StabilityKind */
+import { createHash } from 'crypto';
+
+/** @typedef {'ok'|'timeout'|'transport'|'infra'|'error'} StabilityKind */
+
+/**
+ * Short stable fingerprint for grouping errors in dashboards (no PII — message is already truncated upstream).
+ * @param {string|null|undefined} error
+ */
+export function errorFingerprint(error) {
+  const raw = (error || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!raw) return '';
+  return createHash('sha256').update(raw, 'utf8').digest('hex').slice(0, 12);
+}
 
 /**
  * Classify a single test outcome for stability reporting.
@@ -23,9 +35,37 @@ export function classifyStability(error) {
     e.includes('connection closed') ||
     e.includes('not connected') ||
     e.includes('econnrefused') ||
-    e.includes('websocket error')
+    e.includes('websocket error') ||
+    e.includes('econnreset') ||
+    e.includes('socket hang up') ||
+    e.includes('enetunreach') ||
+    e.includes('enotfound')
   ) {
     return 'transport';
+  }
+  // Gateway OOM / overload / upstream 5xx — exclude from capability score like timeouts
+  if (
+    e.includes('heap') ||
+    e.includes('out of memory') ||
+    e.includes('allocation failed') ||
+    e.includes('javascript heap') ||
+    e.includes('enomem') ||
+    e.includes('503') ||
+    e.includes('502') ||
+    e.includes('504') ||
+    e.includes('500') ||
+    e.includes('bad gateway') ||
+    e.includes('service unavailable') ||
+    e.includes('gateway timeout') ||
+    e.includes('status code 503') ||
+    e.includes('status code 502') ||
+    e.includes('status code 504') ||
+    e.includes('status code 500') ||
+    e.includes('cloudflare') ||
+    e.includes('working memory') ||
+    e.includes('payload too large')
+  ) {
+    return 'infra';
   }
   return 'error';
 }
@@ -35,7 +75,7 @@ export function classifyStability(error) {
  */
 export function isInfrastructureFailure(error) {
   const kind = classifyStability(error);
-  return kind === 'timeout' || kind === 'transport';
+  return kind === 'timeout' || kind === 'transport' || kind === 'infra';
 }
 
 /**
@@ -56,7 +96,7 @@ export function isIntegrationShapedTest(r) {
 export function computeSplitScores(results) {
   const total = results.length;
   let infraFailures = 0;
-  const byReason = { timeout: 0, transport: 0, error: 0 };
+  const byReason = { timeout: 0, transport: 0, infra: 0, error: 0 };
 
   for (const r of results) {
     const kind = classifyStability(r.error);
@@ -66,6 +106,9 @@ export function computeSplitScores(results) {
     } else if (kind === 'transport') {
       infraFailures++;
       byReason.transport++;
+    } else if (kind === 'infra') {
+      infraFailures++;
+      byReason.infra++;
     } else if (kind === 'error') {
       byReason.error++;
     }
@@ -127,4 +170,21 @@ export function computeSplitScores(results) {
       all_ok: runValid && stabilityOk && capabilityOk,
     },
   };
+}
+
+/**
+ * Top N error fingerprints for summary (infra triage).
+ */
+export function topErrorFingerprints(results, limit = 15) {
+  const m = {};
+  for (const r of results) {
+    const fp = r.error_fingerprint || '';
+    if (!fp) continue;
+    const key = fp;
+    if (!m[key]) m[key] = { fingerprint: fp, count: 0, example_error: (r.error || '').slice(0, 120) };
+    m[key].count++;
+  }
+  return Object.values(m)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
 }
