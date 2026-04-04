@@ -31,7 +31,7 @@ const HEALTH_WAIT_MS = Math.max(5000, parseInt(process.env.EVAL_HEALTH_WAIT_MS |
 const GATEWAY_HEALTH_URL = process.env.GATEWAY_HEALTH_URL || 'http://127.0.0.1:18789/health';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const RESULTS_DIR = join(__dirname, 'results');
+const RESULTS_DIR = process.env.EVAL_RESULTS_DIR || join(__dirname, 'results');
 const CASES_DIR = process.env.CASES_DIR || join(__dirname, 'cases');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 
