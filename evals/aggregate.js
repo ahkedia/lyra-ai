@@ -6,6 +6,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { computeSplitScores } from './lib/metrics.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = join(__dirname, 'results');
@@ -68,12 +69,19 @@ function main() {
     return;
   }
 
-  // Latest summary
-  const latest = summaries[summaries.length - 1];
-  console.log(`Latest run: ${latest.date} (${latest.total} tests, ${Math.round(latest.pass_rate * 100)}% pass rate)`);
+  // Latest summary — recompute split metrics from JSONL if older run lacks Phase 0 fields
+  let latest = summaries[summaries.length - 1];
+  if (!latest.scores && !latest.stability) {
+    const rows = loadDayResults(latest.date);
+    if (rows.length > 0) {
+      const split = computeSplitScores(rows);
+      latest = { ...latest, ...split };
+    }
+  }
+  console.log(`Latest run: ${latest.date} (${latest.total} tests, ${Math.round(latest.pass_rate * 100)}% legacy pass rate)`);
 
-  // 1. summary.json — latest run
-  writeJSON('summary.json', {
+  // 1. summary.json — latest run (Phase 0: split metrics when present on -summary.json)
+  const summaryPayload = {
     date: latest.date,
     timestamp: latest.timestamp,
     total_tests: latest.total,
@@ -84,19 +92,33 @@ function main() {
     p95_latency_ms: latest.p95_latency_ms,
     by_tier: latest.by_tier,
     by_category: latest.by_category,
-  });
+  };
+  if (latest.stability) summaryPayload.stability = latest.stability;
+  if (latest.scores) summaryPayload.scores = latest.scores;
+  if (latest.gates) summaryPayload.gates = latest.gates;
+  if (latest.eval_config) summaryPayload.eval_config = latest.eval_config;
+  writeJSON('summary.json', summaryPayload);
 
   // 2. history.json — last 90 days
-  const history = summaries.slice(-90).map((s) => ({
-    date: s.date,
-    total: s.total,
-    passed: s.passed,
-    failed: s.failed,
-    pass_rate: s.pass_rate,
-    avg_latency_ms: s.avg_latency_ms,
-    p95_latency_ms: s.p95_latency_ms,
-    by_tier: s.by_tier,
-  }));
+  const history = summaries.slice(-90).map((s) => {
+    const row = {
+      date: s.date,
+      total: s.total,
+      passed: s.passed,
+      failed: s.failed,
+      pass_rate: s.pass_rate,
+      avg_latency_ms: s.avg_latency_ms,
+      p95_latency_ms: s.p95_latency_ms,
+      by_tier: s.by_tier,
+    };
+    if (s.scores?.capability_pass_rate != null) {
+      row.capability_pass_rate = s.scores.capability_pass_rate;
+    }
+    if (s.stability?.infra_failure_rate != null) {
+      row.infra_failure_rate = s.stability.infra_failure_rate;
+    }
+    return row;
+  });
   writeJSON('history.json', history);
 
   // 3. failures.json — last 20 failures across all runs

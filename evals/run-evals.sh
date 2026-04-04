@@ -26,6 +26,16 @@ fi
 
 export NODE_OPTIONS='--max-old-space-size=384'
 
+# Phase 1 — batching / pacing (override on the server if needed)
+export EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-12}"
+export EVAL_BATCH_PAUSE_MS="${EVAL_BATCH_PAUSE_MS:-45000}"
+export EVAL_INTER_TEST_DELAY_MS="${EVAL_INTER_TEST_DELAY_MS:-10000}"
+export EVAL_POST_TEST_MS="${EVAL_POST_TEST_MS:-2000}"
+export EVAL_HEALTH_WAIT_MS="${EVAL_HEALTH_WAIT_MS:-120000}"
+# Phase 0 — gates (capability score = passes among non-infra tests only)
+export EVAL_MAX_INFRA_FAILURE_RATE="${EVAL_MAX_INFRA_FAILURE_RATE:-0.25}"
+export EVAL_CAPABILITY_MIN_PASS_RATE="${EVAL_CAPABILITY_MIN_PASS_RATE:-0.8}"
+
 # Determine if today is a full eval day (odd days: 1st, 3rd, 5th, ...)
 DAY_OF_MONTH=$(date -u +%-d)
 FORCE_FULL="${1:-}"
@@ -63,6 +73,14 @@ until curl -sf http://localhost:18789/health | grep -q '"ok":true'; do
 done
 echo "Gateway healthy (waited ${WAITED}s)"
 
+# Phase 0 — deploy contract + sanity (fails fast if router path is stale)
+echo "Preflight: deploy contract + health..."
+node preflight-check.js || {
+  echo "ERROR: preflight-check failed — fix router deploy path or set SKIP_ROUTER_CHECK=1 for dev"
+  exit 1
+}
+echo ""
+
 # Step 0: Run routing accuracy eval (ALWAYS — offline, free, no API calls)
 echo "Step 0: Running routing accuracy eval..."
 node routing-eval.js 2>&1 || ROUTING_EXIT=$?
@@ -78,6 +96,11 @@ if [ "$IS_FULL_EVAL_DAY" = true ]; then
   echo "Step 1: Running full eval tests..."
   EVAL_EXIT=0
   node runner.js "$@" || EVAL_EXIT=$?
+  if [ "$EVAL_EXIT" -eq 2 ]; then
+    echo ""
+    echo "WARNING: Eval run INVALID — more than half the tests failed due to infra (timeouts/transport)."
+    echo "  Do not treat legacy pass_rate as comparable. Fix gateway OOM / stability first."
+  fi
 
   # Step 2: Aggregate results
   echo ""

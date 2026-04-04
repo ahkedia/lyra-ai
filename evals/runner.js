@@ -12,8 +12,21 @@ import YAML from 'yaml';
 import { runValidators } from './validators.js';
 import { judgeResponse } from './llm-judge.js';
 import { OpenClawClient } from './ws-client.js';
+import {
+  classifyStability,
+  isInfrastructureFailure,
+  computeSplitScores,
+} from './lib/metrics.js';
 
 const RUN_ID = Date.now().toString(36);
+
+/** Pacing — tune via env (Phase 1: reduce gateway OOM under long runs) */
+const POST_TEST_MS = Math.max(0, parseInt(process.env.EVAL_POST_TEST_MS || '2000', 10));
+const INTER_TEST_DELAY_MS = Math.max(0, parseInt(process.env.EVAL_INTER_TEST_DELAY_MS || '10000', 10));
+const BATCH_SIZE = Math.max(1, parseInt(process.env.EVAL_BATCH_SIZE || '12', 10));
+const BATCH_PAUSE_MS = Math.max(0, parseInt(process.env.EVAL_BATCH_PAUSE_MS || '45000', 10));
+const HEALTH_WAIT_MS = Math.max(5000, parseInt(process.env.EVAL_HEALTH_WAIT_MS || '120000', 10));
+const GATEWAY_HEALTH_URL = process.env.GATEWAY_HEALTH_URL || 'http://127.0.0.1:18789/health';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = join(__dirname, 'results');
@@ -33,6 +46,26 @@ async function ensureConnected() {
   );
   await wsClient.connect();
   console.log('[ws] Connected to gateway.');
+}
+
+/**
+ * Wait until gateway /health reports ok (after batch pause or OOM recovery).
+ */
+async function waitForGatewayHealth() {
+  const start = Date.now();
+  while (Date.now() - start < HEALTH_WAIT_MS) {
+    try {
+      const r = await fetch(GATEWAY_HEALTH_URL);
+      if (r.ok) {
+        const j = await r.json();
+        if (j.ok === true) return true;
+      }
+    } catch {
+      /* retry */
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  return false;
 }
 
 /**
@@ -256,7 +289,9 @@ async function runTest(testCase) {
   if (cleanup) await runCleanup(cleanup);
 
   // Anti-throttle: prevent MiniMax rate-limit spikes on rapid sequential calls
-  await new Promise(r => setTimeout(r, 2000));
+  await new Promise((r) => setTimeout(r, POST_TEST_MS));
+
+  const stability = classifyStability(error);
 
   return {
     id,
@@ -274,6 +309,8 @@ async function runTest(testCase) {
     provider: resultMeta.provider,
     validators: validation.results,
     error,
+    stability,
+    infrastructure_failure: isInfrastructureFailure(error),
     side_effects,
     tags: testCase.tags || [],
   };
@@ -314,7 +351,8 @@ async function main() {
   try {
     await ensureConnected();
 
-    for (const testCase of filteredCases) {
+    for (let idx = 0; idx < filteredCases.length; idx++) {
+      const testCase = filteredCases[idx];
       try {
         const result = await runTest(testCase);
         results.push(result);
@@ -338,14 +376,37 @@ async function main() {
           provider: 'unknown',
           validators: [{ type: 'error', passed: false, detail: err.message }],
           error: err.message,
+          stability: classifyStability(err.message),
+          infrastructure_failure: isInfrastructureFailure(err.message),
           side_effects: testCase.side_effects || 'none',
           tags: testCase.tags || [],
         });
         failed++;
       }
 
-      // Delay between tests (10s — MiniMax rate limit buffer + gateway breathing room)
-      await new Promise((r) => setTimeout(r, 10000));
+      const isLast = idx === filteredCases.length - 1;
+      const batchEnd = (idx + 1) % BATCH_SIZE === 0;
+      if (!isLast) {
+        await new Promise((r) => setTimeout(r, INTER_TEST_DELAY_MS));
+      }
+
+      // Phase 1: pause between batches so the gateway can recover memory / finish GC
+      if (batchEnd && !isLast) {
+        console.log(
+          `\n[batch] --- batch ${Math.floor((idx + 1) / BATCH_SIZE)} complete (${idx + 1}/${filteredCases.length}) — cooling ${BATCH_PAUSE_MS}ms ---\n`,
+        );
+        if (wsClient) {
+          wsClient.disconnect();
+          wsClient = null;
+        }
+        await new Promise((r) => setTimeout(r, BATCH_PAUSE_MS));
+        const healthy = await waitForGatewayHealth();
+        if (!healthy) {
+          console.error('[batch] Gateway health check failed after batch pause — aborting run');
+          throw new Error('Gateway unhealthy after batch pause');
+        }
+        await ensureConnected();
+      }
     }
   } finally {
     if (wsClient) wsClient.disconnect();
@@ -357,7 +418,9 @@ async function main() {
   const jsonlContent = results.map((r) => JSON.stringify(r)).join('\n') + '\n';
   appendFileSync(outputFile, jsonlContent);
 
-  // Write summary
+  const split = computeSplitScores(results);
+
+  // Write summary (legacy fields preserved for dashboards; split metrics added)
   const summary = {
     date: today,
     timestamp: new Date().toISOString(),
@@ -378,7 +441,16 @@ async function main() {
       name: r.name,
       category: r.category,
       error: r.error || r.validators?.find((v) => !v.passed)?.detail || 'Unknown',
+      infrastructure_failure: r.infrastructure_failure === true,
+      stability: r.stability,
     })),
+    ...split,
+    eval_config: {
+      batch_size: BATCH_SIZE,
+      batch_pause_ms: BATCH_PAUSE_MS,
+      inter_test_delay_ms: INTER_TEST_DELAY_MS,
+      post_test_ms: POST_TEST_MS,
+    },
   };
 
   const summaryFile = join(RESULTS_DIR, `${today}-summary.json`);
@@ -386,13 +458,33 @@ async function main() {
 
   // Print summary
   console.log('\n' + '='.repeat(50));
-  console.log(`Results: ${passed}/${results.length} passed (${Math.round(summary.pass_rate * 100)}%)`);
+  console.log(`Legacy pass rate: ${passed}/${results.length} (${Math.round(summary.pass_rate * 100)}%) — includes infra failures`);
+  if (split.scores.capability_pass_rate !== null) {
+    console.log(
+      `Capability pass rate (stable tests only): ${split.scores.capability_passed}/${split.stability.stable_count} (${Math.round(split.scores.capability_pass_rate * 100)}%)`,
+    );
+  } else {
+    console.log('Capability pass rate: N/A (no stable tests)');
+  }
+  console.log(
+    `Infra failures: ${split.stability.infra_failures} (${Math.round(split.stability.infra_failure_rate * 100)}%) — timeouts/transport excluded from capability score`,
+  );
+  if (split.scores.integration_pass_rate !== null) {
+    console.log(
+      `Integration-shaped (stable): ${split.scores.integration_passed}/${split.scores.integration_stable} (${Math.round(split.scores.integration_pass_rate * 100)}%)`,
+    );
+  }
+  console.log(`Gates: run_valid=${split.gates.run_valid} stability_ok=${split.gates.stability_ok} capability_ok=${split.gates.capability_ok}`);
   console.log(`Avg latency: ${summary.avg_latency_ms}ms | P95: ${summary.p95_latency_ms}ms`);
 
   if (failed > 0) {
-    console.log(`\nFailures:`);
-    for (const f of summary.failures) {
-      console.log(`  - [${f.id}] ${f.name}: ${f.error}`);
+    console.log(`\nFailures (sample):`);
+    for (const f of summary.failures.slice(0, 25)) {
+      const tag = f.infrastructure_failure ? ' [infra]' : '';
+      console.log(`  - [${f.id}] ${f.name}: ${f.error}${tag}`);
+    }
+    if (summary.failures.length > 25) {
+      console.log(`  ... and ${summary.failures.length - 25} more`);
     }
   }
 
@@ -400,7 +492,25 @@ async function main() {
   console.log(`Results: ${outputFile}`);
   console.log(`Summary: ${summaryFile}`);
 
-  if (summary.pass_rate < 0.8) process.exit(1);
+  // Exit codes: 0 = green, 1 = capability/stability gate, 2 = invalid run (too unstable)
+  if (process.env.EVAL_LEGACY_EXIT === '1') {
+    if (summary.pass_rate < 0.8) {
+      console.error('\n[exit 1] EVAL_LEGACY_EXIT=1: legacy pass_rate < 80%');
+      process.exit(1);
+    }
+  } else {
+    if (!split.gates.run_valid) {
+      console.error('\n[exit 2] Run invalid: >50% tests had infra failures — do not compare to prior pass rates');
+      process.exit(2);
+    }
+    if (!split.gates.all_ok) {
+      const reasons = [];
+      if (!split.gates.stability_ok) reasons.push('infra_failure_rate too high');
+      if (!split.gates.capability_ok) reasons.push('capability_pass_rate below minimum');
+      console.error(`\n[exit 1] Gate failed: ${reasons.join(', ')}`);
+      process.exit(1);
+    }
+  }
 }
 
 function groupBy(results, field) {

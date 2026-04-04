@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "eval": "node runner.js",
+    "preflight": "node preflight-check.js",
     "aggregate": "node aggregate.js",
     "notion-sync": "node notion-sync.js"
   },
