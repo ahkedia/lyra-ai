@@ -97,6 +97,7 @@ function main() {
   if (latest.scores) summaryPayload.scores = latest.scores;
   if (latest.gates) summaryPayload.gates = latest.gates;
   if (latest.eval_config) summaryPayload.eval_config = latest.eval_config;
+  if (latest.error_fingerprint_top) summaryPayload.error_fingerprint_top = latest.error_fingerprint_top;
   writeJSON('summary.json', summaryPayload);
 
   // 2. history.json — last 90 days

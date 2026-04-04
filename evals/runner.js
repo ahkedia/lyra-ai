@@ -16,6 +16,8 @@ import {
   classifyStability,
   isInfrastructureFailure,
   computeSplitScores,
+  errorFingerprint,
+  topErrorFingerprints,
 } from './lib/metrics.js';
 
 const RUN_ID = Date.now().toString(36);
@@ -134,46 +136,120 @@ async function sendToLyra(message, timeoutMs = 30000, sessionKey = null) {
   }
 }
 
+const NOTION_VERSION = '2025-09-03';
+
+/** Normalize Notion UUID (32 hex → dashed) for API paths */
+function uuidWithDashes(raw) {
+  const hex = String(raw).replace(/[^a-fA-F0-9]/g, '');
+  if (hex.length !== 32) return String(raw).trim();
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 /**
- * Minimal Notion API helper for cleanup operations.
+ * Minimal Notion API helper for cleanup — uses API 2025-09-03; rejects on HTTP >= 400.
  */
 function notionRequest(method, path, body = null) {
   return new Promise((resolve, reject) => {
+    const key = process.env.NOTION_API_KEY;
+    if (!key) {
+      reject(new Error('NOTION_API_KEY not set'));
+      return;
+    }
     const opts = {
       hostname: 'api.notion.com',
       path,
       method,
       headers: {
-        'Authorization': `Bearer ${process.env.NOTION_API_KEY}`,
-        'Notion-Version': '2022-06-28',
+        Authorization: `Bearer ${key}`,
+        'Notion-Version': NOTION_VERSION,
         'Content-Type': 'application/json',
       },
     };
     const req = https.request(opts, (res) => {
       let data = '';
-      res.on('data', chunk => data += chunk);
+      res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
-        try { resolve(JSON.parse(data)); } catch { resolve({}); }
+        let parsed = {};
+        try {
+          parsed = data ? JSON.parse(data) : {};
+        } catch {
+          parsed = { raw: data };
+        }
+        const code = res.statusCode || 0;
+        if (code >= 400) {
+          const msg = parsed.message || parsed.code || data || `HTTP ${code}`;
+          reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)));
+          return;
+        }
+        resolve(parsed);
       });
     });
     req.on('error', reject);
-    if (body) req.write(JSON.stringify(body));
+    if (body != null) req.write(JSON.stringify(body));
     req.end();
   });
 }
 
 /**
+ * Query pages whose title (Name / Task / Item) contains the given string.
+ * Tries OR filter first, then each property alone (Notion errors if property missing in OR).
+ */
+async function queryNotionTitleContains(apiPath, titleContains, titleProperties) {
+  const props =
+    Array.isArray(titleProperties) && titleProperties.length > 0
+      ? titleProperties
+      : ['Task', 'Name', 'Item'];
+  const orBody = {
+    filter: {
+      or: props.map((property) => ({
+        property,
+        title: { contains: titleContains },
+      })),
+    },
+  };
+  try {
+    return await notionRequest('POST', apiPath, orBody);
+  } catch {
+    for (const property of props) {
+      try {
+        return await notionRequest('POST', apiPath, {
+          filter: { property, title: { contains: titleContains } },
+        });
+      } catch {
+        /* try next property */
+      }
+    }
+    throw new Error(`cleanup query failed for path ${apiPath}`);
+  }
+}
+
+/**
  * Post-test cleanup hook for write+cleanup tests.
  * Archives Notion pages matching title_contains (reversible soft-delete).
+ *
+ * YAML: database (required), optional data_source, optional title_properties: [ "Task", "Name" ]
  */
 async function runCleanup(cleanupConfig) {
   if (!cleanupConfig) return;
   if (cleanupConfig.action === 'notion_delete_matching') {
-    const { database, title_contains } = cleanupConfig;
+    const { database, title_contains, data_source, title_properties } = cleanupConfig;
     try {
-      const result = await notionRequest('POST', `/v1/databases/${database}/query`, {
-        filter: { property: 'Name', title: { contains: title_contains } },
-      });
+      let result = { results: [] };
+
+      if (data_source) {
+        try {
+          const dsPath = `/v1/data_sources/${uuidWithDashes(data_source)}/query`;
+          result = await queryNotionTitleContains(dsPath, title_contains, title_properties);
+        } catch (err) {
+          console.warn(`    [cleanup] data_source query: ${err.message}`);
+        }
+      }
+
+      if (!result.results?.length) {
+        const dbPath = `/v1/databases/${uuidWithDashes(database)}/query`;
+        result = await queryNotionTitleContains(dbPath, title_contains, title_properties);
+      }
+
       if (!result.results?.length) return;
       for (const page of result.results) {
         await notionRequest('PATCH', `/v1/pages/${page.id}`, { archived: true });
@@ -183,6 +259,14 @@ async function runCleanup(cleanupConfig) {
       console.warn(`    [cleanup] Failed (non-fatal): ${err.message}`);
     }
   }
+}
+
+function errorMeta(error) {
+  return {
+    stability: classifyStability(error),
+    infrastructure_failure: isInfrastructureFailure(error),
+    error_fingerprint: errorFingerprint(error),
+  };
 }
 
 const RATE_LIMIT_PATTERNS = ['rate limit', 'ratelimit', 'too many requests', '429'];
@@ -291,7 +375,7 @@ async function runTest(testCase) {
   // Anti-throttle: prevent MiniMax rate-limit spikes on rapid sequential calls
   await new Promise((r) => setTimeout(r, POST_TEST_MS));
 
-  const stability = classifyStability(error);
+  const em = errorMeta(error);
 
   return {
     id,
@@ -309,8 +393,7 @@ async function runTest(testCase) {
     provider: resultMeta.provider,
     validators: validation.results,
     error,
-    stability,
-    infrastructure_failure: isInfrastructureFailure(error),
+    ...em,
     side_effects,
     tags: testCase.tags || [],
   };
@@ -376,8 +459,7 @@ async function main() {
           provider: 'unknown',
           validators: [{ type: 'error', passed: false, detail: err.message }],
           error: err.message,
-          stability: classifyStability(err.message),
-          infrastructure_failure: isInfrastructureFailure(err.message),
+          ...errorMeta(err.message),
           side_effects: testCase.side_effects || 'none',
           tags: testCase.tags || [],
         });
@@ -450,7 +532,9 @@ async function main() {
       batch_pause_ms: BATCH_PAUSE_MS,
       inter_test_delay_ms: INTER_TEST_DELAY_MS,
       post_test_ms: POST_TEST_MS,
+      notion_api_version: NOTION_VERSION,
     },
+    error_fingerprint_top: topErrorFingerprints(results),
   };
 
   const summaryFile = join(RESULTS_DIR, `${today}-summary.json`);
@@ -467,7 +551,7 @@ async function main() {
     console.log('Capability pass rate: N/A (no stable tests)');
   }
   console.log(
-    `Infra failures: ${split.stability.infra_failures} (${Math.round(split.stability.infra_failure_rate * 100)}%) — timeouts/transport excluded from capability score`,
+    `Infra failures: ${split.stability.infra_failures} (${Math.round(split.stability.infra_failure_rate * 100)}%) — timeout/transport/gateway stress excluded from capability score`,
   );
   if (split.scores.integration_pass_rate !== null) {
     console.log(
