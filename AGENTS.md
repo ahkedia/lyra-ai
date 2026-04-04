@@ -2,6 +2,10 @@
 
 This folder is home. Treat it that way.
 
+## Git workflow (Cursor, Claude Code, automation)
+
+GitHub **`main`** is canonical. Before editing tracked files: `git fetch origin && git pull --ff-only origin main`. After a change: commit and `git push origin main`. Do not leave unpushed commits only on the VPS. Full contract: **`docs/GIT-WORKFLOW.md`** and root **`CLAUDE.md`**.
+
 ## First Run
 
 If `BOOTSTRAP.md` exists, that's your birth certificate. Follow it, figure out who you are, then delete it. You won't need it again.

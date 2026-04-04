@@ -1,0 +1,14 @@
+---
+description: Mandatory git workflow for lyra-ai (sync with GitHub + VPS)
+alwaysApply: true
+---
+
+# Lyra — Git & deploy (mandatory)
+
+Read **`docs/GIT-WORKFLOW.md`** for the full contract. On every task that changes tracked files:
+
+1. **Start:** `git fetch origin && git pull --ff-only origin main` (from the project root). If `--ff-only` fails, stop and fix divergence before editing.
+2. **End:** `git add` → `git commit` with a clear message → `git push origin main`.
+3. **VPS:** Do not commit only on the server. Deploy with pull from `main` + service restart when needed; see `docs/GIT-WORKFLOW.md`.
+
+The human may not use the terminal; **you** run these commands when implementing work. No silent local-only state.

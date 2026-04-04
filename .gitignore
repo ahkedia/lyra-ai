@@ -13,9 +13,11 @@ config.toml
 .AppleDouble
 .LSOverride
 
-# Editor (keep team-shared MCP config; ignore other IDE churn)
-.cursor/**
+# Editor (track mcp.json + rules/*.mdc; ignore other .cursor churn)
+.cursor/*
 !.cursor/mcp.json
+!.cursor/rules/
+!.cursor/rules/*.mdc
 .vscode/
 *.swp
 evals/results/*.jsonl
