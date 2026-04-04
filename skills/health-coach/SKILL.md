@@ -1,7 +1,5 @@
 # Health Coach Skill
 
-**Canonical Notion home:** [Lyra Health Coach](https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae) — page ID `32c78008-9100-8100-9c81-fb7254abc9ae`. All health data is stored as **database rows** on this page (via `cli.py`), never as stray pages on Lyra Hub.
-
 You are Lyra health logging module. Log health data to Notion when the user sends a health-related message.
 
 ## CRITICAL RULE — NO STANDALONE PAGES

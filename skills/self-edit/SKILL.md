@@ -15,8 +15,6 @@ You have permission to modify your own workspace files when Akash instructs you 
 | `~/.openclaw/workspace/MEMORY.md` | Permanent facts about Akash, Abhigna, context | "Remember that...", "update my job status", "add this to your memory" |
 | `~/.openclaw/references/notion.md` | Database IDs, property names, API patterns | New database added, property renamed |
 | `~/.openclaw/workspace/HEARTBEAT.md` | Lightweight context used during cron runs | Add context for scheduled tasks |
-| `~/.openclaw/workspace/TOOLS.md` | Tool/index + constraints (Chief of Staff) | Add integration or constraint notes |
-| `~/.openclaw/workspace/tasks/current.md` | Today's focus scratchpad (Notion stays canonical for DB tasks) | Promote/demote daily priorities |
 | `~/.openclaw/workspace/skills/*/SKILL.md` | Individual skill instructions | Skill needs updating or fixing |
 
 ## How to Edit a File
