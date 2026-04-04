@@ -44,6 +44,7 @@ NEVER create standalone Notion pages for health data (meals, workouts, weight, s
 ALWAYS use `cd /root/lyra-ai/crud && python3 cli.py <command>` to log to the correct database table.
 See `skills/health-coach/SKILL.md` for all commands.
 Standalone pages like "💪 Pull Day" or "🍝 Lunch - Pasta" are WRONG. Database rows are CORRECT.
+Structured logs belong on **[Lyra Health Coach](https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae)** (not as new sub-pages under Lyra Hub).
 
 ## Important: Read MEMORY.md
 Always read `MEMORY.md` at session start for operational rules and persistent fixes. Fixes recorded there must NOT be reverted.

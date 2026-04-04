@@ -9,6 +9,8 @@ metadata: {"clawdbot":{"emoji":"📝"}}
 
 Use the Notion API to create/read/update pages, data sources (databases), and blocks.
 
+**Health (weight, sleep, food, workouts, steps, energy, snapshots):** do not improvise API calls here. Follow `skills/health-coach/SKILL.md` and run `cd /root/lyra-ai/crud && python3 cli.py …` so entries land in [Lyra Health Coach](https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae), not as new pages under Lyra Hub.
+
 ## Setup
 
 1. Create an integration at https://notion.so/my-integrations

@@ -23,6 +23,8 @@ This is your home in Akash's Notion. You can:
 - Create new databases here when Akash asks for a new tracker or log
 - Add content blocks to existing pages under this hub
 
+**Not for health logs.** Meals, workouts, weight, sleep, steps, calories, energy, body snapshots → use **Lyra Health Coach** only: `skills/health-coach/SKILL.md` + `cd /root/lyra-ai/crud && python3 cli.py …`. Do not create a normal Notion page under Lyra Hub for those (they belong as rows in the four Health Coach databases).
+
 ### Create a new sub-page inside Lyra Hub
 ```bash
 NOTION_KEY=$NOTION_API_KEY
@@ -60,6 +62,17 @@ curl -s -X POST "https://api.notion.com/v1/databases" \
     }
   }'
 ```
+
+---
+
+## Lyra Health Coach — structured fitness and nutrition
+
+**Page ID:** `32c78008-9100-8100-9c81-fb7254abc9ae`  
+**URL:** https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae
+
+The Daily Log, Food Log, Workout Log, and Progress Snapshots databases live on this page. Lyra must write **rows** into those databases via `crud/cli.py`, not new freeform pages under Lyra Hub.
+
+**Commands:** `skills/health-coach/SKILL.md` (same as `config/SOUL.md` health rule).
 
 ---
 
@@ -281,6 +294,7 @@ curl -s -X PATCH "https://api.notion.com/v1/pages/PAGE_ID_HERE" \
 - Never ask user to "share databases in Notion UI" — that is for humans, not APIs
 
 ### Daily Log (Health Coach)
+- **Parent page:** [Lyra Health Coach](https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae) (`32c78008-9100-8100-9c81-fb7254abc9ae`) — not Lyra Hub
 - **database_id:** `53f53768-6e94-493a-9508-42cc41973ba5`
 - **data_source_id:** `53f53768-6e94-493a-9508-42cc41973ba5`
 - **Properties:** Date (date), Weight kg (number), Steps (number), Active Calories (number), Sleep Hours (number), Sleep Quality (select: Poor/Fair/Good/Great), Resting Heart Rate (number), Energy Level (select: Low/Medium/High), Workout Done (checkbox), Notes (rich_text), Data Source (select: Apple Health/Manual/Lyra), Logged At (rich_text)
