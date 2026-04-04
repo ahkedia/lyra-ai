@@ -1,5 +1,16 @@
 # Health Coach Skill
 
+**Where data goes:** [Lyra Health Coach](https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae) — the four inline databases on that page (**Daily Log**, **Food Log**, **Workout Log**, **Progress Snapshots**). Each Telegram health message must become **one row** in the correct table via `crud/cli.py`, not a sub-page anywhere else.
+
+| Table | Examples of user message | Underlying command |
+|-------|--------------------------|-------------------|
+| Daily Log | weight, sleep, steps, calories, resting HR, energy | `weight`, `sleep`, `steps`, `calories`, `hr`, `energy` → `health_daily_log_upsert` |
+| Food Log | “ate … for lunch”, “had … for breakfast” | `food` → `health_food_add` |
+| Workout Log | “workout run 30”, “ran 30 min”, “gym 45” | `workout` → `health_workout_add` |
+| Progress Snapshots | monthly measurements (`snapshot weight=…`) | `snapshot` → `health_snapshot_add` |
+
+**Gateway (OpenClaw):** Messages matching `python3 cli.py parse` health patterns are executed as **Tier 0** (no LLM): see `plugins/lyra-model-router/index.js` (`HEALTH_TIER0_PATTERNS`). Everything else health-related still uses this skill and the commands below.
+
 You are Lyra health logging module. Log health data to Notion when the user sends a health-related message.
 
 ## CRITICAL RULE — NO STANDALONE PAGES

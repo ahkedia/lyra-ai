@@ -76,6 +76,11 @@ tier0_python_jobs:
 # RULE: When adding new CRUD operations to Lyra, always ask:
 #   1. Is this deterministic given the input? → add to tier0_python_jobs
 #   2. Does it need NL understanding/reasoning? → add to tier1 (minimax) or higher
+#
+# Health logging (Lyra Health Coach — four Notion DBs on the coach page):
+#   Implemented in plugins/lyra-model-router/index.js as HEALTH_TIER0_PATTERNS + same
+#   script path: `python3 /root/lyra-ai/crud/cli.py parse "<message>"`.
+#   Keep patterns aligned with crud/cli.py cmd_parse() health regexes.
 
 # --- TIER 1: MiniMax (simple, single-action) ---
 tiers:

@@ -11,6 +11,10 @@
  * v15.1: Normalize prompts (strip trailing "just list briefly") and relax list
  * patterns ("current reminders", text after core phrase) so eval phrasing hits Tier 0.
  *
+ * v15.2: Tier 0 health — messages that match crud/cli.py parse() health regexes run
+ * `python3 cli.py parse` with zero LLM tokens. Writes go to Lyra Health Coach DBs
+ * (Daily / Food / Workout / Snapshots) via crud/notion.py — same as manual cli.
+ *
  * v14: Rate-limit aware routing. When Anthropic API is rate-limited,
  * all requests fall back to MiniMax instead of failing.
  * Starts with Anthropic DISABLED (rate limited until April 1).
@@ -41,6 +45,23 @@ function normalizeTier0Prompt(raw) {
   return s.trim();
 }
 
+// Must stay aligned with crud/cli.py cmd_parse() health branch (after CRUD).
+const HEALTH_TIER0_PATTERNS = [
+  /\bweight[:\s]+\d/i,
+  /\bweigh\s+\d/i,
+  /\bslept?\s+\d/i,
+  /\bsleep[:\s]+\d/i,
+  /(?:walked|steps)[:\s]+\d+/i,
+  /\d+\s+steps\b/i,
+  /(?:active\s+cal(?:ories)?|burned)[:\s]+\d+/i,
+  /(?:resting\s+)?h[ea]rt\s+rate[:\s]+\d+/i,
+  /\bhr[:\s]+\d+/i,
+  /\benergy[:\s]+(?:low|medium|med|high)\b/i,
+  /\bworkout[:\s]+/i,
+  /(?:^|\s)(?:ran|cycled|walked\s+for|did\s+gym)\s+\d+\s*min/i,
+  /(?:ate|had|eaten)\s+.+\s+for\s+(?:breakfast|lunch|dinner|snack)/i,
+];
+
 const TIER0_PATTERNS = [
   /^(?:list|show|what(?:'s| is| are)(?: in| on)?)\s+(?:my|the)\s+(?:current\s+)?(?:reminders?|tasks?)\b/i,
   /^(?:show|list)(?:\s+me)?(?:\s+my)?\s+(?:current\s+)?(?:reminders?|tasks?)\b/i,
@@ -59,7 +80,9 @@ const CRUD_CLI = "/root/lyra-ai/crud/cli.py";
 
 function tryTier0(prompt) {
   const trimmed = normalizeTier0Prompt(prompt);
-  const matched = TIER0_PATTERNS.some((p) => p.test(trimmed));
+  const matched =
+    TIER0_PATTERNS.some((p) => p.test(trimmed)) ||
+    HEALTH_TIER0_PATTERNS.some((p) => p.test(trimmed));
   if (!matched) return null;
   if (!existsSync(CRUD_CLI)) return null;
 
@@ -281,7 +304,7 @@ const plugin = {
       return result || {};
     });
     // Registration logged via stderr only to avoid contaminating eval JSON output
-    process.stderr.write("[lyra-model-router] v15 registered (Tier 0 active)\n");
+    process.stderr.write("[lyra-model-router] v15.2 registered (Tier 0 CRUD + health)\n");
   },
 };
 
