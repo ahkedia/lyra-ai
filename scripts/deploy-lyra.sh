@@ -65,39 +65,82 @@ git pull origin main --ff-only 2>/dev/null || {
 }
 AFTER=$(git rev-parse HEAD)
 
-if [ "$BEFORE" = "$AFTER" ] && [ "$PUSHED" = false ]; then
+# ──────────────────────────────────────────────
+# PHASE 3: Always sync workspace from repo (content-based, not commit-gated)
+# This ensures workspace stays in sync even when BEFORE == AFTER
+# (e.g. after a rebase that resolved with "already up to date")
+# ──────────────────────────────────────────────
+SYNCED=false
+
+# Sync config files (SOUL.md, MEMORY.md, HEARTBEAT.md) — content-based
+for f in SOUL.md MEMORY.md HEARTBEAT.md; do
+    REPO_FILE="$REPO_DIR/config/$f"
+    WORKSPACE_FILE="$WORKSPACE/$f"
+    if [ -f "$REPO_FILE" ]; then
+        if ! diff -q "$REPO_FILE" "$WORKSPACE_FILE" > /dev/null 2>&1; then
+            cp "$REPO_FILE" "$WORKSPACE_FILE"
+            SYNCED=true
+            log "  Synced $f (content drift fixed)"
+        fi
+    fi
+done
+
+# Sync AGENTS.md — content-based
+if [ -f "$REPO_DIR/AGENTS.md" ]; then
+    if ! diff -q "$REPO_DIR/AGENTS.md" "$WORKSPACE/AGENTS.md" > /dev/null 2>&1; then
+        cp "$REPO_DIR/AGENTS.md" "$WORKSPACE/AGENTS.md"
+        SYNCED=true
+        log "  Synced AGENTS.md (content drift fixed)"
+    fi
+fi
+
+# Sync skills — content-based
+if [ -d "$REPO_DIR/skills" ]; then
+    DIFF=$(rsync -a --checksum --dry-run --itemize-changes "$REPO_DIR/skills/" "$WORKSPACE/skills/" 2>/dev/null | grep -v '^\.' || true)
+    if [ -n "$DIFF" ]; then
+        rsync -a --checksum "$REPO_DIR/skills/" "$WORKSPACE/skills/"
+        SYNCED=true
+        log "  Synced skills"
+    fi
+fi
+
+# Sync notion references — content-based
+if [ -d "$REPO_DIR/notion" ]; then
+    DIFF=$(rsync -a --checksum --dry-run --itemize-changes "$REPO_DIR/notion/" "$WORKSPACE/references/" 2>/dev/null | grep -v '^\.' || true)
+    if [ -n "$DIFF" ]; then
+        mkdir -p "$WORKSPACE/references"
+        rsync -a --checksum "$REPO_DIR/notion/" "$WORKSPACE/references/"
+        SYNCED=true
+        log "  Synced notion references"
+    fi
+fi
+
+# Sync workspace extras (TOOLS.md, tasks/current.md — chief-of-staff)
+if [ -d "$REPO_DIR/workspace" ]; then
+    mkdir -p "$WORKSPACE/tasks"
+    if [ -f "$REPO_DIR/workspace/TOOLS.md" ]; then
+        if ! diff -q "$REPO_DIR/workspace/TOOLS.md" "$WORKSPACE/TOOLS.md" > /dev/null 2>&1; then
+            cp "$REPO_DIR/workspace/TOOLS.md" "$WORKSPACE/TOOLS.md"
+            SYNCED=true
+            log "  Synced TOOLS.md"
+        fi
+    fi
+    if [ -f "$REPO_DIR/workspace/tasks/current.md" ]; then
+        if ! diff -q "$REPO_DIR/workspace/tasks/current.md" "$WORKSPACE/tasks/current.md" > /dev/null 2>&1; then
+            cp "$REPO_DIR/workspace/tasks/current.md" "$WORKSPACE/tasks/current.md"
+            SYNCED=true
+            log "  Synced tasks/current.md"
+        fi
+    fi
+fi
+
+if [ "$BEFORE" = "$AFTER" ] && [ "$PUSHED" = false ] && [ "$SYNCED" = false ]; then
     log "No changes in either direction."
     exit 0
 fi
 
 if [ "$BEFORE" != "$AFTER" ]; then
     log "Deploying $BEFORE -> $AFTER"
-
-    # Sync skills (repo → workspace)
-    if [ -d "$REPO_DIR/skills" ]; then
-        rsync -a "$REPO_DIR/skills/" "$WORKSPACE/skills/"
-        log "  Synced skills"
-    fi
-
-    # Sync workspace extras (TOOLS.md, tasks/current.md — chief-of-staff)
-    if [ -d "$REPO_DIR/workspace" ]; then
-        mkdir -p "$WORKSPACE/tasks"
-        if [ -f "$REPO_DIR/workspace/TOOLS.md" ]; then
-            cp "$REPO_DIR/workspace/TOOLS.md" "$WORKSPACE/TOOLS.md"
-            log "  Synced TOOLS.md"
-        fi
-        if [ -f "$REPO_DIR/workspace/tasks/current.md" ]; then
-            cp "$REPO_DIR/workspace/tasks/current.md" "$WORKSPACE/tasks/current.md"
-            log "  Synced tasks/current.md"
-        fi
-    fi
-
-    # Sync notion references
-    if [ -d "$REPO_DIR/notion" ]; then
-        mkdir -p "$WORKSPACE/references"
-        rsync -a "$REPO_DIR/notion/" "$WORKSPACE/references/"
-        log "  Synced notion references"
-    fi
 
     # Sync router plugin to live location
     PLUGIN_SRC="$REPO_DIR/plugins/lyra-model-router"
@@ -108,14 +151,6 @@ if [ "$BEFORE" != "$AFTER" ]; then
             log "  Router plugin synced"
         fi
     fi
-
-    # Sync workspace markdown files
-    for f in SOUL.md MEMORY.md HEARTBEAT.md; do
-        if [ -f "$REPO_DIR/config/$f" ]; then
-            cp "$REPO_DIR/config/$f" "$WORKSPACE/$f"
-            log "  Synced $f"
-        fi
-    done
 
     # Only restart gateway if code/config changed — not for content-only updates
     # (SOUL.md, MEMORY.md, skills, notion refs are hot-loaded; no restart needed)
