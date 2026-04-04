@@ -21,7 +21,7 @@ tests:
         rubric: "Does the response acknowledge the time change to 4pm? It should confirm the reminder has been updated or ask to confirm the update. Simply asking what reminder without context is a FAIL (no conversation continuity)."
     cleanup:
       action: notion_delete_matching
-      database: "1da780089100814fbe1ec27b82acdb8f"
+      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
       title_contains: "[eval]"
     tags: [conversation, multi-turn, reminder]
 
@@ -59,7 +59,7 @@ tests:
         threshold_ms: 45000
     cleanup:
       action: notion_delete_matching
-      database: "1da780089100814fbe1ec27b82acdb8f"
+      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
       title_contains: "[eval]"
     tags: [crud, tier0, reminder]
 
@@ -91,7 +91,7 @@ tests:
         threshold_ms: 45000
     cleanup:
       action: notion_delete_matching
-      database: "31778008-9100-805b-85da-c30c2c6e2284"
+      database: "2054e39c-3f09-431d-8821-0e6a7513913a"
       title_contains: "[eval]"
     tags: [crud, tier0, shopping]
 
@@ -108,7 +108,7 @@ tests:
         rubric: "Does the response confirm adding yogurt to the shopping list? Abhigna has access to the Shopping List. The response should complete the action, not refuse. Refusing is a FAIL."
     cleanup:
       action: notion_delete_matching
-      database: "31778008-9100-805b-85da-c30c2c6e2284"
+      database: "2054e39c-3f09-431d-8821-0e6a7513913a"
       title_contains: "[eval]"
     tags: [access-control, abhigna, shopping]
 
@@ -182,6 +182,6 @@ tests:
         rubric: "Does the response confirm the reminder exists in Notion by querying it? It should read back from Notion and confirm 'water the plants' is there. Just saying 'yes I added it' without querying Notion scores 2. Querying and confirming scores 5."
     cleanup:
       action: notion_delete_matching
-      database: "1da780089100814fbe1ec27b82acdb8f"
+      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
       title_contains: "[eval]"
     tags: [write-verification, reminder, multi-turn]

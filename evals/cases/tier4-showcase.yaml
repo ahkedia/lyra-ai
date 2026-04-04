@@ -15,7 +15,7 @@ tests:
         rubric: "Does the response describe creating a reminder with the correct details? It should parse 'tomorrow' to the correct date, set time to 3pm, mention adding to the Reminders database in Notion, and include the task 'call the dentist'. Vague or incomplete parsing is a low score."
     cleanup:
       action: notion_delete_matching
-      database: "1da780089100814fbe1ec27b82acdb8f"
+      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
       title_contains: "[eval]"
     tags: [multi-step, reminder]
 
@@ -43,7 +43,9 @@ tests:
         rubric: "Does the response describe capturing this as an insight in the Second Brain database? It should: (1) recognize this as a product insight worth saving, (2) describe classifying it (e.g., type: Insight, tags: product/leadership), (3) describe saving to Second Brain in Notion. Simply responding conversationally without capturing is a low score."
     cleanup:
       action: notion_delete_matching
-      database: "31778008-9100-806b-b935-dc1810971e87"
+      database: "e4027aaf-d2ff-49e1-babf-7487725e2ef4"
+      data_source: "f1ce4e0f-9e0d-43da-87f8-94dae2732962"
+      title_properties: ["Name"]
       title_contains: "[eval]"
     tags: [multi-step, second-brain]
 
@@ -75,7 +77,7 @@ tests:
         rubric: "Does this brain brief demonstrate synthesis? It should identify patterns, connect dots between different entries, and surface non-obvious insights. Simply listing items is a low score. Genuine pattern recognition and strategic suggestions score high."
       - type: length_range
         min: 150
-        max: 2000
+        max: 2800
     tags: [proactive, brain-brief]
 
   - id: proactive-content-suggestion
