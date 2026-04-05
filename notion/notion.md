@@ -156,7 +156,7 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Purpose:** Long-term thinking capture — voice notes, spontaneous ideas, key decisions, patterns. This is the core of the second brain.
 
 ### Reminders - Akash
-- **database_id:** `95e1d0de-496f-478e-9fe4-2e2a356c7970`
+- **database_id:** `32678008-9100-802f-ad9f-fb48ff5f4c1d`
 - **data_source_id:** `32678008-9100-8171-8940-000b30243ddd`
 - **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Done (checkbox), List (select: Personal, Work, Health, Finance, Travel, Relocation), Recurrence (select: Once, Daily, Weekly, Monthly), Assigned By (select: Akash, Abhigna, Lyra), Notes (rich_text)
 - **Who can access:** Akash only
