@@ -1,6 +1,5 @@
-# I Built My Own Chief of Staff. Here's What Product Leaders Need to Know About Personal AI.
+# I Built My Own OpenClaw Chief of Staff. Here's What Product Leaders Need to Know About Personal AI.
 
-*Or: I Run a Personal AI on €18/Month. Here's Why Every Product Leader Should Build One.*
 
 ---
 
