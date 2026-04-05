@@ -236,25 +236,50 @@ export class OpenClawClient {
       : message;
 
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`Chat timeout after ${timeout}ms`)), timeout);
+      let stage = 'send_request';
+      let lastProgressTs = Date.now();
+      let lifecycleEvents = 0;
+      let toolEvents = 0;
+      let finished = false;
+      let checkEvent = null;
+      const touch = (nextStage = null) => {
+        if (nextStage) stage = nextStage;
+        lastProgressTs = Date.now();
+      };
+      const failWithTimeout = () => {
+        if (finished) return;
+        finished = true;
+        if (checkEvent) this.ws.removeListener('message', checkEvent);
+        const idleMs = Date.now() - lastProgressTs;
+        reject(new Error(
+          `Chat timeout after ${timeout}ms (stage=${stage}; idle_ms=${idleMs}; lifecycle_events=${lifecycleEvents}; tool_events=${toolEvents})`,
+        ));
+      };
+      const timer = setTimeout(failWithTimeout, timeout);
 
       // Step 1: send the message
       const sendId = randomUUID();
       this.pendingRequests.set(sendId, {
         resolve: async (sendPayload) => {
+          touch('await_run_final');
           const runId = sendPayload?.runId;
           if (!runId) {
             clearTimeout(timer);
+            finished = true;
+            if (checkEvent) this.ws.removeListener('message', checkEvent);
             reject(new Error('chat.send: no runId in response'));
             return;
           }
 
           // Step 2: wait for the final event for this runId
           const onFinal = () => {
+            touch('history_fetch');
             // Step 3: get history for response text
             const histId = randomUUID();
             this.pendingRequests.set(histId, {
               resolve: (histPayload) => {
+                if (finished) return;
+                finished = true;
                 clearTimeout(timer);
                 const msgs = histPayload?.messages || [];
                 const asstMsg = msgs.filter(m => m.role === 'assistant').pop();
@@ -265,9 +290,21 @@ export class OpenClawClient {
                   latencyMs,
                   ttftMs: ttftMs || latencyMs,
                   payload: asstMsg,
+                  timeoutMeta: {
+                    timedOutStage: null,
+                    lastProgressTs: new Date(lastProgressTs).toISOString(),
+                    idleMs: 0,
+                    lifecycleEvents,
+                    toolEvents,
+                  },
                 });
               },
-              reject: (err) => { clearTimeout(timer); reject(err); },
+              reject: (err) => {
+                if (finished) return;
+                finished = true;
+                clearTimeout(timer);
+                reject(err);
+              },
               chunks: [],
             });
             this.ws.send(JSON.stringify({
@@ -277,25 +314,39 @@ export class OpenClawClient {
           };
 
           // Register a one-time event listener for the chat final event
-          const checkEvent = (data) => {
+          checkEvent = (data) => {
             try {
               const f = JSON.parse(data.toString());
               if (f.type === 'event' && f.event === 'agent' && 
                   f.payload?.runId === runId && f.payload?.stream === 'lifecycle') {
+                lifecycleEvents += 1;
+                touch('await_run_final');
                 if (f.payload.data?.phase === 'start' && ttftMs === null) {
                   ttftMs = Date.now() - startTime; // time to first agent activity
                 }
               }
+              if (f.type === 'event' && f.event === 'agent' &&
+                  f.payload?.runId === runId && f.payload?.stream === 'tool') {
+                toolEvents += 1;
+                touch('await_run_final');
+              }
               if (f.type === 'event' && f.event === 'chat' &&
                   f.payload?.runId === runId && f.payload?.state === 'final') {
                 this.ws.removeListener('message', checkEvent);
+                touch('run_final');
                 onFinal();
               }
             } catch {}
           };
           this.ws.on('message', checkEvent);
         },
-        reject: (err) => { clearTimeout(timer); reject(err); },
+        reject: (err) => {
+          if (finished) return;
+          finished = true;
+          if (checkEvent) this.ws.removeListener('message', checkEvent);
+          clearTimeout(timer);
+          reject(err);
+        },
         chunks: [],
       });
 

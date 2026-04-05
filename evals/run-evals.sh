@@ -32,9 +32,20 @@ export EVAL_BATCH_PAUSE_MS="${EVAL_BATCH_PAUSE_MS:-45000}"
 export EVAL_INTER_TEST_DELAY_MS="${EVAL_INTER_TEST_DELAY_MS:-10000}"
 export EVAL_POST_TEST_MS="${EVAL_POST_TEST_MS:-2000}"
 export EVAL_HEALTH_WAIT_MS="${EVAL_HEALTH_WAIT_MS:-120000}"
+export EVAL_LANE="${EVAL_LANE:-production_representative}"
+export EVAL_RUN_MODE="${EVAL_RUN_MODE:-e2e_live_tools}"
+export EVAL_ENABLE_LANE_SPLIT="${EVAL_ENABLE_LANE_SPLIT:-0}"
+export EVAL_RUN_DIAGNOSTIC_ON_EVEN_DAYS="${EVAL_RUN_DIAGNOSTIC_ON_EVEN_DAYS:-0}"
+export EVAL_RUN_DIAGNOSTIC_AFTER_PROD="${EVAL_RUN_DIAGNOSTIC_AFTER_PROD:-0}"
+export EVAL_DIAGNOSTIC_NON_BLOCKING="${EVAL_DIAGNOSTIC_NON_BLOCKING:-1}"
 # Phase 0 — gates (capability score = passes among non-infra tests only)
 export EVAL_MAX_INFRA_FAILURE_RATE="${EVAL_MAX_INFRA_FAILURE_RATE:-0.25}"
 export EVAL_CAPABILITY_MIN_PASS_RATE="${EVAL_CAPABILITY_MIN_PASS_RATE:-0.8}"
+export EVAL_ENABLE_STRICT_KIND_GATES="${EVAL_ENABLE_STRICT_KIND_GATES:-1}"
+export EVAL_MAX_TIMEOUT_RATE="${EVAL_MAX_TIMEOUT_RATE:-0.25}"
+export EVAL_MAX_HEARTBEAT_LEAKS="${EVAL_MAX_HEARTBEAT_LEAKS:-0}"
+export EVAL_MAX_AUTH_FAILURE_RATE="${EVAL_MAX_AUTH_FAILURE_RATE:-0.2}"
+export EVAL_MAX_RETRIEVAL_JUDGE_FAILURES="${EVAL_MAX_RETRIEVAL_JUDGE_FAILURES:-0}"
 
 # Determine if today is a full eval day (odd days: 1st, 3rd, 5th, ...)
 DAY_OF_MONTH=$(date -u +%-d)
@@ -95,11 +106,33 @@ EVAL_EXIT=0
 if [ "$IS_FULL_EVAL_DAY" = true ]; then
   echo "Step 1: Running full eval tests..."
   EVAL_EXIT=0
-  node runner.js "$@" || EVAL_EXIT=$?
+  if [ "$EVAL_ENABLE_LANE_SPLIT" = "1" ]; then
+    echo "  Lane split enabled: running production-representative lane"
+    EVAL_LANE="production_representative" EVAL_TARGET_LANE="production_representative" node runner.js --lane production_representative "$@" || EVAL_EXIT=$?
+  else
+    node runner.js "$@" || EVAL_EXIT=$?
+  fi
   if [ "$EVAL_EXIT" -eq 2 ]; then
     echo ""
     echo "WARNING: Eval run INVALID — more than half the tests failed due to infra (timeouts/transport)."
     echo "  Do not treat legacy pass_rate as comparable. Fix gateway OOM / stability first."
+  fi
+
+  # Optional: run diagnostic lane without affecting dashboard or main gate
+  if [ "$EVAL_ENABLE_LANE_SPLIT" = "1" ] && [ "$EVAL_RUN_DIAGNOSTIC_AFTER_PROD" = "1" ]; then
+    echo ""
+    echo "Step 1b: Running diagnostic lane (non-blocking)"
+    DIAG_RESULTS_DIR="$SCRIPT_DIR/results-diagnostic"
+    DIAG_EXIT=0
+    EVAL_LANE="diagnostic" EVAL_TARGET_LANE="diagnostic" EVAL_RESULTS_DIR="$DIAG_RESULTS_DIR" node runner.js --lane diagnostic || DIAG_EXIT=$?
+    if [ "$DIAG_EXIT" -ne 0 ]; then
+      echo "  ⚠️ Diagnostic lane failed with exit code $DIAG_EXIT"
+      if [ "$EVAL_DIAGNOSTIC_NON_BLOCKING" = "1" ]; then
+        echo "  Continuing (non-blocking diagnostic mode)"
+      else
+        EVAL_EXIT="$DIAG_EXIT"
+      fi
+    fi
   fi
 
   # Step 2: Aggregate results
@@ -130,8 +163,24 @@ if [ "$IS_FULL_EVAL_DAY" = true ]; then
     fi
   fi
 else
-  echo "Step 1: Skipped (even day — routing-only mode)"
-  echo "Steps 2-4: Skipped"
+  if [ "$EVAL_ENABLE_LANE_SPLIT" = "1" ] && [ "$EVAL_RUN_DIAGNOSTIC_ON_EVEN_DAYS" = "1" ]; then
+    echo "Step 1: Running diagnostic lane only (even day)"
+    DIAG_RESULTS_DIR="$SCRIPT_DIR/results-diagnostic"
+    DIAG_EXIT=0
+    EVAL_LANE="diagnostic" EVAL_TARGET_LANE="diagnostic" EVAL_RESULTS_DIR="$DIAG_RESULTS_DIR" node runner.js --lane diagnostic || DIAG_EXIT=$?
+    if [ "$DIAG_EXIT" -ne 0 ]; then
+      echo "  ⚠️ Diagnostic lane failed with exit code $DIAG_EXIT"
+      if [ "$EVAL_DIAGNOSTIC_NON_BLOCKING" = "1" ]; then
+        echo "  Continuing (non-blocking diagnostic mode)"
+      else
+        EVAL_EXIT="$DIAG_EXIT"
+      fi
+    fi
+    echo "Steps 2-4: Skipped (diagnostic lane does not publish dashboard by default)"
+  else
+    echo "Step 1: Skipped (even day — routing-only mode)"
+    echo "Steps 2-4: Skipped"
+  fi
 fi
 
 # Step 5: Alert if pass rate < 80% or routing accuracy < 90%

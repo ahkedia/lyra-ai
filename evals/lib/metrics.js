@@ -79,6 +79,50 @@ export function isInfrastructureFailure(error) {
 }
 
 /**
+ * Coarse failure taxonomy for dashboards and gate triage.
+ * Keeps legacy pass/fail unchanged; this only adds explainability.
+ *
+ * @param {{ passed?: boolean, error?: string|null, failure_reason?: string|null, response_preview?: string|null }} r
+ * @returns {'none'|'timeout'|'infra'|'heartbeat_leak'|'judge'|'latency_threshold'|'assertion'|'auth'|'other'}
+ */
+export function classifyFailureKind(r = {}) {
+  if (r.passed) return 'none';
+
+  const error = (r.error || '').toString();
+  const reason = (r.failure_reason || '').toString();
+  const preview = (r.response_preview || '').toString();
+  const haystack = `${error} ${reason}`.toLowerCase();
+
+  if (preview.trim().toUpperCase() === 'HEARTBEAT_OK' || haystack.includes('heartbeat_ok')) {
+    return 'heartbeat_leak';
+  }
+
+  const stability = classifyStability(haystack);
+  if (stability === 'timeout') return 'timeout';
+  if (stability === 'transport' || stability === 'infra') return 'infra';
+
+  if (haystack.includes('llm judge')) return 'judge';
+  if (haystack.includes('latency') && haystack.includes('threshold')) return 'latency_threshold';
+  if (
+    haystack.includes('unexpectedly contains') ||
+    haystack.includes('missing "') ||
+    haystack.includes('does not match pattern') ||
+    haystack.includes('unknown validator type')
+  ) {
+    return 'assertion';
+  }
+  if (
+    haystack.includes('unauthorized') ||
+    haystack.includes('forbidden') ||
+    haystack.includes('permission') ||
+    haystack.includes('auth')
+  ) {
+    return 'auth';
+  }
+  return 'other';
+}
+
+/**
  * @param {{ error?: string|null, tags?: string[], category?: string, side_effects?: string }} r
  */
 export function isIntegrationShapedTest(r) {
@@ -97,8 +141,23 @@ export function computeSplitScores(results) {
   const total = results.length;
   let infraFailures = 0;
   const byReason = { timeout: 0, transport: 0, infra: 0, error: 0 };
+  const failureKinds = {
+    timeout: 0,
+    infra: 0,
+    heartbeat_leak: 0,
+    judge: 0,
+    latency_threshold: 0,
+    assertion: 0,
+    auth: 0,
+    other: 0,
+  };
 
   for (const r of results) {
+    if (!r.passed) {
+      const kind = classifyFailureKind(r);
+      if (failureKinds[kind] == null) failureKinds[kind] = 0;
+      failureKinds[kind] += 1;
+    }
     const kind = classifyStability(r.error);
     if (kind === 'timeout') {
       infraFailures++;
@@ -129,6 +188,14 @@ export function computeSplitScores(results) {
       : null;
 
   const infraFailureRate = total > 0 ? Math.round((infraFailures / total) * 10000) / 10000 : 0;
+  const timeoutRate = total > 0 ? Math.round((failureKinds.timeout / total) * 10000) / 10000 : 0;
+  const authFailureRate = total > 0 ? Math.round((failureKinds.auth / total) * 10000) / 10000 : 0;
+
+  const stableRetrievalJudgeFailures = stable.filter((r) =>
+    !r.passed &&
+    (r.category || '') === 'retrieval_quality' &&
+    classifyFailureKind(r) === 'judge',
+  ).length;
 
   const legacyPassed = results.filter((r) => r.passed).length;
   const legacyPassRate = total > 0 ? Math.round((legacyPassed / total) * 10000) / 10000 : 0;
@@ -138,10 +205,20 @@ export function computeSplitScores(results) {
 
   const STABILITY_MAX_INFRA = Number(process.env.EVAL_MAX_INFRA_FAILURE_RATE || 0.25);
   const CAPABILITY_MIN = Number(process.env.EVAL_CAPABILITY_MIN_PASS_RATE || 0.8);
+  const STRICT_KIND_GATES = process.env.EVAL_ENABLE_STRICT_KIND_GATES !== '0';
+  const MAX_TIMEOUT_RATE = Number(process.env.EVAL_MAX_TIMEOUT_RATE || 0.25);
+  const MAX_HEARTBEAT_LEAKS = Number(process.env.EVAL_MAX_HEARTBEAT_LEAKS || 0);
+  const MAX_AUTH_FAILURE_RATE = Number(process.env.EVAL_MAX_AUTH_FAILURE_RATE || 0.2);
+  const MAX_RETRIEVAL_JUDGE_FAILURES = Number(process.env.EVAL_MAX_RETRIEVAL_JUDGE_FAILURES || 0);
 
   const stabilityOk = infraFailureRate <= STABILITY_MAX_INFRA;
   const capabilityOk =
     capabilityPassRate !== null && capabilityPassRate >= CAPABILITY_MIN;
+  const timeoutOk = timeoutRate <= MAX_TIMEOUT_RATE;
+  const heartbeatOk = (failureKinds.heartbeat_leak || 0) <= MAX_HEARTBEAT_LEAKS;
+  const authOk = authFailureRate <= MAX_AUTH_FAILURE_RATE;
+  const retrievalGroundingOk = stableRetrievalJudgeFailures <= MAX_RETRIEVAL_JUDGE_FAILURES;
+  const kindGatesOk = !STRICT_KIND_GATES || (timeoutOk && heartbeatOk && authOk && retrievalGroundingOk);
 
   return {
     stability: {
@@ -149,6 +226,7 @@ export function computeSplitScores(results) {
       infra_failures: infraFailures,
       infra_failure_rate: infraFailureRate,
       by_reason: byReason,
+      by_failure_kind: failureKinds,
       stable_count: stableCount,
       unstable_count: total - stableCount,
     },
@@ -161,13 +239,20 @@ export function computeSplitScores(results) {
       integration_stable: integStable.length,
       integration_passed: integPassed,
       integration_pass_rate: integrationPassRate,
+      stable_retrieval_judge_failures: stableRetrievalJudgeFailures,
     },
     gates: {
       run_valid: runValid,
       stability_ok: stabilityOk,
       capability_ok: capabilityOk,
+      timeout_ok: timeoutOk,
+      heartbeat_ok: heartbeatOk,
+      auth_ok: authOk,
+      retrieval_grounding_ok: retrievalGroundingOk,
+      strict_kind_gates_enabled: STRICT_KIND_GATES,
+      kind_gates_ok: kindGatesOk,
       /** All gates for a "green" eval */
-      all_ok: runValid && stabilityOk && capabilityOk,
+      all_ok: runValid && stabilityOk && capabilityOk && kindGatesOk,
     },
   };
 }

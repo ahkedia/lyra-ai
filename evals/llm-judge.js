@@ -10,13 +10,14 @@ const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 /**
  * Call Claude Haiku to judge a response against a rubric.
  * @param {string} response - Lyra's response to evaluate
- * @param {object} config - { rubric, prompt (original test prompt) }
+ * @param {object} config - { rubric, prompt (original test prompt), transcript (optional) }
  * @param {string} apiKey - Anthropic API key
  * @returns {Promise<{ passed: boolean, score: number, detail: string }>}
  */
 export async function judgeResponse(response, config, apiKey) {
   const rubric = config.rubric || 'Is this a good response?';
   const originalPrompt = config.prompt || '';
+  const transcript = (config.transcript || '').slice(0, 3500);
 
   const systemPrompt = `You are an eval judge for Lyra, a personal AI assistant. Score the assistant's response on a scale of 1-5 based on the rubric. Be strict but fair.
 
@@ -29,7 +30,13 @@ Scoring:
 
 Respond with ONLY a JSON object: {"score": <1-5>, "reasoning": "<one sentence>"}`;
 
+  const transcriptSection = transcript
+    ? `Conversation transcript (oldest to newest):\n${transcript}\n\n`
+    : '';
+
   const userMessage = `Original prompt: "${originalPrompt}"
+
+${transcriptSection}
 
 Assistant's response:
 """

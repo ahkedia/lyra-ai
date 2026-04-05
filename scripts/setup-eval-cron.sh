@@ -64,7 +64,7 @@ NEW_CRON="$CLEANED_CRON
 # Pre-check: verify gateway is running 10 min before evals
 50 3 * * * /bin/bash -c 'curl -sf http://localhost:18789/health > /dev/null 2>&1 || (systemctl restart openclaw 2>/dev/null && sleep 30)' >> $LOG_FILE 2>&1 $PRECHECK_MARKER
 # Main eval run: daily at 4 AM UTC (includes infra checks, recovery, status refresh)
-0 4 * * * /bin/bash -c 'echo \"=== Eval Run: \$(date -u) ===\" >> $LOG_FILE && cd /root/lyra-ai/evals && bash run-evals.sh >> $LOG_FILE 2>&1' $CRON_MARKER
+0 4 * * * /bin/bash -c 'echo \"=== Eval Run: \$(date -u) ===\" >> $LOG_FILE && cd /root/lyra-ai/evals && EVAL_ENABLE_LANE_SPLIT=1 EVAL_RUN_DIAGNOSTIC_ON_EVEN_DAYS=1 EVAL_DIAGNOSTIC_NON_BLOCKING=1 bash run-evals.sh >> $LOG_FILE 2>&1' $CRON_MARKER
 # Status dashboard: refresh every 5 minutes
 */5 * * * * /bin/bash /root/lyra-ai/scripts/lyra-status.sh >> /var/log/lyra/health.log 2>&1 $STATUS_MARKER
 # Cost report: daily at 11 PM UTC

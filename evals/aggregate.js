@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { computeSplitScores } from './lib/metrics.js';
+import { computeSplitScores, classifyFailureKind } from './lib/metrics.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = join(__dirname, 'results');
@@ -96,6 +96,10 @@ function main() {
   if (latest.stability) summaryPayload.stability = latest.stability;
   if (latest.scores) summaryPayload.scores = latest.scores;
   if (latest.gates) summaryPayload.gates = latest.gates;
+  if (latest.eval_lane) summaryPayload.eval_lane = latest.eval_lane;
+  if (latest.eval_lane_counts) summaryPayload.eval_lane_counts = latest.eval_lane_counts;
+  if (latest.run_mode) summaryPayload.run_mode = latest.run_mode;
+  if (latest.failure_breakdown) summaryPayload.failure_breakdown = latest.failure_breakdown;
   if (latest.eval_config) summaryPayload.eval_config = latest.eval_config;
   if (latest.error_fingerprint_top) summaryPayload.error_fingerprint_top = latest.error_fingerprint_top;
   writeJSON('summary.json', summaryPayload);
@@ -118,6 +122,8 @@ function main() {
     if (s.stability?.infra_failure_rate != null) {
       row.infra_failure_rate = s.stability.infra_failure_rate;
     }
+    if (s.eval_lane) row.eval_lane = s.eval_lane;
+    if (s.failure_breakdown) row.failure_breakdown = s.failure_breakdown;
     return row;
   });
   writeJSON('history.json', history);
@@ -136,8 +142,18 @@ function main() {
           category: r.category,
           prompt: r.prompt,
           response_preview: r.response_preview?.slice(0, 200),
-          error: r.error || r.validators?.find((v) => !v.passed)?.detail || 'Unknown',
+          error: r.failure_reason || r.error || r.validators?.find((v) => !v.passed)?.detail || 'Unknown',
+          failure_kind: r.failure_kind || classifyFailureKind({
+            passed: r.passed,
+            error: r.error,
+            failure_reason: r.failure_reason || r.validators?.find((v) => !v.passed)?.detail || '',
+            response_preview: r.response_preview,
+          }),
           latency_ms: r.latency_ms,
+          timed_out_stage: r.timed_out_stage || null,
+          tool_chain_depth: r.tool_chain_depth ?? null,
+          expected_tool_chain_depth: r.expected_tool_chain_depth ?? null,
+          idle_ms: r.idle_ms ?? null,
         });
       }
     }

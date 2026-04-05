@@ -47,14 +47,18 @@ tests:
   - id: tool-reminder-dryrun
     tier: architectural
     category: tool_use
-    name: "Notion reminder creation (dry run)"
+    name: "Notion reminder creation (verified write)"
     prompt: "Add a reminder: [eval] check eval framework results"
     timeout_ms: 60000
     side_effects: write
     validators:
       - type: llm_judge
-        rubric: "Does the response confirm that a reminder was added to Notion? It should mention the reminder text or the Reminders database, and indicate success (e.g., added, created, set). Scores 1-2 if it refuses or describes what it would do; scores 4-5 if it confirms the write happened."
-    tags: [notion, tool-use, dry-run]
+        rubric: "Does the response confirm a real reminder write to Notion (not a plan)? It should mention the reminder text and indicate completion. If write fails, the response should clearly report failure instead of pretending success."
+    cleanup:
+      action: notion_delete_matching
+      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
+      title_contains: "[eval]"
+    tags: [notion, tool-use, write]
 
   - id: tool-cron-list
     tier: architectural
@@ -86,14 +90,18 @@ tests:
   - id: tool-cross-user-dryrun
     tier: architectural
     category: tool_use
-    name: "Cross-user messaging (dry run)"
-    prompt: "Tell Abhigna to check the meal plan for next week"
-    timeout_ms: 30000
-    side_effects: none
+    name: "Cross-user task handoff (write-backed)"
+    prompt: "Tell Abhigna to check the meal plan for next week, and add a shared reminder titled [eval] meal plan follow-up."
+    timeout_ms: 45000
+    side_effects: write
     validators:
       - type: llm_judge
-        rubric: "Does the response describe or attempt to send a message to Abhigna via Telegram? It should mention notifying Abhigna, referencing the meal plan."
-    tags: [cross-user, telegram]
+        rubric: "Does the response complete a real cross-user handoff? It should (1) mention notifying Abhigna and (2) confirm creating the shared [eval] reminder in Notion. A theoretical plan without completion is a FAIL."
+    cleanup:
+      action: notion_delete_matching
+      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
+      title_contains: "[eval]"
+    tags: [cross-user, telegram, write]
 
   # --- Model Routing ---
   - id: routing-simple-minimax

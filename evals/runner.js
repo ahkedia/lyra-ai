@@ -14,6 +14,7 @@ import { judgeResponse } from './llm-judge.js';
 import { OpenClawClient } from './ws-client.js';
 import {
   classifyStability,
+  classifyFailureKind,
   isInfrastructureFailure,
   computeSplitScores,
   errorFingerprint,
@@ -34,6 +35,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = process.env.EVAL_RESULTS_DIR || join(__dirname, 'results');
 const CASES_DIR = process.env.CASES_DIR || join(__dirname, 'cases');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
+const DEFAULT_EVAL_LANE = process.env.EVAL_LANE || 'production_representative';
 
 if (!existsSync(RESULTS_DIR)) mkdirSync(RESULTS_DIR, { recursive: true });
 
@@ -92,11 +94,32 @@ function loadTestCases() {
     const content = readFileSync(path, 'utf8');
     const parsed = YAML.parse(content);
     if (Array.isArray(parsed?.tests)) {
-      cases.push(...parsed.tests);
+      for (const t of parsed.tests) {
+        cases.push({
+          ...t,
+          eval_lane: deriveEvalLane(t),
+        });
+      }
     }
   }
 
   return cases;
+}
+
+/**
+ * Default lane assignment (can be overridden per-test via eval_lane in YAML).
+ */
+function deriveEvalLane(testCase) {
+  if (testCase.eval_lane) return testCase.eval_lane;
+  const category = (testCase.category || '').toLowerCase();
+  const tags = (testCase.tags || []).map((t) => String(t).toLowerCase());
+  if (category === 'latency' || category === 'model_routing' || category === 'edge_cases') {
+    return 'diagnostic';
+  }
+  if (tags.includes('edge') || tags.includes('stress') || tags.includes('chaos')) {
+    return 'diagnostic';
+  }
+  return 'production_representative';
 }
 
 /**
@@ -118,6 +141,7 @@ async function sendToLyra(message, timeoutMs = 30000, sessionKey = null) {
       provider: 'unknown',
       sessionId: null,
       error: null,
+      timeoutMeta: result.timeoutMeta || null,
     };
   } catch (err) {
     // Mark disconnected so ensureConnected() reconnects on next test
@@ -132,8 +156,22 @@ async function sendToLyra(message, timeoutMs = 30000, sessionKey = null) {
       provider: 'unknown',
       sessionId: null,
       error: err.message?.slice(0, 200) || 'error',
+      timeoutMeta: parseTimeoutMetaFromError(err.message || ''),
     };
   }
+}
+
+function parseTimeoutMetaFromError(error) {
+  const e = String(error || '');
+  const m = e.match(/stage=([^;]+); idle_ms=(\d+); lifecycle_events=(\d+); tool_events=(\d+)/i);
+  if (!m) return null;
+  return {
+    timedOutStage: m[1],
+    idleMs: Number(m[2] || 0),
+    lifecycleEvents: Number(m[3] || 0),
+    toolEvents: Number(m[4] || 0),
+    lastProgressTs: null,
+  };
 }
 
 const NOTION_VERSION = '2025-09-03';
@@ -276,6 +314,54 @@ function isRateLimitError(result) {
   return RATE_LIMIT_PATTERNS.some((p) => haystack.includes(p));
 }
 
+function parseCliArgs(argv) {
+  let onlyIds = null;
+  let tierOrIdFilter = null;
+  let laneFilter = process.env.EVAL_TARGET_LANE || null;
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--only') {
+      onlyIds = (argv[i + 1] || '').split(',').map((s) => s.trim()).filter(Boolean);
+      i++;
+      continue;
+    }
+    if (arg === '--lane') {
+      laneFilter = argv[i + 1] || laneFilter;
+      i++;
+      continue;
+    }
+    if (!arg.startsWith('--') && !tierOrIdFilter) {
+      tierOrIdFilter = arg;
+    }
+  }
+
+  return { onlyIds, tierOrIdFilter, laneFilter };
+}
+
+function formatTranscriptForJudge(transcript) {
+  if (!Array.isArray(transcript) || transcript.length === 0) return '';
+  const clipped = transcript.slice(-12);
+  return clipped.map((t, i) => {
+    const role = (t.role || 'assistant').toUpperCase();
+    const text = String(t.message || '').replace(/\s+/g, ' ').slice(0, 320);
+    return `${i + 1}. ${role}: ${text}`;
+  }).join('\n');
+}
+
+function inferExpectedToolChainDepth(testCase) {
+  const category = (testCase.category || '').toLowerCase();
+  const sideEffects = (testCase.side_effects || '').toLowerCase();
+  const tags = (testCase.tags || []).map((t) => String(t).toLowerCase());
+  let depth = 0;
+  if (sideEffects === 'write') depth += 1;
+  if (sideEffects === 'read_only') depth += 1;
+  if (category.includes('multi_step') || tags.includes('multi-step')) depth += 1;
+  if (category.includes('proactive') || category.includes('digest')) depth += 1;
+  if (tags.includes('cross-user') || tags.includes('telegram')) depth += 1;
+  return Math.max(1, depth);
+}
+
 /**
  * Run a single test case against Lyra.
  */
@@ -297,17 +383,22 @@ async function runTest(testCase) {
   let latencyMs = 0;
   let ttftMs = 0;
   let resultMeta = { model: 'unknown', provider: 'unknown', error: null };
+  let timeoutMeta = null;
+  const transcript = [];
 
   if (multi_turn && Array.isArray(turns) && turns.length > 0) {
     // Multi-turn: send each user turn, validate only the final response.
     // All turns share the same sessionKey so context carries through.
     for (const turn of turns) {
       if (turn.role === 'user') {
+        transcript.push({ role: 'user', message: turn.message || '' });
         const turnResult = await sendToLyra(turn.message, timeout_ms, `eval-${RUN_ID}-${id}`);
         response = turnResult.text;
         latencyMs = turnResult.durationMs;
         ttftMs = turnResult.ttftMs;
         resultMeta = { model: turnResult.model, provider: turnResult.provider, error: turnResult.error };
+        timeoutMeta = turnResult.timeoutMeta || timeoutMeta;
+        if (turnResult.text) transcript.push({ role: 'assistant', message: turnResult.text });
         if (turnResult.error) break; // stop on error
         await new Promise(r => setTimeout(r, 1000)); // pacing between turns
       }
@@ -334,6 +425,9 @@ async function runTest(testCase) {
     latencyMs = result.durationMs;
     ttftMs = result.ttftMs;
     resultMeta = { model: result.model, provider: result.provider, error: result.error };
+    timeoutMeta = result.timeoutMeta || timeoutMeta;
+    transcript.push({ role: 'user', message: finalPrompt });
+    if (result.text) transcript.push({ role: 'assistant', message: result.text });
   }
 
   const { error } = resultMeta;
@@ -348,9 +442,15 @@ async function runTest(testCase) {
       const v = validatorConfigs[i];
       if (v.type === 'llm_judge' && ANTHROPIC_KEY) {
         try {
+          const derivedPrompt = prompt || transcript
+            .filter((t) => t.role === 'user')
+            .map((t) => t.message)
+            .join(' -> ')
+            .slice(0, 500);
           llmJudgeResults[i] = await judgeResponse(response, {
             rubric: v.rubric,
-            prompt: prompt,
+            prompt: derivedPrompt,
+            transcript: formatTranscriptForJudge(transcript),
           }, ANTHROPIC_KEY);
           console.log(`    Judge: ${llmJudgeResults[i].score}/5 — ${llmJudgeResults[i].detail.slice(0, 80)}`);
         } catch (err) {
@@ -365,6 +465,15 @@ async function runTest(testCase) {
   const validation = error
     ? { passed: false, results: [{ type: 'error', passed: false, detail: error }] }
     : runValidators(response, validatorConfigs, meta);
+  const failureReason = validation.passed
+    ? null
+    : (error || validation.results.find((v) => !v.passed)?.detail || 'Unknown failure');
+  const failureKind = classifyFailureKind({
+    passed: validation.passed,
+    error,
+    failure_reason: failureReason,
+    response_preview: response,
+  });
 
   const status = validation.passed ? 'PASS' : 'FAIL';
   console.log(`    ${status} (${latencyMs}ms ttft:${ttftMs}ms, ${resultMeta.model})`);
@@ -375,13 +484,14 @@ async function runTest(testCase) {
   // Anti-throttle: prevent MiniMax rate-limit spikes on rapid sequential calls
   await new Promise((r) => setTimeout(r, POST_TEST_MS));
 
-  const em = errorMeta(error);
+  const em = errorMeta(failureReason || error);
 
   return {
     id,
     tier: testCase.tier,
     category: testCase.category,
     name: testCase.name || id,
+    eval_lane: testCase.eval_lane || DEFAULT_EVAL_LANE,
     prompt: (prompt || '').slice(0, 200),
     timestamp: new Date().toISOString(),
     passed: validation.passed,
@@ -393,6 +503,14 @@ async function runTest(testCase) {
     provider: resultMeta.provider,
     validators: validation.results,
     error,
+    failure_reason: failureReason,
+    failure_kind: failureKind,
+    timed_out_stage: timeoutMeta?.timedOutStage || null,
+    tool_chain_depth: timeoutMeta?.toolEvents ?? null,
+    expected_tool_chain_depth: inferExpectedToolChainDepth(testCase),
+    last_progress_ts: timeoutMeta?.lastProgressTs || null,
+    idle_ms: timeoutMeta?.idleMs ?? null,
+    lifecycle_events: timeoutMeta?.lifecycleEvents ?? null,
     ...em,
     side_effects,
     tags: testCase.tags || [],
@@ -413,19 +531,20 @@ async function main() {
   }
   console.log(`Loaded ${testCases.length} test cases.\n`);
 
-  // Filter by CLI arg (--only id1,id2 or tier name)
-  const filterArg = process.argv[2];
-  const filteredCases = filterArg
-    ? testCases.filter((tc) => {
-        if (filterArg.startsWith('--only')) {
-          const ids = (process.argv[3] || '').split(',').map(s => s.trim());
-          return ids.some(id => tc.id === id || tc.id?.includes(id));
-        }
-        return tc.tier?.includes(filterArg) || tc.id?.includes(filterArg);
-      })
-    : testCases;
+  // Filter by CLI args: --only id1,id2 | --lane production_representative|diagnostic | <tier-or-id>
+  const { onlyIds, tierOrIdFilter, laneFilter } = parseCliArgs(process.argv.slice(2));
+  let filteredCases = testCases;
+  if (laneFilter) {
+    filteredCases = filteredCases.filter((tc) => (tc.eval_lane || DEFAULT_EVAL_LANE) === laneFilter);
+  }
+  if (onlyIds && onlyIds.length > 0) {
+    filteredCases = filteredCases.filter((tc) => onlyIds.some((id) => tc.id === id || tc.id?.includes(id)));
+  } else if (tierOrIdFilter) {
+    filteredCases = filteredCases.filter((tc) => tc.tier?.includes(tierOrIdFilter) || tc.id?.includes(tierOrIdFilter));
+  }
 
-  console.log(`Running ${filteredCases.length} tests...\n`);
+  const laneSuffix = laneFilter ? ` (lane=${laneFilter})` : '';
+  console.log(`Running ${filteredCases.length} tests${laneSuffix}...\n`);
 
   const results = [];
   let passed = 0;
@@ -448,6 +567,7 @@ async function main() {
           tier: testCase.tier,
           category: testCase.category,
           name: testCase.name || testCase.id,
+          eval_lane: testCase.eval_lane || DEFAULT_EVAL_LANE,
           prompt: testCase.prompt?.slice(0, 200),
           timestamp: new Date().toISOString(),
           passed: false,
@@ -459,6 +579,8 @@ async function main() {
           provider: 'unknown',
           validators: [{ type: 'error', passed: false, detail: err.message }],
           error: err.message,
+          failure_reason: err.message,
+          failure_kind: classifyFailureKind({ passed: false, error: err.message }),
           ...errorMeta(err.message),
           side_effects: testCase.side_effects || 'none',
           tags: testCase.tags || [],
@@ -501,6 +623,10 @@ async function main() {
   appendFileSync(outputFile, jsonlContent);
 
   const split = computeSplitScores(results);
+  const failureBreakdown = groupFailuresByKind(results);
+  const laneCounts = groupBy(results, 'eval_lane');
+  const laneKeys = Object.keys(laneCounts);
+  const summaryLane = laneKeys.length === 1 ? laneKeys[0] : 'mixed';
 
   // Write summary (legacy fields preserved for dashboards; split metrics added)
   const summary = {
@@ -522,17 +648,27 @@ async function main() {
       id: r.id,
       name: r.name,
       category: r.category,
-      error: r.error || r.validators?.find((v) => !v.passed)?.detail || 'Unknown',
+      error: r.failure_reason || r.error || r.validators?.find((v) => !v.passed)?.detail || 'Unknown',
+      failure_kind: r.failure_kind || 'other',
       infrastructure_failure: r.infrastructure_failure === true,
       stability: r.stability,
     })),
+    failure_breakdown: failureBreakdown,
     ...split,
+    eval_lane: summaryLane,
+    eval_lane_counts: laneCounts,
+    run_mode: process.env.EVAL_RUN_MODE || 'e2e_live_tools',
     eval_config: {
       batch_size: BATCH_SIZE,
       batch_pause_ms: BATCH_PAUSE_MS,
       inter_test_delay_ms: INTER_TEST_DELAY_MS,
       post_test_ms: POST_TEST_MS,
       notion_api_version: NOTION_VERSION,
+      strict_kind_gates_enabled: process.env.EVAL_ENABLE_STRICT_KIND_GATES !== '0',
+      max_timeout_rate: Number(process.env.EVAL_MAX_TIMEOUT_RATE || 0.25),
+      max_heartbeat_leaks: Number(process.env.EVAL_MAX_HEARTBEAT_LEAKS || 0),
+      max_auth_failure_rate: Number(process.env.EVAL_MAX_AUTH_FAILURE_RATE || 0.2),
+      max_retrieval_judge_failures: Number(process.env.EVAL_MAX_RETRIEVAL_JUDGE_FAILURES || 0),
     },
     error_fingerprint_top: topErrorFingerprints(results),
   };
@@ -591,6 +727,10 @@ async function main() {
       const reasons = [];
       if (!split.gates.stability_ok) reasons.push('infra_failure_rate too high');
       if (!split.gates.capability_ok) reasons.push('capability_pass_rate below minimum');
+      if (!split.gates.timeout_ok) reasons.push('timeout_rate too high');
+      if (!split.gates.heartbeat_ok) reasons.push('heartbeat_leak detected');
+      if (!split.gates.auth_ok) reasons.push('auth_failure_rate too high');
+      if (!split.gates.retrieval_grounding_ok) reasons.push('retrieval grounding regressions');
       console.error(`\n[exit 1] Gate failed: ${reasons.join(', ')}`);
       process.exit(1);
     }
@@ -609,6 +749,16 @@ function groupBy(results, field) {
     groups[key].pass_rate = Math.round((groups[key].passed / groups[key].total) * 100) / 100;
   }
   return groups;
+}
+
+function groupFailuresByKind(results) {
+  const out = {};
+  for (const r of results) {
+    if (r.passed) continue;
+    const kind = r.failure_kind || 'other';
+    out[kind] = (out[kind] || 0) + 1;
+  }
+  return out;
 }
 
 main().catch((err) => {
