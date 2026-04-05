@@ -92,8 +92,9 @@ function renderHeroStats(summary, costReport) {
 
   if (summary.timestamp) {
     const date = new Date(summary.timestamp);
+    const laneSuffix = summary.eval_lane ? ` · lane: ${summary.eval_lane}` : '';
     document.getElementById('lastUpdated').textContent =
-      `Last run: ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} UTC`;
+      `Last run: ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} UTC${laneSuffix}`;
   }
 }
 
@@ -572,16 +573,23 @@ function renderFailures(failures) {
   subtitle.textContent = `(${failures.length} from recent runs)`;
 
   tbody.innerHTML = failures.map((f) => {
-    const isTimeout = (f.error || '').includes('Timeout');
-    const isJudge = (f.error || '').includes('Judge');
+    const kind = (f.failure_kind || '').toLowerCase();
+    const errorLower = (f.error || '').toLowerCase();
+    const isTimeout = kind === 'timeout' || errorLower.includes('timeout');
+    const isJudge = kind === 'judge' || errorLower.includes('judge');
     const errorClass = isTimeout ? 'timeout' : isJudge ? 'judge-fail' : '';
+    const kindBadge = kind ? ` [${kind}]` : '';
+    const timeoutMeta = isTimeout && f.timed_out_stage
+      ? ` (stage=${f.timed_out_stage}${f.idle_ms != null ? `, idle=${Math.round(f.idle_ms / 1000)}s` : ''})`
+      : '';
+    const displayError = `${(f.error || '\u2014').slice(0, 100)}${kindBadge}${timeoutMeta}`;
 
     return `
       <tr>
         <td>${f.date || '\u2014'}</td>
         <td><strong>${f.name || f.id}</strong></td>
         <td>${(f.category || '').replace(/_/g, ' ')}</td>
-        <td><span class="error-text ${errorClass}" title="${escapeAttr(f.error || '')}">${escapeHtml((f.error || '\u2014').slice(0, 100))}</span></td>
+        <td><span class="error-text ${errorClass}" title="${escapeAttr(displayError)}">${escapeHtml(displayError)}</span></td>
         <td>${formatLatency(f.latency_ms)}</td>
       </tr>
     `;

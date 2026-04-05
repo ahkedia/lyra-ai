@@ -12,7 +12,7 @@ tests:
     side_effects: write
     validators:
       - type: llm_judge
-        rubric: "Does the response describe creating a reminder with the correct details? It should parse 'tomorrow' to the correct date, set time to 3pm, mention adding to the Reminders database in Notion, and include the task 'call the dentist'. Vague or incomplete parsing is a low score."
+        rubric: "Does the response confirm creating the reminder in Notion with correct details? It should parse 'tomorrow' to a date, include 3pm, and include the task text. Planning without completion is a FAIL."
     cleanup:
       action: notion_delete_matching
       database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
@@ -23,13 +23,17 @@ tests:
     tier: showcase
     category: multi_step
     name: "Cross-user task delegation"
-    prompt: "Tell Abhigna we need to plan meals for next week"
+    prompt: "Tell Abhigna we need to plan meals for next week, and create a shared reminder titled [eval] meal planning sync."
     timeout_ms: 45000
-    side_effects: none
+    side_effects: write
     validators:
       - type: llm_judge
-        rubric: "Does the response describe a multi-step flow? It should: (1) describe writing to the shared Reminders or Meal Planning database, (2) describe sending a Telegram message to Abhigna. Both steps should be mentioned. Only doing one is incomplete."
-    tags: [multi-step, cross-user]
+        rubric: "Does the response complete both parts: (1) notify Abhigna and (2) confirm writing the shared [eval] reminder in Notion? Missing either step is a FAIL."
+    cleanup:
+      action: notion_delete_matching
+      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
+      title_contains: "[eval]"
+    tags: [multi-step, cross-user, write]
 
   - id: multi-insight-capture
     tier: showcase
@@ -40,7 +44,7 @@ tests:
     side_effects: write
     validators:
       - type: llm_judge
-        rubric: "Does the response describe capturing this as an insight in the Second Brain database? It should: (1) recognize this as a product insight worth saving, (2) describe classifying it (e.g., type: Insight, tags: product/leadership), (3) describe saving to Second Brain in Notion. Simply responding conversationally without capturing is a low score."
+        rubric: "Does the response confirm capturing this as a real insight write in Second Brain? It should classify it (e.g., tags/type) and confirm persistence in Notion, not just discuss it."
     cleanup:
       action: notion_delete_matching
       database: "e4027aaf-d2ff-49e1-babf-7487725e2ef4"
