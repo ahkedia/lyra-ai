@@ -134,8 +134,8 @@ if [[ -z "$ACCESS_TOKEN" ]]; then
   log "Token refreshed successfully"
 fi
 
-# Step 2: Fetch bookmarks
-log "Fetching bookmarks created after ${DATE_FILTER}..."
+# Step 2: Fetch bookmarks (API doesn't support start_time; filter client-side)
+log "Fetching bookmarks..."
 
 BOOKMARKS=$(curl -s -X GET "https://api.twitter.com/2/users/${TWITTER_USER_ID}/bookmarks" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}" \
@@ -144,8 +144,7 @@ BOOKMARKS=$(curl -s -X GET "https://api.twitter.com/2/users/${TWITTER_USER_ID}/b
   -d "max_results=100" \
   -d "tweet.fields=author_id,created_at,public_metrics,context_annotations" \
   -d "expansions=author_id" \
-  -d "user.fields=username,name,verified" \
-  -d "start_time=${DATE_FILTER}")
+  -d "user.fields=username,name,verified")
 
 # Check for API errors
 if echo "$BOOKMARKS" | jq -e '.errors != null and (.errors | length > 0)' >/dev/null 2>&1; then
@@ -159,8 +158,22 @@ TWEET_COUNT=$(echo "$BOOKMARKS" | jq '.data | length // 0')
 log "Found ${TWEET_COUNT} bookmark(s) in API response"
 
 if (( TWEET_COUNT == 0 )); then
-  log "No bookmarks in response for start_time=${DATE_FILTER}"
-  telegram_alert "ℹ️ Lyra Twitter: No bookmarks in API response (since ${DATE_FILTER})"
+  log "No bookmarks in API response"
+  telegram_alert "ℹ️ Lyra Twitter: No bookmarks in API response"
+  echo "$BOOKMARKS" > "$OUTPUT_FILE"
+  exit 0
+fi
+
+# Filter by date client-side (API doesn't support start_time for bookmarks)
+BOOKMARKS=$(echo "$BOOKMARKS" | jq --arg cutoff "$DATE_FILTER" '
+  .data = [.data[] | select(.created_at >= $cutoff)]
+  | .meta.result_count = (.data | length)
+')
+TWEET_COUNT=$(echo "$BOOKMARKS" | jq '.data | length // 0')
+log "After date filter (>= ${DATE_FILTER}): ${TWEET_COUNT} bookmark(s)"
+
+if (( TWEET_COUNT == 0 )); then
+  log "No bookmarks after date filter"
   echo "$BOOKMARKS" > "$OUTPUT_FILE"
   exit 0
 fi
