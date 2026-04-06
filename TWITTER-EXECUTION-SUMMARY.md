@@ -9,9 +9,10 @@
 ## Files Created (All in `/Users/akashkedia/AI/lyra-ai/`)
 
 ### Executables (Copy to Hetzner)
-- `scripts/fetch-twitter-bookmarks.sh` — Fetches bookmarks daily
+- `scripts/fetch-twitter-bookmarks.sh` — Fetches bookmarks daily (X OAuth2 refresh, Notion dedupe by tweet id; **requires `jq`**)
+- `scripts/run-with-openclaw-env.sh` — Sources `/root/.openclaw/.env` then runs a command (**use this from cron**)
 - `scripts/analyze-claude-setup.js` — Analyzes patterns
-- `scripts/aggregate-morning-digest.js` — Creates morning digest
+- `scripts/aggregate-morning-digest.js` — Creates morning digest (includes **Workflow mix** when `Primary workflow` is set)
 
 ### Skills (Copy to Hetzner)
 - `skills/twitter-synthesis/SKILL.md` — Synthesis engine
@@ -43,11 +44,13 @@
    ```bash
    ssh hetzner "nano ~/.openclaw/.env"
 
-   # Add these 4 lines:
+   # Add these lines (client secret required for refresh_token grant):
    TWITTER_CLIENT_ID="paste_here"
    TWITTER_CLIENT_SECRET="paste_here"
    TWITTER_REFRESH_TOKEN="paste_here"
    TWITTER_USER_ID="your_numeric_id"
+   NOTION_API_KEY="..."           # for dedupe against Twitter Insights
+   TWITTER_INSIGHTS_DB_ID="..." # optional at first; needed for dedupe
 
    # Save and restart
    ssh hetzner "sudo systemctl restart openclaw"
@@ -55,8 +58,8 @@
 
 4. **Verify**
    ```bash
-   ssh hetzner "/root/fetch-twitter-bookmarks.sh"
-   # Should say: ✅ Lyra Twitter: Fetched X new bookmarks
+   ssh hetzner "/root/lyra-ai/scripts/run-with-openclaw-env.sh /root/lyra-ai/scripts/fetch-twitter-bookmarks.sh"
+   # Should say: ✅ Lyra Twitter: Fetched X new bookmark(s)
    ```
 
 ---
@@ -66,21 +69,7 @@
 1. **In Notion (GUI)**
    - Open Lyra Hub workspace
    - New Database → Name it "Twitter Insights"
-   - Add these 11 properties:
-
-   ```
-   1. Content Byte (Title)
-   2. Source Tweet (URL)
-   3. Type (Select: Problem-Solving/Thought Leadership/Journey-Based/Mixed)
-   4. Themes (Multi-select: ai, fintech, product, recruiting, etc.)
-   5. Original Tweet Summary (Text)
-   6. My Take (Text)
-   7. Full Byte (Text)
-   8. For Recruiter (Checkbox)
-   9. Recruiter Notes (Text)
-   10. Status (Select: Draft/Ready/Published/Archived)
-   11. Generated At (Date)
-   ```
+   - Add properties from [`docs/NOTION-TWITTER-INSIGHTS-SETUP.md`](docs/NOTION-TWITTER-INSIGHTS-SETUP.md) — **base 11 + workflow 6** (Workflow multi-select, Primary workflow, Workflow confidence, Content mode, Workflow rationale, Needs review). Exact workflow option names must match the synthesis skill (e.g. `lyra_capability`, `content_create`).
 
 2. **Get Database ID**
    - Open Twitter Insights DB
@@ -105,12 +94,15 @@
 1. **Copy scripts to server**
    ```bash
    # From your Mac, in lyra-ai directory:
-   scp scripts/fetch-twitter-bookmarks.sh hetzner:/root/
-   scp scripts/analyze-claude-setup.js hetzner:/root/
-   scp scripts/aggregate-morning-digest.js hetzner:/root/
+   ssh hetzner "mkdir -p /root/lyra-ai/scripts"
+   scp scripts/fetch-twitter-bookmarks.sh hetzner:/root/lyra-ai/scripts/
+   scp scripts/run-with-openclaw-env.sh hetzner:/root/lyra-ai/scripts/
+   scp scripts/analyze-claude-setup.js hetzner:/root/lyra-ai/scripts/
+   scp scripts/aggregate-morning-digest.js hetzner:/root/lyra-ai/scripts/
 
-   ssh hetzner "chmod +x /root/fetch-twitter-bookmarks.sh"
+   ssh hetzner "chmod +x /root/lyra-ai/scripts/fetch-twitter-bookmarks.sh /root/lyra-ai/scripts/run-with-openclaw-env.sh"
    ```
+   Install **`jq`** on the server if missing: `apt-get install -y jq` (Debian/Ubuntu).
 
 2. **Create skill directories and copy**
    ```bash
@@ -125,8 +117,8 @@
 
 3. **Verify**
    ```bash
-   ssh hetzner "ls /root/*.sh /root/*.js"
-   # Should show 3 files
+   ssh hetzner "ls /root/lyra-ai/scripts/*.sh /root/lyra-ai/scripts/*.js"
+   # Should show fetch + run-with-openclaw-env + two node scripts
    ```
 
 ---
@@ -135,19 +127,19 @@
 
 1. **Test fetch**
    ```bash
-   ssh hetzner "/root/fetch-twitter-bookmarks.sh"
+   ssh hetzner "/root/lyra-ai/scripts/run-with-openclaw-env.sh /root/lyra-ai/scripts/fetch-twitter-bookmarks.sh"
    # ✅ Should show bookmark count
    ```
 
 2. **Test analysis**
    ```bash
-   ssh hetzner "cd /root && node analyze-claude-setup.js"
+   ssh hetzner "/root/lyra-ai/scripts/run-with-openclaw-env.sh node /root/lyra-ai/scripts/analyze-claude-setup.js"
    # ✅ Should show theme distribution and suggestions
    ```
 
 3. **Test digest**
    ```bash
-   ssh hetzner "cd /root && node aggregate-morning-digest.js"
+   ssh hetzner "/root/lyra-ai/scripts/run-with-openclaw-env.sh node /root/lyra-ai/scripts/aggregate-morning-digest.js"
    # ✅ Should show digest preview
    # ✅ Should send to Telegram
    ```
@@ -177,19 +169,19 @@
    ssh hetzner
 
    # If using OpenClaw CLI:
-   openclaw cron add --at "0 7 * * *" --name "twitter-fetch" --command "/root/fetch-twitter-bookmarks.sh"
-   openclaw cron add --at "5 7 * * *" --name "twitter-synthesis" --command "node /root/analyze-claude-setup.js"
-   openclaw cron add --at "15 7 * * *" --name "morning-digest" --command "node /root/aggregate-morning-digest.js"
+   openclaw cron add --at "0 7 * * *" --name "twitter-fetch" --command "/root/lyra-ai/scripts/run-with-openclaw-env.sh /root/lyra-ai/scripts/fetch-twitter-bookmarks.sh"
+   openclaw cron add --at "5 7 * * *" --name "twitter-synthesis" --command "/root/lyra-ai/scripts/run-with-openclaw-env.sh node /root/lyra-ai/scripts/analyze-claude-setup.js"
+   openclaw cron add --at "15 7 * * *" --name "morning-digest" --command "/root/lyra-ai/scripts/run-with-openclaw-env.sh node /root/lyra-ai/scripts/aggregate-morning-digest.js"
    ```
 
-   OR add to system crontab:
+   OR add to system crontab (**always load `.env` via wrapper**):
    ```bash
    crontab -e
 
-   # Add these lines:
-   0 7 * * * /root/fetch-twitter-bookmarks.sh >> /var/log/twitter-fetch.log 2>&1
-   5 7 * * * cd /root && node analyze-claude-setup.js >> /var/log/twitter-analysis.log 2>&1
-   15 7 * * * cd /root && node aggregate-morning-digest.js >> /var/log/twitter-digest.log 2>&1
+   # Add these lines (adjust paths to match where you copied scripts):
+   0 7 * * * /root/lyra-ai/scripts/run-with-openclaw-env.sh /root/lyra-ai/scripts/fetch-twitter-bookmarks.sh >> /var/log/twitter-fetch.log 2>&1
+   5 7 * * * /root/lyra-ai/scripts/run-with-openclaw-env.sh node /root/lyra-ai/scripts/analyze-claude-setup.js >> /var/log/twitter-analysis.log 2>&1
+   15 7 * * * /root/lyra-ai/scripts/run-with-openclaw-env.sh node /root/lyra-ai/scripts/aggregate-morning-digest.js >> /var/log/twitter-digest.log 2>&1
    ```
 
 ---
@@ -241,9 +233,9 @@ Review entries in Twitter Insights DB
 
 - [ ] X API app created + credentials saved
 - [ ] Refresh token obtained and added to .env
-- [ ] Notion Twitter Insights DB created with 11 properties
+- [ ] Notion Twitter Insights DB created with all properties (11 + workflow fields)
 - [ ] Database ID added to .env
-- [ ] Scripts copied to /root/
+- [ ] Scripts copied to `/root/lyra-ai/scripts/` (or consistent path used in cron)
 - [ ] Skills copied to /root/.openclaw/workspace/skills/
 - [ ] All 3 scripts tested manually
 - [ ] Notion DB has entries
