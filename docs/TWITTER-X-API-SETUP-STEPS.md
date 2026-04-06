@@ -55,7 +55,7 @@ You register a small “app” on X, prove who you are once in the browser, and 
 
 X does not give you a long-lived refresh token until you **authorize the app once**.
 
-1. Follow **[`skills/twitter-bookmarks/oauth-setup.md`](../skills/twitter-bookmarks/oauth-setup.md)** — Option A (shell) or Option B (Postman).
+1. **Easiest:** from your `lyra-ai` clone, run `./scripts/get-twitter-oauth-refresh-token.sh` after setting `TWITTER_CLIENT_ID` and `TWITTER_CLIENT_SECRET` (see **[`skills/twitter-bookmarks/oauth-setup.md`](../skills/twitter-bookmarks/oauth-setup.md)** Option A).
 2. That flow does roughly:
    - Build an **authorize URL** with your Client ID, redirect URI, scopes, and PKCE.
    - Open it in the browser → log in → **Authorize**.
