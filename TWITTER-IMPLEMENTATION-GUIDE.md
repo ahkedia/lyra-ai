@@ -4,6 +4,8 @@
 **Timeline:** ~2 hours to full deployment
 **Date Filter:** Only bookmarks after 2026-03-19
 
+**Current deploy paths / `jq` / env wrapper:** Prefer [`TWITTER-EXECUTION-SUMMARY.md`](TWITTER-EXECUTION-SUMMARY.md) as the quick reference; it matches `run-with-openclaw-env.sh` and `/root/lyra-ai/scripts/` layout.
+
 ---
 
 ## What's Been Created
@@ -71,7 +73,7 @@
 1. **Manual Setup** (Fastest)
    - Open Notion → Lyra Hub
    - Create new database: "Twitter Insights"
-   - Add 11 properties (see `/docs/NOTION-TWITTER-INSIGHTS-SETUP.md`)
+   - Add all properties including workflow fields (see `/docs/NOTION-TWITTER-INSIGHTS-SETUP.md`)
    - Copy database ID from URL
 
 2. **Add to Environment**
