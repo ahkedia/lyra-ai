@@ -109,6 +109,7 @@ if [[ -z "$ACCESS_TOKEN" ]]; then
     --data-urlencode "refresh_token=${TWITTER_REFRESH_TOKEN}")
 
   ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty')
+  NEW_REFRESH_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.refresh_token // empty')
   ERR=$(echo "$TOKEN_RESPONSE" | jq -r '.error // empty')
 
   if [[ -z "$ACCESS_TOKEN" ]]; then
@@ -116,6 +117,17 @@ if [[ -z "$ACCESS_TOKEN" ]]; then
     log "Response: $TOKEN_RESPONSE"
     telegram_alert "❌ Lyra Twitter fetch failed: OAuth2 token refresh failed (${ERR})"
     exit 1
+  fi
+
+  # X rotates refresh tokens — save the new one to .env
+  if [[ -n "$NEW_REFRESH_TOKEN" && "$NEW_REFRESH_TOKEN" != "$TWITTER_REFRESH_TOKEN" ]]; then
+    ENV_FILE="${HOME}/.openclaw/.env"
+    if [[ -f "$ENV_FILE" ]]; then
+      # Update TWITTER_REFRESH_TOKEN in place
+      sed -i.bak "s|^TWITTER_REFRESH_TOKEN=.*|TWITTER_REFRESH_TOKEN=\"${NEW_REFRESH_TOKEN}\"|" "$ENV_FILE"
+      export TWITTER_REFRESH_TOKEN="$NEW_REFRESH_TOKEN"
+      log "Refresh token rotated and saved to $ENV_FILE"
+    fi
   fi
 
   printf '%s' "$ACCESS_TOKEN" > "$ACCESS_TOKEN_FILE"
