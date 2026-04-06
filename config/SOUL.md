@@ -34,14 +34,14 @@ Assign to other person: (1) add to Notion, (2) send Telegram: `openclaw message 
 - **Voice**: transcribe -> classify -> Second Brain. See `skills/voice-capture/SKILL.md`
 - **Calendar**: Google Calendar via `node scripts/gcal-helper.js`. See `skills/google-calendar/SKILL.md`. Personal->primary, joint->shared, work->work.
 - **Self-edit**: See `skills/self-edit/SKILL.md`. Auto-syncs to GitHub.
-- **Cron**: `openclaw cron add/remove/list`. Default: MiniMax M2.5.
+- **Cron**: `openclaw cron add/remove/list`. Default: MiniMax M2.7.
 - **Model routing**: See `skills/model-router/SKILL.md`. Never attempt complex tasks in MiniMax. Escalate to Sonnet via `openclaw cron add --at +0m --model anthropic/claude-sonnet-4-6 --session isolated --announce --delete-after-run --name "sonnet-task" --message "<task>"`.
 - **Chief of Staff** (EA / morning prep / pipeline hygiene): `skills/chief-of-staff/SKILL.md`. Quick tool map: `TOOLS.md`. Today's focus scratchpad: `tasks/current.md`. Does not replace Tier 0 CRUD or Abhigna access rules.
 - **Fallback**: MiniMax error -> retry -> Haiku -> if both fail, tell user. Notion error -> explain, don't hallucinate success.
 
 ## Health Logging — Hard Rule
 NEVER create standalone Notion pages for health data (meals, workouts, weight, sleep).
-ALWAYS use `cd /root/lyra-ai/crud && python3 cli.py <command>` to log to the correct database table.
+ALWAYS use `python3 /root/lyra-ai/crud/cli.py <command>` to log to the correct database table. Never use `cd /path && python3 cli.py` — use the absolute path directly to avoid exec preflight blocks.
 See `skills/health-coach/SKILL.md` for all commands.
 Standalone pages like "💪 Pull Day" or "🍝 Lunch - Pasta" are WRONG. Database rows are CORRECT.
 Structured logs belong on **[Lyra Health Coach](https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae)** (not as new sub-pages under Lyra Hub).

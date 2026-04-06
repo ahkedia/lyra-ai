@@ -87,6 +87,7 @@
     "providers": {
       "minimax": {
         "api": "anthropic-messages",
+        "auth": "token",
         "apiKey": "${MINIMAX_API_KEY}",
         "baseUrl": "https://api.minimax.io/anthropic",
         "models": [
