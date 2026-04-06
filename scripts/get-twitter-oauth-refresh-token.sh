@@ -4,8 +4,8 @@
 # Two-phase (works when stdin is not a TTY, e.g. Cursor agent runs phase 1):
 #   export TWITTER_CLIENT_ID='...' TWITTER_CLIENT_SECRET='...'
 #   ./scripts/get-twitter-oauth-refresh-token.sh start
-#   # Authorize in browser, then:
-#   ./scripts/get-twitter-oauth-refresh-token.sh exchange 'http://localhost:3000/auth/callback?code=...'
+#   # Authorize in browser, then (paste URL when prompted — no quotes in zsh):
+#   ./scripts/get-twitter-oauth-refresh-token.sh exchange
 #
 # Interactive (real terminal):
 #   export TWITTER_CLIENT_ID='...' TWITTER_CLIENT_SECRET='...'
@@ -85,7 +85,7 @@ exchange_tokens() {
     AUTH_CODE=$(echo "$INPUT" | tr -d '\r\n' | tr -d ' ')
   fi
 
-  TOKEN_RESPONSE=$(curl -s -X POST "https://oauth2.twitter.com/2/oauth2/token" \
+  TOKEN_RESPONSE=$(curl -s -X POST "https://api.twitter.com/2/oauth2/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     --data-urlencode "grant_type=authorization_code" \
     --data-urlencode "client_id=${CLIENT_ID}" \
@@ -138,15 +138,27 @@ case "${1:-}" in
     elif command -v xdg-open >/dev/null 2>&1; then
       xdg-open "$AUTH_URL" || true
     fi
-    echo "After you click Authorize, run:"
-    echo "  $0 exchange 'PASTE_FULL_CALLBACK_URL_HERE'"
+    echo "After you click Authorize, run (easiest — no quotes needed):"
+    echo "  $0 exchange"
+    echo "…then paste the full URL from the address bar when asked."
+    echo ""
+    echo "Or one line (must use quotes in zsh): $0 exchange 'http://localhost:3000/...'"
     ;;
   exchange)
-    if [[ -z "${2:-}" ]]; then
-      echo "Usage: $0 exchange 'http://localhost:3000/auth/callback?code=...'"
-      exit 1
+    if [[ -n "${2:-}" ]]; then
+      exchange_tokens "$2"
+    else
+      echo ""
+      echo "Paste the FULL callback URL from your browser (http://localhost:3000/auth/callback?...)"
+      echo "Then press Enter. No quotes needed."
+      echo ""
+      read -r URL || true
+      if [[ -z "${URL:-}" ]]; then
+        echo "No URL pasted."
+        exit 1
+      fi
+      exchange_tokens "$URL"
     fi
-    exchange_tokens "$2"
     ;;
   interactive)
     load_creds

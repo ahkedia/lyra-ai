@@ -27,7 +27,7 @@ LOG_FILE="/var/log/lyra-twitter-bookmarks.log"
 DATE_FILTER="2026-03-19T00:00:00Z"  # Only bookmarks after this date (ISO 8601)
 
 # X OAuth 2.0 (same host as skills/twitter-bookmarks/oauth-setup.md)
-TWITTER_TOKEN_URL="https://oauth2.twitter.com/2/oauth2/token"
+TWITTER_TOKEN_URL="https://api.twitter.com/2/oauth2/token"
 
 # Helper: Log to file and stderr
 log() {
