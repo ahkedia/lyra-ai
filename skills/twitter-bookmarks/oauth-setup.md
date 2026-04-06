@@ -68,58 +68,28 @@ This guide walks through setting up OAuth2 authentication for Lyra to access you
 
 ## Step 4: Get Refresh Token (One-Time)
 
-Lyra needs a refresh token to access your bookmarks indefinitely. Here's how to get one:
+Lyra needs a refresh token to access your bookmarks indefinitely.
 
-### Option A: Using curl (Fastest)
+**Scopes used:** `tweet.read` `bookmark.read` `users.read` `offline.access` (the last one is what allows a **refresh token** to be returned).
 
-1. Create a bash script `get-twitter-token.sh`:
-   ```bash
-   #!/bin/bash
+### Option A: Helper script (recommended — correct PKCE)
 
-   CLIENT_ID="your_client_id_here"
-   CLIENT_SECRET="your_client_secret_here"
-   REDIRECT_URI="http://localhost:3000/auth/callback"
+From your `lyra-ai` clone on **Mac** (or any machine with `bash`, `openssl`, `curl`, `python3`):
 
-   # Step 1: Generate code challenge (for PKCE)
-   CODE_CHALLENGE=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')
+```bash
+cd /path/to/lyra-ai
+export TWITTER_CLIENT_ID='paste_your_client_id'
+export TWITTER_CLIENT_SECRET='paste_your_client_secret'
+chmod +x scripts/get-twitter-oauth-refresh-token.sh
+./scripts/get-twitter-oauth-refresh-token.sh
+```
 
-   # Step 2: Open browser for user authorization
-   AUTH_URL="https://twitter.com/i/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=tweet.read%20bookmark.read%20users.read&state=state&code_challenge=${CODE_CHALLENGE}&code_challenge_method=S256"
+1. The script opens a browser tab to X. Log in if asked, then click **Authorize**.
+2. The browser will try to open `http://localhost:3000/auth/callback?...` — **“connection refused” is normal** (nothing is listening on port 3000).
+3. **Copy the entire URL** from the address bar (or copy only the `code=...` value after `code=`).
+4. Paste into the terminal when prompted. The script prints JSON and then a line you can copy as `TWITTER_REFRESH_TOKEN=...`.
 
-   echo "Opening browser for authorization..."
-   echo "URL: $AUTH_URL"
-   open "$AUTH_URL"  # On Mac; use 'xdg-open' on Linux
-
-   # Step 3: Prompt for authorization code
-   read -p "After authorizing, paste the auth code here: " AUTH_CODE
-
-   # Step 4: Exchange code for refresh token
-   TOKEN_RESPONSE=$(curl -s -X POST "https://oauth2.twitter.com/2/oauth2/token" \
-     -H "Content-Type: application/x-www-form-urlencoded" \
-     -d "grant_type=authorization_code&code=${AUTH_CODE}&client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&redirect_uri=${REDIRECT_URI}&code_verifier=${CODE_CHALLENGE}")
-
-   echo "Token response:"
-   echo "$TOKEN_RESPONSE" | jq .
-
-   # Extract refresh token
-   REFRESH_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.refresh_token')
-   echo ""
-   echo "Your refresh token: $REFRESH_TOKEN"
-   ```
-
-2. Run it:
-   ```bash
-   chmod +x get-twitter-token.sh
-   ./get-twitter-token.sh
-   ```
-
-3. When it opens your browser:
-   - Click **Authorize app**
-   - You'll be redirected (might show error, that's ok)
-   - Copy the authorization code from the URL or error page
-   - Paste it into the script prompt
-
-4. The script will output your refresh token
+If you see an error about `invalid_grant` or PKCE, the `code` expires in a few minutes — run the script again and paste the new URL immediately.
 
 ### Option B: Using Postman (Visual)
 
@@ -133,10 +103,11 @@ Lyra needs a refresh token to access your bookmarks indefinitely. Here's how to 
    - `client_secret`: Your Client Secret
    - `redirect_uri`: `http://localhost:3000/auth/callback`
    - `code`: [Authorization code you'll get from browser]
-4. First, authorize manually by visiting:
+4. First, authorize manually by visiting (include `offline.access` for refresh tokens):
    ```
-   https://twitter.com/i/oauth2/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=http://localhost:3000/auth/callback&response_type=code&scope=tweet.read%20bookmark.read%20users.read
+   https://twitter.com/i/oauth2/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=http://localhost:3000/auth/callback&response_type=code&scope=tweet.read%20bookmark.read%20users.read%20offline.access
    ```
+   (PKCE is still required for production; use Option A unless you know how to add `code_challenge` manually.)
 5. Copy the auth code from redirect
 6. Send Postman request → get refresh token
 
@@ -233,7 +204,7 @@ You don't need to do anything - it's automatic.
 
 ## Scopes Requested
 
-The `tweet.read`, `bookmark.read`, `users.read` scopes allow:
+The `tweet.read`, `bookmark.read`, `users.read`, and `offline.access` scopes allow:
 - ✅ Read your bookmarked tweets
 - ✅ Read tweet content and metadata
 - ✅ Read user information (authors)
