@@ -85,11 +85,11 @@ exchange_tokens() {
     AUTH_CODE=$(echo "$INPUT" | tr -d '\r\n' | tr -d ' ')
   fi
 
+  # X API requires Basic Auth for confidential clients
   TOKEN_RESPONSE=$(curl -s -X POST "https://api.twitter.com/2/oauth2/token" \
+    -u "${CLIENT_ID}:${CLIENT_SECRET}" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     --data-urlencode "grant_type=authorization_code" \
-    --data-urlencode "client_id=${CLIENT_ID}" \
-    --data-urlencode "client_secret=${CLIENT_SECRET}" \
     --data-urlencode "redirect_uri=${REDIR}" \
     --data-urlencode "code_verifier=${VERIFIER}" \
     --data-urlencode "code=${AUTH_CODE}")

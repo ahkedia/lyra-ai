@@ -101,12 +101,12 @@ fi
 
 if [[ -z "$ACCESS_TOKEN" ]]; then
   log "Refreshing access token via X OAuth2..."
+  # X API requires Basic Auth for confidential clients
   TOKEN_RESPONSE=$(curl -s -X POST "$TWITTER_TOKEN_URL" \
+    -u "${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     --data-urlencode "grant_type=refresh_token" \
-    --data-urlencode "refresh_token=${TWITTER_REFRESH_TOKEN}" \
-    --data-urlencode "client_id=${TWITTER_CLIENT_ID}" \
-    --data-urlencode "client_secret=${TWITTER_CLIENT_SECRET}")
+    --data-urlencode "refresh_token=${TWITTER_REFRESH_TOKEN}")
 
   ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty')
   ERR=$(echo "$TOKEN_RESPONSE" | jq -r '.error // empty')
