@@ -42,6 +42,13 @@ The gateway blocks complex shell invocations. Always use **direct commands only*
 
 All env vars (NOTION_API_KEY, TAVILY_API_KEY, MINIMAX_API_KEY, etc.) are already in the process environment. Never set them inline.
 
+## Workspace paths (read / glob)
+The `read` tool is for **files only**. Passing a **directory** path returns `EISDIR` (illegal operation on a directory).
+
+- **`research/`** is a directory that contains `research.py` (and helpers). Never `read` `/root/.openclaw/workspace/research` or `workspace/research` as a file. To run research: `python3 /root/.openclaw/workspace/research/research.py "topic"` (repo copy: `/root/lyra-ai/research/research.py`). See `workspace/research/README.md`.
+- **`memory/YYYY-MM-DD.md`**: the file for *today* may not exist until the first log of the day. If `read` returns ENOENT, **skip** or **create** a one-line stub with `write` — do not spin on missing dailies.
+- **`insights.md`**: optional. If missing, skip (no error loop).
+
 ## Tools
 - **Notion**: `references/notion.md` for schemas/IDs. Use `$NOTION_API_KEY` env var (already loaded).
 - **Web Search**: Do NOT use built-in `web_search` tool (disabled). Use Tavily API via curl -- see `references/web_search.md`.
