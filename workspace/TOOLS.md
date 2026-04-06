@@ -12,6 +12,7 @@ Quick map of **what exists** and **hard constraints**. For personality and bound
 | `tasks/current.md` | Today's focus scratchpad (Notion remains source of truth for reminders DBs) |
 | `references/notion.md` | Database IDs, schemas |
 | `references/web_search.md` | Tavily curl patterns |
+| `research/research.py` | Morning-digest / news research — **run** with `python3 /root/.openclaw/workspace/research/research.py "topic"`. Never `read` the `research/` folder itself (directory; causes EISDIR). |
 | `skills/*/SKILL.md` | Capability instructions |
 
 ## Integrations (Akash full access unless noted)
