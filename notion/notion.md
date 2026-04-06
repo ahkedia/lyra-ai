@@ -105,6 +105,13 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Properties:** Contact Name (title), Company (rich_text), Status (select), Channel (select), Contact Type (select), Next Action (rich_text), Next Action Date (date), Last Action (rich_text), Notes (rich_text), AI Portfolio Sent (checkbox)
 - **Who can access:** Akash only
 
+### Twitter Insights
+- **database_id:** `33a7800891008166aa55ddec1d2e5dc2` (with dashes: `33a78008-9100-8166-aa55-ddec1d2e5dc2`)
+- **data_source_id:** `33a78008-9100-81c2-9593-000b5821c87b`
+- **Parent:** Lyra Hub — full-page DB for sidebar nesting
+- **Env:** `TWITTER_INSIGHTS_DB_ID` (no dashes)
+- **Setup:** `node scripts/setup-twitter-insights-db.cjs` — see `docs/NOTION-TWITTER-INSIGHTS-SETUP.md`
+
 ### Content Ideas
 - **database_id:** `27fc8e00643a4b9390f7ce8b9a345c62`
 - **data_source_id:** `f008d0bb-ac81-401d-889d-4e8f508ab134`
