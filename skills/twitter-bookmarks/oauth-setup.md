@@ -81,15 +81,19 @@ cd /path/to/lyra-ai
 export TWITTER_CLIENT_ID='paste_your_client_id'
 export TWITTER_CLIENT_SECRET='paste_your_client_secret'
 chmod +x scripts/get-twitter-oauth-refresh-token.sh
-./scripts/get-twitter-oauth-refresh-token.sh
+./scripts/get-twitter-oauth-refresh-token.sh start
 ```
 
-1. The script opens a browser tab to X. Log in if asked, then click **Authorize**.
-2. The browser will try to open `http://localhost:3000/auth/callback?...` — **“connection refused” is normal** (nothing is listening on port 3000).
-3. **Copy the entire URL** from the address bar (or copy only the `code=...` value after `code=`).
-4. Paste into the terminal when prompted. The script prints JSON and then a line you can copy as `TWITTER_REFRESH_TOKEN=...`.
+1. A browser tab opens → click **Authorize**. Localhost may show **connection refused** — normal.
+2. Copy the **full URL** from the address bar, then run:
+   ```bash
+   ./scripts/get-twitter-oauth-refresh-token.sh exchange 'PASTE_FULL_URL_HERE'
+   ```
+3. Copy the printed `TWITTER_REFRESH_TOKEN=...` into `.env`.
 
-If you see an error about `invalid_grant` or PKCE, the `code` expires in a few minutes — run the script again and paste the new URL immediately.
+**One-shot (interactive terminal only):** `./scripts/get-twitter-oauth-refresh-token.sh interactive`
+
+If you see `invalid_grant`, the `code` expired — run `start` again, then `exchange` within a few minutes.
 
 ### Option B: Using Postman (Visual)
 
