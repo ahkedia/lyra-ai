@@ -24,7 +24,8 @@ fi
 
 OUTPUT_FILE="/tmp/lyra-bookmarks-$(date +%Y-%m-%d).json"
 LOG_FILE="/var/log/lyra-twitter-bookmarks.log"
-DATE_FILTER="2026-03-19T00:00:00Z"  # Only bookmarks after this date (ISO 8601)
+# Only fetch bookmarks from yesterday (saves API credits - ~$0.005/bookmark)
+DATE_FILTER="$(date -u -d 'yesterday' +%Y-%m-%dT00:00:00Z 2>/dev/null || date -u -v-1d +%Y-%m-%dT00:00:00Z)"
 
 # X OAuth 2.0 (same host as skills/twitter-bookmarks/oauth-setup.md)
 TWITTER_TOKEN_URL="https://api.twitter.com/2/oauth2/token"
