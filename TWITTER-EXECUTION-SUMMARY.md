@@ -29,6 +29,8 @@
 
 ### ⏱️ Step 1: X API OAuth2 Setup (30 min)
 
+**Readable walkthrough:** [`docs/TWITTER-X-API-SETUP-STEPS.md`](docs/TWITTER-X-API-SETUP-STEPS.md) (then use `skills/twitter-bookmarks/oauth-setup.md` for token commands).
+
 1. **Register X Developer App**
    - Go to https://developer.twitter.com/
    - Create app: "Lyra Twitter Bookmarks"

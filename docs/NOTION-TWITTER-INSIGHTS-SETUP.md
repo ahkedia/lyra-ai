@@ -35,13 +35,17 @@ Create the "Twitter Insights" database for storing synthesized content bytes.
 
 ### Option 2: API (Programmatic)
 
-Use the provided script:
+From the `lyra-ai` repo (requires `NOTION_API_KEY` and your Notion integration **must have access** to [Lyra Hub](https://www.notion.so/akashkedia/Lyra-Hub-317780089100806bb935dc1810971e87)):
 
 ```bash
-node setup-twitter-insights-db.js
+cd /path/to/lyra-ai
+export NOTION_API_KEY="secret_..."   # or rely on env
+node scripts/setup-twitter-insights-db.cjs
 ```
 
-This creates the database automatically via Notion API.
+This creates **Twitter Insights** as a **full page** under Lyra Hub (`is_inline: false`) so it nests in the sidebar. It includes all base fields plus the six workflow fields (**Workflow**, **Primary workflow**, **Workflow confidence**, **Content mode**, **Workflow rationale**, **Needs review**) with the correct select/multi-select options.
+
+If the script errors with **object_not_found** on the parent page, open Lyra Hub in Notion → **⋯** → **Connections** → add your integration.
 
 ---
 

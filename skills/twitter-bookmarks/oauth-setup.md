@@ -2,6 +2,8 @@
 
 This guide walks through setting up OAuth2 authentication for Lyra to access your Twitter bookmarks via the X API.
 
+**New to the flow?** Read the linear checklist first: [`docs/TWITTER-X-API-SETUP-STEPS.md`](../../docs/TWITTER-X-API-SETUP-STEPS.md).
+
 ## Overview
 
 **What we're building:**
