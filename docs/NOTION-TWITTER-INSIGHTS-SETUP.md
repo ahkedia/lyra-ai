@@ -22,8 +22,14 @@ Create the "Twitter Insights" database for storing synthesized content bytes.
 | **Full Byte** | Text | Complete content byte ready to share |
 | **For Recruiter** | Checkbox | Flag if good for outreach |
 | **Recruiter Notes** | Text | How to use in recruiter conversation |
-| **Status** | Select | Ready / Draft / Published / Archived |
+| **Status** | Select | Draft / Ready / Published / Archived (default Draft at creation) |
 | **Generated At** | Date | When Lyra created it |
+| **Workflow** | Multi-select | See workflow options below (all that apply) |
+| **Primary workflow** | Select | Single best route (must be one of the Workflow options) |
+| **Workflow confidence** | Select | High / Medium / Low |
+| **Content mode** | Select | Quote OK / Commentary only / N/A |
+| **Workflow rationale** | Text | One-line model rationale (optional to keep after review) |
+| **Needs review** | Checkbox | True when classification is uncertain |
 
 5. Save the database
 
@@ -162,6 +168,34 @@ After creating the database, you need to tell Lyra where it is:
 - **Auto-filled:** By synthesis script
 - **Example:** 2026-03-22
 
+### Workflow (Multi-select)
+- **Options (use exact names for API/skill alignment):**
+  - `lyra_capability`
+  - `work_claude_setup`
+  - `personal_claude_setup`
+  - `work_productivity`
+  - `content_create`
+  - `research_read_later`
+  - `tool_eval`
+  - `market_competitor`
+- **Used by:** Routing digest and future automation; see `skills/twitter-synthesis/SKILL.md`
+
+### Primary workflow (Select)
+- **Type:** Select — **same option strings** as Workflow (single value)
+- **Used by:** Primary routing, digest “Workflow mix” line in `aggregate-morning-digest.js`
+
+### Workflow confidence (Select)
+- **Options:** `High`, `Medium`, `Low`
+
+### Content mode (Select)
+- **Options:** `Quote OK`, `Commentary only`, `N/A` (use `N/A` when primary path is not content)
+
+### Workflow rationale (Text)
+- **Description:** One sentence from the model; safe to clear after you correct the row
+
+### Needs review (Checkbox)
+- **Description:** Check when classification should be double-checked
+
 ---
 
 ## Views (Optional)
@@ -188,6 +222,15 @@ Create these views for easier navigation:
 - **Sort by:** `For Recruiter` (descending)
 - **Purpose:** See theme distribution
 
+### View 5: By Primary workflow
+- **Group by:** `Primary workflow`
+- **Sort by:** `Generated At` (descending)
+- **Purpose:** Triage Lyra vs work vs content rows
+
+### View 6: Needs review
+- **Filter:** `Needs review` = checked
+- **Sort by:** `Generated At` (descending)
+
 ---
 
 ## Integration Points
@@ -195,8 +238,9 @@ Create these views for easier navigation:
 This database is read/written by:
 
 1. **Fetch script** (`fetch-twitter-bookmarks.sh`)
-   - Reads: Source Tweet URLs (for deduplication)
-   - Writes: None
+   - Reads: Source Tweet URLs from Notion (first 100 rows) for deduplication by tweet id
+   - Writes: JSON at `/tmp/lyra-bookmarks-YYYY-MM-DD.json`
+   - Requires: `jq`, `TWITTER_INSIGHTS_DB_ID` (env) or `~/.twitter-insights-db-id` (legacy)
 
 2. **Synthesis skill** (`skills/twitter-synthesis/SKILL.md`)
    - Reads: Generated At (to find recent entries)

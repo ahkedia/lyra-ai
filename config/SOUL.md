@@ -60,6 +60,7 @@ The `read` tool is for **files only**. Passing a **directory** path returns `EIS
 - **Cron**: `openclaw cron add/remove/list`. Default: MiniMax M2.7.
 - **Model routing**: See `skills/model-router/SKILL.md`. Never attempt complex tasks in MiniMax. Escalate to Sonnet via `openclaw cron add --at +0m --model anthropic/claude-sonnet-4-6 --session isolated --announce --delete-after-run --name "sonnet-task" --message "<task>"`.
 - **Chief of Staff** (EA / morning prep / pipeline hygiene): `skills/chief-of-staff/SKILL.md`. Quick tool map: `TOOLS.md`. Today's focus scratchpad: `tasks/current.md`. Does not replace Tier 0 CRUD or Abhigna access rules.
+- **Twitter bookmarks → Notion:** After `fetch-twitter-bookmarks.sh` runs, process `/tmp/lyra-bookmarks-*.json` with `skills/twitter-synthesis/SKILL.md`. Classify **Primary workflow** + **Workflow** (multi) per skill; save to **Twitter Insights** with all properties in the skill. User may correct misclassified rows in Notion—those overrides are ground truth.
 - **Fallback**: MiniMax error -> retry -> Haiku -> if both fail, tell user. Notion error -> explain, don't hallucinate success.
 
 ## Health Logging — Hard Rule

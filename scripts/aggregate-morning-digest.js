@@ -70,14 +70,26 @@ async function fetchTwitterInsights() {
       const byte = entry.properties?.['Content Byte']?.title?.[0]?.text?.content || '';
       const type = entry.properties?.Type?.select?.name || '';
       const forRecruiter = entry.properties?.['For Recruiter']?.checkbox ? '⭐' : '';
+      const pw = entry.properties?.['Primary workflow']?.select?.name;
+      const wfTag = pw ? ` {${pw}}` : '';
 
-      return `${forRecruiter} [${type}] ${byte}`;
+      return `${forRecruiter} [${type}]${wfTag} ${byte}`;
     });
+
+    const wfCounts = {};
+    for (const entry of entries) {
+      const pw = entry.properties?.['Primary workflow']?.select?.name;
+      if (!pw) continue;
+      wfCounts[pw] = (wfCounts[pw] || 0) + 1;
+    }
+    const wfLine = Object.keys(wfCounts).length
+      ? `\nWorkflow mix: ${Object.entries(wfCounts).map(([k, v]) => `${k} (${v})`).join(', ')}`
+      : '';
 
     return {
       count: entries.length,
       preview: formatted,
-      section: formatted.length > 0 ? `📱 TWITTER INSIGHTS\n${formatted.join('\n')}` : null
+      section: formatted.length > 0 ? `📱 TWITTER INSIGHTS\n${formatted.join('\n')}${wfLine}` : null
     };
 
   } catch (error) {
