@@ -10,7 +10,7 @@ Before processing any user message, classify it using the routing rules.
 
 | Tier | Model | When |
 |------|-------|------|
-| **minimax** | MiniMax M2.5 | Single-action: Notion CRUD, reminders, weather, lookups, greetings |
+| **minimax** | MiniMax M2.7 | Single-action: Notion CRUD, reminders, weather, lookups, greetings |
 | **haiku** | Claude Haiku 4.5 | Moderate: email, web search, multi-step, data formatting |
 | **sonnet** | Claude Sonnet 4.6 | Complex: synthesis, strategy, analysis, long-form drafting, planning |
 
