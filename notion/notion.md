@@ -23,7 +23,7 @@ This is your home in Akash's Notion. You can:
 - Create new databases here when Akash asks for a new tracker or log
 - Add content blocks to existing pages under this hub
 
-**Not for health logs.** Meals, workouts, weight, sleep, steps, calories, energy, body snapshots → use **Lyra Health Coach** only: `skills/health-coach/SKILL.md` + `cd /root/lyra-ai/crud && python3 cli.py …`. Do not create a normal Notion page under Lyra Hub for those (they belong as rows in the four Health Coach databases).
+**Not for health logs.** Meals, workouts, weight, sleep, steps, calories, energy, body snapshots → use **Lyra Health Coach** only: `skills/health-coach/SKILL.md` + `python3 /root/lyra-ai/crud/cli.py …` (absolute path, no `cd`). Do not create a normal Notion page under Lyra Hub for those (they belong as rows in the four Health Coach databases).
 
 ### Create a new sub-page inside Lyra Hub
 ```bash
@@ -124,6 +124,25 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Properties:** Draft (title), Platform (select), Channel (select), Status (select), Content (rich_text), Notes (rich_text), Target date (date), Scheduled Date (date), Performance (rich_text)
 - **Who can access:** Akash only
 
+### Lenny Topic Library Page
+- **page_id:** `33c78008-9100-81e9-a7a7-ca0b72f84706`
+- **url:** https://www.notion.so/Lenny-Topic-Library-33c78008910081e9a7a7ca0b72f84706
+- **Purpose:** Dedicated surface for the visible Lenny-driven topic pool and weekly shortlist workflow.
+
+### Topic Library
+- **database_id:** `9a2caa02-226f-47b7-ae15-e427d55ed097`
+- **data_source_id:** `309b556c-4057-41bd-9300-e035a7e5c4c0`
+- **Properties:** Name (title, topic), Topic Key (rich_text), Status (select), Pillar (select), Angle Type (select), Source Count (number), Primary Source (rich_text), Supporting Sources (rich_text), One-Line Thesis (rich_text), Why Now (rich_text), Proof From Me Prompt (rich_text), Candidate Format (select), Score (number), Reviewed Week (date), Selected This Week (checkbox), Notes (rich_text)
+- **Who can access:** Akash only
+- **Purpose:** Visible inventory of Lenny-derived topics, bounded to about 50 active rows and meant for browsing, curation, and override.
+
+### Weekly Shortlist
+- **database_id:** `3a43e895-7ac6-45ba-bb18-6dbfcbe5bc04`
+- **data_source_id:** `df3f6ffe-e48d-40d1-a5df-d81b1d2d423c`
+- **Properties:** Name (title, topic), Topic Key (rich_text), Week (date), Recommendation Rank (number), Selection Reason (rich_text), Chosen By (select), Advance To Content Ideas (checkbox), Status (select), Topic Library Page ID (rich_text), Candidate Format (select), Content Idea URL (url), Notes (rich_text)
+- **Who can access:** Akash only
+- **Purpose:** Explicit weekly queue pulled from Topic Library before promotion into Content Ideas.
+
 ### US Relocation Tasks
 - **database_id:** `6138e85b5d9d4ccab7ff741c75d3e63a`
 - **data_source_id:** `95a33b1d-4a91-41e4-8082-9aafa3f4f8e1`
@@ -175,6 +194,14 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Done (checkbox), List (select: Groceries, Household, Bills, Travel, Shopping), Recurrence (select: Once, Daily, Weekly, Monthly), For (select: Akash, Abhigna, Both), Assigned By (select: Akash, Abhigna, Lyra), Notes (rich_text)
 - **Who can access:** Akash and Abhigna
 - **Purpose:** Shared household reminders — shopping, bills, joint tasks.
+
+### Personal Wiki Database
+- **database_id:** `33d78008-9100-8183-850d-e7677ac46b63`
+- **data_source_id:** `33d78008-9100-8197-9f0f-000b205edfe8`
+- **Parent page:** Personal Wiki (`33d78008-9100-81e6-9b2e-d3fc890ebfaf`) under Lyra Hub
+- **Properties:** Title (title), Domain (select: AI/ML, Credit & Lending, Growth and Retention, Payments, UI/UX, Wealth & Investments, Personalisation, Subscriptions, E-commerce, Meta), Type (select: Domain Knowledge, Career, Voice Canon, Lenny Synthesis, Interview Story, Mental Model), Source (rich_text), Last Reviewed (date), Tags (multi_select)
+- **Who can access:** Akash only
+- **Purpose:** Personal knowledge wiki — career narratives, domain expertise, voice canon, Lenny synthesis. Queried by Lyra for career/positioning questions.
 
 ### Reminders - Abhigna
 - **database_id:** `5d6732b1-7e30-4856-b56b-edbf9c3df229`
