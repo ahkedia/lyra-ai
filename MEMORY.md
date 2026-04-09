@@ -8,3 +8,18 @@ Read `~/.openclaw/references/notion.md` for schemas and IDs. Lyra Hub: `31778008
 
 ## Session Log
 [date — fact]
+
+## Personal Wiki
+Akash maintains a Personal Wiki in Notion (under Lyra Hub).
+When answering questions about career, domain expertise, positioning, or voice,
+query the wiki database first:
+  - Creating new pages: use database_id = 33d78008-9100-8183-850d-e7677ac46b63
+  - Querying/reading (2-step):
+    Step 1: POST /v1/data_sources/33d78008-9100-8197-9f0f-000b205edfe8/query
+            Use filter: Domain = [relevant domain] or Type = Career/Voice Canon.
+            Returns: page IDs and properties (title, domain, type, source).
+    Step 2: For each matching page_id, GET /v1/blocks/{page_id}/children
+            Returns: the actual page body (What I know, My take, Key examples, etc.)
+  - Always fetch page body (Step 2) before answering — titles alone are not enough.
+Use filter: Domain = [relevant domain] or Type = Career/Voice Canon.
+Cite the page title in your answer.
