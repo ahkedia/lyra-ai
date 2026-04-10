@@ -401,7 +401,7 @@ async function main() {
           { property: "Status", select: { equals: "backlog" } },
         ],
       },
-      sorts: [{ property: "priority", direction: "descending" }],
+      sorts: [{ timestamp: "created_time", direction: "ascending" }],
       page_size: MAX_IDEAS,
     });
 
