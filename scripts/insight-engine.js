@@ -29,7 +29,9 @@ const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const CONTENT_IDEAS_DB = "27fc8e00643a4b9390f7ce8b9a345c62";
 const CONTENT_DRAFTS_DB = "8135676dd15c4ef4925336cf484567ac";
 const CONTENT_JOB_LOG_DB = "33d780089100815 0b18fd9967447d1fb".replace(/\s/g, "");
-const WIKI_DATA_SOURCE_ID = "33d78008-9100-8197-9f0f-000b205edfe8";
+// Personal Wiki Notion DB (standard database query API)
+// Note: data_source_id 33d78008-9100-8197-9f0f-000b205edfe8 is for Notion AI features only
+const PERSONAL_WIKI_DB = "33d78008-9100-8183-850d-e7677ac46b63";
 
 const MAX_IDEAS = 3;
 const MAX_RUNS_PER_DAY = 1;
@@ -184,7 +186,7 @@ async function fetchWikiEvidence(domain) {
   if (!domain) return null;
   try {
     // Step 1: Query wiki by domain filter
-    const queryRes = await notionRequest("POST", `/data_sources/${WIKI_DATA_SOURCE_ID}/query`, {
+    const queryRes = await notionRequest("POST", `/databases/${PERSONAL_WIKI_DB}/query`, {
       filter: { property: "Domain", select: { equals: domain } },
       page_size: 2,
     });
@@ -223,8 +225,8 @@ function loadVoiceCanon(voiceCanonText) {
 
 async function fetchVoiceCanon() {
   try {
-    const queryRes = await notionRequest("POST", `/data_sources/${WIKI_DATA_SOURCE_ID}/query`, {
-      filter: { property: "Type", select: { equals: "Meta" } },
+    const queryRes = await notionRequest("POST", `/databases/${PERSONAL_WIKI_DB}/query`, {
+      filter: { property: "Type", select: { equals: "Voice Canon" } },
       page_size: 10,
     });
     const voicePage = (queryRes.results || []).find(
@@ -393,7 +395,7 @@ async function main() {
     console.log(`[insight-engine] Voice Canon: ${voiceCanonText ? "fetched" : "using fallback"}`);
 
     // Step 2: Fetch content ideas (status=backlog, limit MAX_IDEAS)
-    const ideasRes = await notionRequest("POST", `/data_sources/${CONTENT_IDEAS_DB}/query`, {
+    const ideasRes = await notionRequest("POST", `/databases/${CONTENT_IDEAS_DB}/query`, {
       filter: {
         and: [
           { property: "Status", select: { equals: "backlog" } },
