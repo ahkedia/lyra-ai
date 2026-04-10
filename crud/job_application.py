@@ -119,13 +119,13 @@ def _extract_url(msg: str) -> str:
 def _extract_company(msg: str) -> str:
     # Patterns: "company X", "company is X", "at X", "for X", "from X"
     patterns = [
-        r'company\s+(?:is\s+)?([A-Z][A-Za-z0-9\s&.]+?)(?:\s*[,\-\|]|\s+(?:job|role|position|opening|link)|$)',
-        r'(?:at|for|from)\s+([A-Z][A-Za-z0-9\s&.]+?)(?:\s*[,\-\|]|\s+(?:job|role|position|opening|link|—)|$)',
+        r'company\s+(?:is\s+)?([A-Z][A-Za-z0-9\s&.]+?)(?:\s*[,\-\|:]|\s+(?:job|role|position|opening|link)|$)',
+        r'(?:at|for|from)\s+([A-Z][A-Za-z0-9\s&.]+?)(?:\s*[,\-\|:]|\s+(?:job|role|position|opening|link|—)|$)',
     ]
     for pat in patterns:
         m = re.search(pat, msg)
         if m:
-            candidate = m.group(1).strip()
+            candidate = m.group(1).strip().rstrip(':')
             if 2 < len(candidate) < 50:
                 return candidate
     return ''
