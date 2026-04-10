@@ -25,7 +25,7 @@ This is your home in Akash's Notion. You can:
 - Create new databases here when Akash asks for a new tracker or log
 - Add content blocks to existing pages under this hub
 
-**Not for health logs.** Meals, workouts, weight, sleep, steps, calories, energy, body snapshots → use **Lyra Health Coach** only: `skills/health-coach/SKILL.md` + `cd /root/lyra-ai/crud && python3 cli.py …`. Do not create a normal Notion page under Lyra Hub for those (they belong as rows in the four Health Coach databases).
+**Not for health logs.** Meals, workouts, weight, sleep, steps, calories, energy, body snapshots → use **Lyra Health Coach** only: `skills/health-coach/SKILL.md` + `python3 /root/lyra-ai/crud/cli.py …` (absolute path, no `cd`). Do not create a normal Notion page under Lyra Hub for those (they belong as rows in the four Health Coach databases).
 
 ### Create a new sub-page inside Lyra Hub
 ```bash
@@ -126,8 +126,15 @@ Every database has two IDs. Use the right one depending on what you're doing:
 ### Content Drafts
 - **database_id:** `8135676dd15c4ef4925336cf484567ac`
 - **data_source_id:** `553cecf2-69dd-44b9-a46e-43e761407fb4`
-- **Properties:** Draft (title), Platform (select), Channel (select), Status (select), Content (rich_text), Notes (rich_text), Target date (date), Scheduled Date (date), Performance (rich_text)
+- **Properties:** Draft (title), Platform (select), Channel (select), Status (select), Content (rich_text), Notes (rich_text), Target date (date), Scheduled Date (date), Performance (rich_text), text_approval_status (select: pending/approved/rejected), visual_approval_status (select: pending/approved/rejected/not_required), humanization_score (number 0-10)
 - **Who can access:** Akash only
+- **Note:** `text_approval_status` + `visual_approval_status` are the two-signal approval model. Both must be "approved" before x-publisher.js will publish. `humanization_score` is Haiku's self-assessment of humanization quality (0-10, null if humanization step failed).
+
+### ContentJobLog
+- **database_id:** `33d78008-9100-8150-b18f-d9967447d1fb`
+- **Properties:** run_id (title), status (select: running/completed/failed/partial), started_at (date), finished_at (date), drafts_generated (number), drafts_flagged (number), ideas_skipped (number), error_message (rich_text), phase (select: phase1/phase2/phase3)
+- **Who can access:** Akash only
+- **Purpose:** Observability log for every InsightEngine cron run. Must exist BEFORE any production cron fires. Rows older than 90 days are deleted by Sunday cleanup cron.
 
 ### US Relocation Tasks
 - **database_id:** `6138e85b5d9d4ccab7ff741c75d3e63a`
@@ -167,13 +174,12 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Who can access:** Akash only
 - **Purpose:** Long-term thinking capture — voice notes, spontaneous ideas, key decisions, patterns. This is the core of the second brain.
 
-### Reminders - Akash ⚠️ NOT ACCESSIBLE
-- **database_id:** `95e1d0de-496f-478e-9fe4-2e2a356c7970`
-- **data_source_id:** `c80025d7-782d-4159-a10d-74bd9aa622ef`
+### Reminders - Akash
+- **database_id:** `32678008-9100-802f-ad9f-fb48ff5f4c1d`
+- **data_source_id:** `32678008-9100-8171-8940-000b30243ddd`
 - **Properties:** Task (title), Due (date), Priority (select: High, Medium, Low), Done (checkbox), List (select: Personal, Work, Health, Finance, Travel, Relocation), Recurrence (select: Once, Daily, Weekly, Monthly), Assigned By (select: Akash, Abhigna, Lyra), Notes (rich_text)
 - **Who can access:** Akash only
 - **Purpose:** Akash's personal reminders and tasks.
-- **Status:** NOT accessible to OpenClaw integration. Need to share with OpenClaw-Lyra in Notion.
 
 ### Reminders - Shared
 - **database_id:** `2054e39c-3f09-431d-8821-0e6a7513913a`
