@@ -398,7 +398,7 @@ async function main() {
     const ideasRes = await notionRequest("POST", `/databases/${CONTENT_IDEAS_DB}/query`, {
       filter: {
         and: [
-          { property: "Status", select: { equals: "backlog" } },
+          { property: "Status", select: { equals: "Idea" } },
         ],
       },
       sorts: [{ timestamp: "created_time", direction: "ascending" }],
