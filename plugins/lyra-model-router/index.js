@@ -1,36 +1,54 @@
 /**
- * Lyra Model Router v15 — OpenClaw Plugin
+ * Lyra Model Router v16 — OpenClaw Plugin
  *
- * This is the server-side routing plugin that runs inside OpenClaw on Hetzner.
- * It intercepts model resolution and routes to the appropriate provider/model.
+ * 4-way real-time router for ad-hoc traffic:
+ *   Tier0 CRUD -> MiniMax -> Haiku -> Sonnet
  *
- * v15: Tier 0 Python bypass. Pure CRUD operations (list reminders, add item,
- * mark done, etc.) are executed via Python scripts directly — zero LLM tokens.
- * Exits before model resolution if matched.
- *
- * v15.1: Normalize prompts (strip trailing "just list briefly") and relax list
- * patterns ("current reminders", text after core phrase) so eval phrasing hits Tier 0.
- *
- * v15.2: Tier 0 health — messages that match crud/cli.py parse() health regexes run
- * `python3 cli.py parse` with zero LLM tokens. Writes go to Lyra Health Coach DBs
- * (Daily / Food / Workout / Snapshots) via crud/notion.py — same as manual cli.
- *
- * v14: Rate-limit aware routing. When Anthropic API is rate-limited,
- * all requests fall back to MiniMax instead of failing.
- * Starts with Anthropic DISABLED (rate limited until April 1).
- * Auto re-checks every 30 minutes.
- *
- * Deployment: SCP to /root/lyra-model-router/index.js on Hetzner, restart openclaw.
- *
- * NOTE: This is different from scripts/model-router.js which is the local
- * CLI-based classifier with rule+LLM routing. This plugin hooks directly
- * into OpenClaw's model resolution pipeline.
+ * Includes:
+ * - MiniMax-first complexity routing with configurable thresholds
+ * - rolling 24h/3d/7d Anthropic share checks
+ * - conservative fallback profile
+ * - budget-aware route clamping
  */
 
 import { execFileSync } from "child_process";
-import { existsSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
+import { dirname } from "path";
 
 const ABHIGNA_ID = "5003298152";
+const LOG_PATH = process.env.LYRA_ROUTING_LOG_PATH || "/root/lyra-ai/logs/routing-decisions.jsonl";
+const LOG_DIR = dirname(LOG_PATH);
+const POLICY_VERSION = process.env.LYRA_ROUTING_POLICY_VERSION || "routing_thresholds_v1";
+const THRESHOLD_SET = process.env.LYRA_ROUTING_THRESHOLD_SET || "routing_thresholds_v1";
+
+const MODELS = {
+  minimax: { providerOverride: undefined, modelOverride: undefined, provider: "minimax", model: "minimax/MiniMax-M2.7" },
+  haiku: { providerOverride: "anthropic", modelOverride: "claude-haiku-4-5", provider: "anthropic", model: "anthropic/claude-haiku-4-5" },
+  sonnet: { providerOverride: "anthropic", modelOverride: "claude-sonnet-4-6", provider: "anthropic", model: "anthropic/claude-sonnet-4-6" },
+};
+
+const V1 = {
+  crud: parseFloat(process.env.LYRA_ROUTING_CRUD_THRESHOLD || "0.80"),
+  haiku: parseFloat(process.env.LYRA_ROUTING_HAIKU_THRESHOLD || "0.78"),
+  sonnet: parseFloat(process.env.LYRA_ROUTING_SONNET_THRESHOLD || "0.92"),
+  sonnetVeryHigh: parseFloat(process.env.LYRA_ROUTING_SONNET_VERY_HIGH || "0.96"),
+  sonnetMargin: parseFloat(process.env.LYRA_ROUTING_SONNET_MARGIN || "0.08"),
+};
+
+const CONSERVATIVE = {
+  crud: parseFloat(process.env.LYRA_ROUTING_FALLBACK_CRUD_THRESHOLD || "0.78"),
+  haiku: parseFloat(process.env.LYRA_ROUTING_FALLBACK_HAIKU_THRESHOLD || "0.90"),
+  sonnet: parseFloat(process.env.LYRA_ROUTING_FALLBACK_SONNET_THRESHOLD || "0.97"),
+  sonnetVeryHigh: parseFloat(process.env.LYRA_ROUTING_FALLBACK_SONNET_VERY_HIGH || "0.98"),
+  sonnetMargin: parseFloat(process.env.LYRA_ROUTING_FALLBACK_SONNET_MARGIN || "0.12"),
+};
+
+const COSTS = { minimax: 0.0001, haiku: 0.001, sonnet: 0.01 };
+const BUDGET_EUR = parseFloat(process.env.MONTHLY_BUDGET_EUR || "20");
+const USD_PER_EUR = parseFloat(process.env.LYRA_USD_PER_EUR || "1.09");
+const BUDGET_USD = BUDGET_EUR * USD_PER_EUR;
+const FORCE_CONSERVATIVE = process.env.LYRA_ROUTING_FORCE_FALLBACK === "1";
+const CACHE_MS = 60_000;
 
 // --- Tier 0: Python CRUD bypass ---
 // These patterns skip the LLM entirely and execute Python scripts directly.
@@ -71,12 +89,27 @@ const TIER0_PATTERNS = [
   /^(?:what'?s?|show|list)(?: my)?(?: upcoming)? trips?$/i,
   /^remind me (?:to |about )?/i,
   /^set (?:a )?reminder (?:to |for |about )?/i,
+  /^add (?:a )?reminder(?:\s*:\s*|\s+to\s+|\s+for\s+|\s+about\s+|\s+)/i,
+  /^create (?:a )?reminder(?:\s*:\s*|\s+to\s+|\s+for\s+|\s+about\s+|\s+)/i,
   /^add .+? to (?:(?:my |the )?(?:shopping|grocery|groceries|meal|task|todo|reminder|trip|content|idea)s? (?:list|plan|db|database)?|(?:my )?reminders?)$/i,
   /^mark .+? (?:as )?(?:done|complete|finished)$/i,
   /^(?:done|complete|finished)[:\s]+.+$/i,
+  // Job application workflow — Phase A (trigger)
+  /(?:apply(?:ing)?\s+to\b|job\s+(?:link|post|opening|at)\b|cover\s+letter\s+(?:for|to)\b|draft\s+.*?outreach\s+(?:to|for)\b|linkedin\.com\/jobs|write\s+.*?cover\s+letter\b|message\s+.*?(?:and|plus)\s+cover\s+letter\b)/i,
+  // Job application workflow — Phase B (clarification reply; Python validates state file exists)
+  /^(?:[1-3]|both|outreach(?:\s+only)?|cover(?:\s+letter)?(?:\s+only)?|message(?:\s+only)?)(?:\s+.{0,120})?$/i,
 ];
 
 const CRUD_CLI = "/root/lyra-ai/crud/cli.py";
+const SONNET_ALLOWLIST = [
+  /\b(?:weekly review|brain brief|competitor digest|content strategy)\b/i,
+  /\b(?:trade.?off|pros and cons|priorit(?:ize|ise)|what should i)\b/i,
+  /\b(?:analy[sz]e).*(?:strategy|market|competitor|themes?|patterns?)\b/i,
+  /\b(?:synthes(?:ize|is)|across my|across all|connect the dots)\b/i,
+  /\b(?:draft|write|compose).*(?:proposal|strategy|plan|blog|article|essay)\b/i,
+];
+const ACK_PATTERNS = [/^(?:hi|hello|hey|gm|ok|okay|thanks|thank you|done|yes|no|sure|got it|cool|great|perfect|👍|🙏)\s*$/i];
+let _rollingCache = { at: 0, state: null };
 
 function tryTier0(prompt) {
   const trimmed = normalizeTier0Prompt(prompt);
@@ -128,23 +161,240 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
-const SONNET_PATTERNS = [
-  /\b(?:brain brief|weekly brief|digest quality|content suggest|analyze themes?|synthesize|synthesis)\b/i,
-  /\bdraft (?:a |an )?(?:blog|article|essay|report|strategy|plan|proposal)\b/i,
-  /\b(?:compare and contrast|pros and cons|strategic analysis|deep dive|comprehensive review)\b/i,
-  /\b(?:across (?:all |my )?databases|connect the dots|find patterns?|what themes)\b/i,
-  /\b(?:write me a|compose a|create a detailed|elaborate on)\b/i,
-];
-const HAIKU_PATTERNS = [
-  /\b(?:exactly \d+ (?:bullet|point|item|sentence|word)|format (?:as|it as)|in (?:a )?table|markdown format)\b/i,
-  /\b(?:draft (?:a |an )?email|reply to|respond to .{0,40}email|write back to)\b/i,
-  /\b(?:what (?:can|do) (?:i|you) have access|show me .{0,40}database|list .{0,40}databases?|what databases?)\b/i,
-  /\b(?:search (?:the web|google|online)|find (?:me )?(?:articles?|news|information) about)\b/i,
-  /\b(?:summarize|summary of|brief me|give me (?:a |the )?(?:rundown|overview|highlights?))\b/i,
-];
-
 // tier0Result is set when a CRUD bypass executes before model resolution
 let _tier0Result = null;
+
+function clip01(n) {
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function matchesAny(patterns, text) {
+  return patterns.some((p) => p.test(text));
+}
+
+function extractFeatures(prompt) {
+  const text = (prompt || "").trim();
+  const lower = text.toLowerCase();
+  const qCount = (text.match(/\?/g) || []).length;
+  const conjunctionCount = (lower.match(/\b(and|then|also|after that|plus)\b/g) || []).length;
+  const sentenceCount = text.split(/[.!?]+/).filter((s) => s.trim()).length;
+  const length = text.length;
+  return {
+    text,
+    lower,
+    qCount,
+    conjunctionCount,
+    sentenceCount,
+    length,
+    hasAck: matchesAny(ACK_PATTERNS, text),
+    strategyIntent: /\b(strategy|strategic|priorit(?:ize|ise)|trade.?off|pros and cons|recommend)\b/i.test(text),
+    crossSourceSynthesis: /\b(across|patterns?|themes?|connect the dots|synthes(?:ize|is)|multi-source|based on my)\b/i.test(text),
+    timeHorizon: /\b(week|month|quarter|lately|recently|over time)\b/i.test(text),
+    formattingIntent: /\b(table|markdown format|format as|exactly \d+)\b/i.test(text),
+    emailIntent: /\b(email|reply|draft)\b/i.test(text),
+    webIntent: /\b(search|research|look up|latest news)\b/i.test(text),
+  };
+}
+
+function computeScores(features) {
+  const sonnetHints =
+    (/\b(?:weekly review|brain brief|competitor digest|content strategy)\b/i.test(features.text) ? 1 : 0) +
+    (/\b(?:analy[sz]e|synthes(?:ize|is)|patterns?|themes?)\b/i.test(features.text) ? 1 : 0);
+  const haikuHints =
+    (/\b(?:draft (?:a |an )?(?:email|reply)|respond to)\b/i.test(features.text) ? 1 : 0) +
+    (/\b(?:format (?:as|it as)|table|markdown format|rewrite concisely|summary)\b/i.test(features.text) ? 1 : 0);
+
+  const sonnet =
+    0.08 +
+    0.2 * (features.strategyIntent ? 1 : 0) +
+    0.22 * (features.crossSourceSynthesis ? 1 : 0) +
+    0.12 * (features.timeHorizon ? 1 : 0) +
+    0.12 * Math.min(sonnetHints, 2) +
+    0.08 * (features.length > 500 ? 1 : 0) +
+    0.06 * (features.qCount >= 2 ? 1 : 0);
+  const haiku =
+    0.12 +
+    0.2 * (features.emailIntent ? 1 : 0) +
+    0.18 * (features.formattingIntent ? 1 : 0) +
+    0.16 * (features.webIntent ? 1 : 0) +
+    0.12 * (features.conjunctionCount >= 1 || features.sentenceCount >= 2 ? 1 : 0) +
+    0.1 * Math.min(haikuHints, 2) +
+    0.06 * (features.length > 200 ? 1 : 0);
+  const minimax =
+    0.5 +
+    0.2 * (features.hasAck ? 1 : 0) +
+    0.12 * (features.length < 140 ? 1 : 0) -
+    0.15 * (features.strategyIntent ? 1 : 0) -
+    0.16 * (features.crossSourceSynthesis ? 1 : 0) -
+    0.08 * (features.conjunctionCount >= 1 ? 1 : 0);
+  return {
+    crud: 0,
+    minimax: clip01(minimax),
+    haiku: clip01(haiku),
+    sonnet: clip01(sonnet),
+  };
+}
+
+function parseEntries(limit = 6000) {
+  if (!existsSync(LOG_PATH)) return [];
+  const content = readFileSync(LOG_PATH, "utf8").trim();
+  if (!content) return [];
+  const lines = content.split("\n");
+  const selected = lines.slice(Math.max(0, lines.length - limit));
+  return selected.map((line) => {
+    try {
+      return JSON.parse(line);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+}
+
+function rollingAnthropic(entries, hours) {
+  const cutoff = Date.now() - hours * 60 * 60 * 1000;
+  const recent = entries.filter((e) => {
+    const sender = String(e.sender || "");
+    const channel = String(e.channel || "");
+    if (sender === "test" || sender === "eval" || channel === "test" || channel === "eval") return false;
+    const t = Date.parse(e.timestamp || "");
+    return Number.isFinite(t) && t >= cutoff;
+  });
+  let anthropic = 0;
+  for (const e of recent) {
+    const model = String(e.model || "");
+    if (Boolean(e.anthropic_call) || model.includes("anthropic") || model.includes("claude")) anthropic++;
+  }
+  return { n: recent.length, anthropic, share: recent.length ? anthropic / recent.length : 0 };
+}
+
+function monthRunRateUsd(entries) {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  let total = 0;
+  for (const e of entries) {
+    const sender = String(e.sender || "");
+    const channel = String(e.channel || "");
+    if (sender === "test" || sender === "eval" || channel === "test" || channel === "eval") continue;
+    const d = new Date(e.timestamp || 0);
+    if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month) continue;
+    total += COSTS[String(e.tier || "minimax")] || COSTS.minimax;
+  }
+  return total;
+}
+
+function getRoutingMode() {
+  if (FORCE_CONSERVATIVE) {
+    return { mode: "emergency", reason: "force_fallback", roll24h: null, roll3d: null, roll7d: null, monthUsd: 0 };
+  }
+  const now = Date.now();
+  if (_rollingCache.state && now - _rollingCache.at < CACHE_MS) return _rollingCache.state;
+
+  const entries = parseEntries();
+  const roll24h = rollingAnthropic(entries, 24);
+  const roll3d = rollingAnthropic(entries, 72);
+  const roll7d = rollingAnthropic(entries, 168);
+  const monthUsd = monthRunRateUsd(entries);
+
+  let mode = "normal";
+  let reason = "within_limits";
+  if (monthUsd > BUDGET_USD) {
+    mode = "emergency";
+    reason = "budget_breach";
+  } else if (roll24h.n >= 50 && roll24h.share >= 0.25) {
+    mode = "emergency";
+    reason = "rolling_24h_extreme";
+  } else if (roll7d.n >= 200 && roll7d.share >= 0.20) {
+    mode = "emergency";
+    reason = "rolling_7d_extreme";
+  } else if ((roll24h.n >= 50 && roll24h.share >= 0.15) || (roll3d.n >= 100 && roll3d.share >= 0.14)) {
+    mode = "clamp";
+    reason = "rolling_share_clamp";
+  }
+  const state = { mode, reason, roll24h, roll3d, roll7d, monthUsd };
+  _rollingCache = { at: now, state };
+  return state;
+}
+
+function thresholdsForMode(mode) {
+  if (mode === "clamp" || mode === "emergency") return CONSERVATIVE;
+  return V1;
+}
+
+function decideTier(features, scores, sessionKey, mode) {
+  const t = thresholdsForMode(mode.mode);
+  const sonnetAllowlisted = matchesAny(SONNET_ALLOWLIST, features.text);
+  const sonnetStrong =
+    (scores.sonnet >= t.sonnet && (features.strategyIntent || features.crossSourceSynthesis)) ||
+    scores.sonnet >= t.sonnetVeryHigh;
+  const sonnetMarginOk = (scores.sonnet - scores.haiku) >= t.sonnetMargin;
+  const haikuStrong = scores.haiku >= t.haiku;
+
+  if (features.hasAck) return { tier: "minimax", reason: "ack_force_minimax", thresholdMode: mode.mode };
+  if (mode.mode === "emergency") {
+    if (sonnetAllowlisted && sonnetStrong) return { tier: "sonnet", reason: "emergency_allowlisted_sonnet", thresholdMode: mode.mode };
+    return { tier: "minimax", reason: "emergency_forced_minimax", thresholdMode: mode.mode };
+  }
+  if (sessionKey.includes(ABHIGNA_ID) && haikuStrong) {
+    return { tier: "haiku", reason: "abhigna_acl_haiku", thresholdMode: mode.mode };
+  }
+  if (sonnetStrong && sonnetMarginOk) {
+    return { tier: "sonnet", reason: "score_sonnet", thresholdMode: mode.mode };
+  }
+  if (haikuStrong) {
+    return { tier: "haiku", reason: "score_haiku", thresholdMode: mode.mode };
+  }
+  return { tier: "minimax", reason: "default_minimax", thresholdMode: mode.mode };
+}
+
+function logDecision(event, ctx, chosen, scores, features, modeState) {
+  try {
+    if (!existsSync(LOG_DIR)) mkdirSync(LOG_DIR, { recursive: true });
+    const mapped = MODELS[chosen.tier] || MODELS.minimax;
+    const entry = {
+      timestamp: new Date().toISOString(),
+      policy_version: POLICY_VERSION,
+      threshold_set_id: THRESHOLD_SET,
+      threshold_mode: chosen.thresholdMode,
+      threshold_reason: modeState.reason,
+      decision_reason: chosen.reason,
+      message_preview: String(event?.prompt || "").slice(0, 120),
+      message_length: String(event?.prompt || "").length,
+      trigger: ctx?.trigger || "unknown",
+      sender: ctx?.sender || "unknown",
+      channel: ctx?.channel || "unknown",
+      tier: chosen.tier,
+      provider: mapped.provider,
+      model: mapped.model,
+      anthropic_call: chosen.tier === "haiku" || chosen.tier === "sonnet",
+      confidence: Number(Math.max(scores.minimax, scores.haiku, scores.sonnet).toFixed(3)),
+      classifier: "plugin_scoring_v1",
+      scores: {
+        minimax: Number(scores.minimax.toFixed(3)),
+        haiku: Number(scores.haiku.toFixed(3)),
+        sonnet: Number(scores.sonnet.toFixed(3)),
+      },
+      features: {
+        qCount: features.qCount,
+        conjunctionCount: features.conjunctionCount,
+        sentenceCount: features.sentenceCount,
+        strategyIntent: features.strategyIntent,
+        crossSourceSynthesis: features.crossSourceSynthesis,
+        timeHorizon: features.timeHorizon,
+      },
+      rolling: {
+        h24: modeState.roll24h ? { n: modeState.roll24h.n, share: Number(modeState.roll24h.share.toFixed(4)) } : null,
+        d3: modeState.roll3d ? { n: modeState.roll3d.n, share: Number(modeState.roll3d.share.toFixed(4)) } : null,
+        d7: modeState.roll7d ? { n: modeState.roll7d.n, share: Number(modeState.roll7d.share.toFixed(4)) } : null,
+      },
+      estimated_month_usd: Number(modeState.monthUsd.toFixed(4)),
+    };
+    appendFileSync(LOG_PATH, JSON.stringify(entry) + "\n");
+  } catch {
+    // do not fail routing because logging fails
+  }
+}
 
 function routeQuery(event, ctx) {
   const prompt = event?.prompt || "";
@@ -154,43 +404,33 @@ function routeQuery(event, ctx) {
   // Crons use their own model config
   if (trigger === "cron" || trigger === "scheduled") return undefined;
 
-  // Tier 0: CRUD Python bypass — check before any model routing
-  // If matched, store result and signal "use noop model" (will be intercepted post-hook)
   const tier0 = tryTier0(prompt);
   if (tier0 !== null) {
     _tier0Result = tier0;
-    process.stderr.write(`[R] Tier0 hit — bypassing LLM\n`);
-    // Return a special marker; the response hook below will short-circuit
+    process.stderr.write("[R] Tier0 hit — bypassing LLM\n");
     return { __tier0: true, directResponse: tier0 };
   }
   _tier0Result = null;
 
-  // If Anthropic is unavailable, everything stays on MiniMax (default)
-  if (!isAnthropicAvailable()) {
-    return undefined;
+  const features = extractFeatures(prompt);
+  const scores = computeScores(features);
+  const modeState = getRoutingMode();
+  const chosen = decideTier(features, scores, sessionKey, modeState);
+
+  let route = undefined;
+  if (chosen.tier !== "minimax" && !isAnthropicAvailable()) {
+    chosen.tier = "minimax";
+    chosen.reason = "anthropic_unavailable_fallback_minimax";
+  }
+  if (chosen.tier !== "minimax") {
+    route = {
+      providerOverride: MODELS[chosen.tier].providerOverride,
+      modelOverride: MODELS[chosen.tier].modelOverride,
+    };
   }
 
-  // Abhigna -> Haiku (ACL-aware responses)
-  if (sessionKey.includes(ABHIGNA_ID)) {
-    return { providerOverride: "anthropic", modelOverride: "claude-haiku-4-5" };
-  }
-
-  // Sonnet patterns
-  for (const p of SONNET_PATTERNS) {
-    if (p.test(prompt)) return { providerOverride: "anthropic", modelOverride: "claude-sonnet-4-6" };
-  }
-
-  // Haiku patterns
-  for (const p of HAIKU_PATTERNS) {
-    if (p.test(prompt)) return { providerOverride: "anthropic", modelOverride: "claude-haiku-4-5" };
-  }
-
-  // Long messages -> Haiku
-  if (prompt.trim().length > 500) {
-    return { providerOverride: "anthropic", modelOverride: "claude-haiku-4-5" };
-  }
-
-  return undefined;
+  logDecision(event, ctx, chosen, scores, features, modeState);
+  return route;
 }
 
 let patchCount = 0;
@@ -224,7 +464,7 @@ function patchRunner(runner) {
 }
 
 const HR_KEY = Symbol.for("openclaw.plugins.hook-runner-global-state");
-const SETUP_KEY = Symbol.for("lyra-model-router.v14");
+const SETUP_KEY = Symbol.for("lyra-model-router.v16");
 
 if (!globalThis[SETUP_KEY]) {
   globalThis[SETUP_KEY] = true;
@@ -286,7 +526,7 @@ process.stderr.write = function(chunk, ...args) {
 const plugin = {
   id: "lyra-model-router",
   name: "Lyra Model Router",
-  description: "Tier 0 Python bypass + 3-tier routing: Python (0 tokens) -> MiniMax -> Haiku -> Sonnet",
+  description: "Tier 0 Python bypass + MiniMax-first 4-way routing with rolling guardrails",
   register(api) {
     api.on("before_model_resolve", (event, ctx) => {
       const result = routeQuery(event, ctx);
@@ -304,7 +544,7 @@ const plugin = {
       return result || {};
     });
     // Registration logged via stderr only to avoid contaminating eval JSON output
-    process.stderr.write("[lyra-model-router] v15.2 registered (Tier 0 CRUD + health)\n");
+    process.stderr.write("[lyra-model-router] v16 registered (4-way thresholds + rolling guardrails)\n");
   },
 };
 
