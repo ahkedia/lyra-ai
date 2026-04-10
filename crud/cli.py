@@ -17,6 +17,7 @@ def usage():
   cli.py food <meal_type> <description...>
   cli.py snapshot [weight=X] [bodyfat=X] [waist=X] [notes=...]
   cli.py parse "<natural language message>"
+  cli.py job-application "<message>"
 """)
 
 def cmd_weight(args):
@@ -112,6 +113,26 @@ def cmd_parse(args):
     if not raw:
         print("parse requires a message")
         sys.exit(1)
+
+    # --- Job application workflow (Phase A: trigger, Phase B: clarification reply) ---
+    from job_application import (
+        is_job_trigger,
+        is_clarification_reply,
+        has_recent_state,
+        handle_trigger,
+        handle_clarification_reply,
+    )
+
+    # Phase B: check for pending state + clarification reply FIRST
+    if has_recent_state() and is_clarification_reply(raw):
+        print(handle_clarification_reply(raw))
+        return
+
+    # Phase A: new job trigger
+    if is_job_trigger(raw):
+        print(handle_trigger(raw))
+        return
+    # --- End job application ---
 
     from parse import (
         detect_intent,
@@ -307,6 +328,20 @@ def cmd_daily_summary(args):
     print(json.dumps(out, indent=2))
 
 
+def cmd_job_application(args):
+    """Directly invoke the job application workflow (parse + trigger or reply)."""
+    from job_application import is_job_trigger, is_clarification_reply, has_recent_state, handle_trigger, handle_clarification_reply
+    raw = ' '.join(args).strip()
+    if not raw:
+        print('job-application requires a message'); sys.exit(1)
+    if has_recent_state() and is_clarification_reply(raw):
+        print(handle_clarification_reply(raw))
+    elif is_job_trigger(raw):
+        print(handle_trigger(raw))
+    else:
+        print(f'Not a job application trigger: {raw}'); sys.exit(1)
+
+
 COMMANDS = {
     'weight': cmd_weight,
     'sleep': cmd_sleep,
@@ -319,6 +354,7 @@ COMMANDS = {
     'snapshot': cmd_snapshot,
     'parse': cmd_parse,
     'daily-summary': cmd_daily_summary,
+    'job-application': cmd_job_application,
 }
 
 if __name__ == '__main__':

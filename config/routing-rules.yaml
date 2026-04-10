@@ -2,7 +2,7 @@
 # Maps task categories to models based on patterns, keywords, and complexity signals.
 #
 # Three tiers:
-#   minimax   → MiniMax M2.5 (fast, cheap, 87% of tasks)
+#   minimax   → MiniMax M2.7 (fast, cheap, 87% of tasks)
 #   haiku     → Claude Haiku 4.5 (fallback, moderate complexity)
 #   sonnet    → Claude Sonnet 4.6 (synthesis, judgment, strategic)
 #
@@ -53,10 +53,14 @@ tier0_python_jobs:
       patterns:
         - "^remind me (?:to |about )?(.+)"
         - "^set (?:a )?reminder (?:to |for |about )?(.+)"
+        - "^add (?:a )?reminder(?:\\s*:\\s*|\\s+to\\s+|\\s+for\\s+|\\s+about\\s+|\\s+)(.+)"
+        - "^create (?:a )?reminder(?:\\s*:\\s*|\\s+to\\s+|\\s+for\\s+|\\s+about\\s+|\\s+)(.+)"
       command: "notion add-reminder"
       examples:
         - "Remind me to call the dentist tomorrow"
         - "Set a reminder for the dentist on Friday"
+        - "Add a reminder: pick up dry cleaning"
+        - "Create a reminder to renew insurance by Monday"
     add_item:
       patterns:
         - "^add (.+?) to (?:(?:my |the )?(?:shopping|grocery|groceries|meal|task|todo|trip|content|idea)s? (?:list|plan)?|(?:my )?reminders?)$"
@@ -72,6 +76,28 @@ tier0_python_jobs:
       examples:
         - "Mark dentist call done"
         - "Mark the visa task as complete"
+
+    job_application:
+      description: >
+        Two-phase job application pipeline. Phase A detects a job link/company/person and
+        returns clarification questions. Phase B (reply '1','2','3','both', etc.) launches
+        a background Python process that: fetches job context via Tavily, fetches all
+        Personal Wiki pages (career + domain knowledge) from Notion, calls Sonnet to generate
+        a cover letter and/or outreach message, saves both as Gmail drafts via himalaya,
+        and upserts a row in Recruiter Tracker.
+      script: "/root/lyra-ai/crud/cli.py + /root/lyra-ai/crud/job_application.py"
+      patterns:
+        - "apply to|job link|job post|job opening|job at|cover letter for|draft.*outreach|linkedin.com/jobs|write.*cover letter"
+        - "^[1-3]$|^both$|^outreach( only)?$|^cover( letter)?( only)?$|^message( only)?$"
+      examples:
+        - "Apply to this: https://linkedin.com/jobs/xyz — company is Stripe"
+        - "Write a cover letter for the PM role at Revolut: [url]"
+        - "Draft an outreach message to Sarah Chen at N26 (sarah@n26.com)"
+        - "3 more formal"  # Phase B reply: both, more formal tone
+      state: "/tmp/lyra-job-state.json (30-min TTL)"
+      background_log: "/tmp/lyra-job-pipeline.log"
+      models_used: "Sonnet 4.6 (for cover letter + outreach generation)"
+      integrations: "Tavily (job/company research), Notion (wiki pages), himalaya (Gmail drafts)"
 
 # RULE: When adding new CRUD operations to Lyra, always ask:
 #   1. Is this deterministic given the input? → add to tier0_python_jobs
