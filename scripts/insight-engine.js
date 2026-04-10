@@ -229,9 +229,7 @@ async function fetchVoiceCanon() {
       filter: { property: "Type", select: { equals: "Voice Canon" } },
       page_size: 10,
     });
-    const voicePage = (queryRes.results || []).find(
-      (p) => (p.properties?.Name?.title?.[0]?.plain_text || "").toLowerCase().includes("voice canon")
-    );
+    const voicePage = (queryRes.results || [])[0];
     if (!voicePage) return null;
 
     const blocksRes = await notionRequest("GET", `/blocks/${voicePage.id}/children?page_size=30`);
