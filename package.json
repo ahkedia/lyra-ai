@@ -5,6 +5,7 @@
   "description": "Personal AI agent for work, life, and household — built on OpenClaw, Claude, Telegram, Notion",
   "private": true,
   "scripts": {
+    "test": "node --test test/content-machine.test.js",
     "route": "node scripts/model-router.js",
     "route:test": "node scripts/model-router.js --test",
     "route:stats": "node scripts/model-router.js --stats"
