@@ -1,0 +1,30 @@
+{
+  "_comment": "Maps content topic keywords to Personal Wiki domain names for wiki retrieval in InsightEngine.",
+  "_source": "plan section 4.6",
+  "mappings": [
+    {
+      "keywords": ["ai", "llm", "agents", "evals", "ml", "machine learning", "model", "gpt", "claude", "openai", "anthropic", "rag", "embeddings", "inference", "fine-tuning"],
+      "domain": "AI/ML"
+    },
+    {
+      "keywords": ["growth", "distribution", "cac", "acquisition", "retention", "activation", "referral", "viral", "go-to-market", "gtm", "internationalisation", "internationalization", "expansion", "market entry"],
+      "domain": "Growth & Internationalisation"
+    },
+    {
+      "keywords": ["product strategy", "pm", "product manager", "roadmap", "prioritization", "discovery", "user research", "jobs to be done", "jtbd", "strategy", "positioning", "competitive", "moat"],
+      "domain": "Strategy & GTM"
+    },
+    {
+      "keywords": ["payments", "fintech", "checkout", "payment processing", "stripe", "adyen", "psp", "acquiring", "issuing", "rails", "swift", "sepa", "open banking"],
+      "domain": "Payments"
+    },
+    {
+      "keywords": ["credit", "lending", "loan", "underwriting", "bnpl", "buy now pay later", "credit scoring", "risk", "default", "npl", "sme lending", "working capital"],
+      "domain": "Credit & Lending"
+    },
+    {
+      "keywords": ["building in public", "founder", "startup", "indie hacker", "bootstrapping", "team", "hiring", "leadership", "management", "culture", "lessons learned", "retrospective"],
+      "domain": "Leadership & Team Building"
+    }
+  ]
+}
