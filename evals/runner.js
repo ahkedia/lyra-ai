@@ -125,12 +125,17 @@ function deriveEvalLane(testCase) {
 /**
  * Send a message to Lyra via persistent WebSocket session.
  * Returns { text, durationMs, ttftMs, model, provider, sessionId, error }
+ *
+ * @param {string} message - The message to send
+ * @param {number} timeoutMs - Timeout in milliseconds
+ * @param {string|null} sessionKey - Session key for multi-turn conversations
+ * @param {boolean} dryRun - If true, prepends EVAL MODE prefix to prevent writes
  */
-async function sendToLyra(message, timeoutMs = 30000, sessionKey = null) {
+async function sendToLyra(message, timeoutMs = 30000, sessionKey = null, dryRun = false) {
   await ensureConnected(); // reconnects if gateway restarted mid-run
   const startTime = Date.now();
   try {
-    const opts = { timeout: timeoutMs };
+    const opts = { timeout: timeoutMs, dryRun };
     if (sessionKey) opts.sessionKey = sessionKey;
     const result = await wsClient.chat(message, opts);
     return {
@@ -299,6 +304,70 @@ async function runCleanup(cleanupConfig) {
   }
 }
 
+/**
+ * Global cleanup sweep — runs at end of eval to catch any leaked [eval] data.
+ * Scans all known databases that could have eval test data.
+ */
+const EVAL_CLEANUP_TARGETS = [
+  // Reminders - Akash
+  { database: '32678008-9100-802f-ad9f-fb48ff5f4c1d', data_source: '32678008-9100-8171-8940-000b30243ddd', title_properties: ['Task'] },
+  // Reminders - Shared (wife's shared reminders)
+  { database: '2054e39c-3f09-431d-8821-0e6a7513913a', data_source: '9f206d71-7b25-408b-ad20-02daf0b43da0', title_properties: ['Task'] },
+  // Second Brain / Personal Wiki
+  { database: 'e4027aaf-d2ff-49e1-babf-7487725e2ef4', data_source: 'f1ce4e0f-9e0d-43da-87f8-94dae2732962', title_properties: ['Name'] },
+  // Upcoming Trips - scan for Tokyo/Dubai test trips
+  { database: '64215718b5944945a7f7241a20e89eb1', data_source: 'f9cfc4ff-5a74-4955-baab-144943962a99', title_properties: ['Trip Name', 'Name'] },
+  // Reminders - Abhigna (wife's personal reminders)
+  { database: '5d6732b1-7e30-4856-b56b-edbf9c3df229', data_source: '1e74f66d-cb24-40f5-8697-84a3ad8ad1bc', title_properties: ['Task'] },
+];
+
+async function runGlobalCleanupSweep() {
+  console.log('\n[global-cleanup] Sweeping all databases for leaked [eval] data...');
+  let totalArchived = 0;
+
+  for (const target of EVAL_CLEANUP_TARGETS) {
+    try {
+      let result = { results: [] };
+
+      if (target.data_source) {
+        try {
+          const dsPath = `/v1/data_sources/${uuidWithDashes(target.data_source)}/query`;
+          result = await queryNotionTitleContains(dsPath, '[eval]', target.title_properties);
+        } catch {
+          // Fallback to database query
+        }
+      }
+
+      if (!result.results?.length) {
+        const dbPath = `/v1/databases/${uuidWithDashes(target.database)}/query`;
+        try {
+          result = await queryNotionTitleContains(dbPath, '[eval]', target.title_properties);
+        } catch {
+          continue; // Skip this database if both queries fail
+        }
+      }
+
+      for (const page of result.results || []) {
+        try {
+          await notionRequest('PATCH', `/v1/pages/${page.id}`, { archived: true });
+          totalArchived++;
+          console.log(`  [global-cleanup] Archived leaked eval page: ${page.id}`);
+        } catch (err) {
+          console.warn(`  [global-cleanup] Failed to archive ${page.id}: ${err.message}`);
+        }
+      }
+    } catch (err) {
+      // Non-fatal: continue with other databases
+    }
+  }
+
+  if (totalArchived > 0) {
+    console.log(`[global-cleanup] Archived ${totalArchived} leaked eval pages.`);
+  } else {
+    console.log('[global-cleanup] No leaked eval data found.');
+  }
+}
+
 function errorMeta(error) {
   return {
     stability: classifyStability(error),
@@ -386,13 +455,18 @@ async function runTest(testCase) {
   let timeoutMeta = null;
   const transcript = [];
 
+  // Determine if this test should use dry-run mode to prevent accidental writes.
+  // Tests with side_effects: 'none' get dry-run protection.
+  // Tests with side_effects: 'write' or 'read_only' run normally.
+  const useDryRun = side_effects === 'none';
+
   if (multi_turn && Array.isArray(turns) && turns.length > 0) {
     // Multi-turn: send each user turn, validate only the final response.
     // All turns share the same sessionKey so context carries through.
     for (const turn of turns) {
       if (turn.role === 'user') {
         transcript.push({ role: 'user', message: turn.message || '' });
-        const turnResult = await sendToLyra(turn.message, timeout_ms, `eval-${RUN_ID}-${id}`);
+        const turnResult = await sendToLyra(turn.message, timeout_ms, `eval-${RUN_ID}-${id}`, useDryRun);
         response = turnResult.text;
         latencyMs = turnResult.durationMs;
         ttftMs = turnResult.ttftMs;
@@ -409,16 +483,16 @@ async function runTest(testCase) {
     if (!prompt || prompt.trim() === '') {
       finalPrompt = ' '; // tests Lyra's handling of empty-like input
     }
-    // Note: EVAL MODE dry-run prefix removed — tests now use natural prompts
+    // Dry-run mode enabled for side_effects: 'none' to prevent accidental Notion writes
 
-    let result = await sendToLyra(finalPrompt, timeout_ms, `eval-${RUN_ID}-${id}`);
+    let result = await sendToLyra(finalPrompt, timeout_ms, `eval-${RUN_ID}-${id}`, useDryRun);
 
     // Rate limit backoff: wait 10 min and retry once if MiniMax rate limits hit
     if (isRateLimitError(result)) {
       console.log(`    [rate-limit] MiniMax rate limit detected. Waiting 10 minutes before retry...`);
       await new Promise((r) => setTimeout(r, 10 * 60 * 1000));
       console.log(`    [rate-limit] Retrying [${id}]...`);
-      result = await sendToLyra(finalPrompt, timeout_ms, `eval-${RUN_ID}-${id}`);
+      result = await sendToLyra(finalPrompt, timeout_ms, `eval-${RUN_ID}-${id}`, useDryRun);
     }
 
     response = result.text;
@@ -675,6 +749,9 @@ async function main() {
 
   const summaryFile = join(RESULTS_DIR, `${today}-summary.json`);
   writeFileSync(summaryFile, JSON.stringify(summary, null, 2));
+
+  // Global cleanup sweep — catch any leaked [eval] data from all databases
+  await runGlobalCleanupSweep();
 
   // Print summary
   console.log('\n' + '='.repeat(50));
