@@ -80,6 +80,13 @@ const HEALTH_TIER0_PATTERNS = [
   /(?:ate|had|eaten)\s+.+\s+for\s+(?:breakfast|lunch|dinner|snack)/i,
 ];
 
+// Tier 1 Haiku patterns — these need an LLM but Haiku is sufficient (short, structured tasks)
+// Unlike TIER0 (zero-token Python CRUD), these make a Haiku API call.
+// Handled downstream in the router after Tier0 check.
+const HAIKU_PATTERNS = [
+  /^promote to wiki:/i,
+];
+
 const TIER0_PATTERNS = [
   /^(?:list|show|what(?:'s| is| are)(?: in| on)?)\s+(?:my|the)\s+(?:current\s+)?(?:reminders?|tasks?)\b/i,
   /^(?:show|list)(?:\s+me)?(?:\s+my)?\s+(?:current\s+)?(?:reminders?|tasks?)\b/i,
@@ -411,6 +418,15 @@ function routeQuery(event, ctx) {
     return { __tier0: true, directResponse: tier0 };
   }
   _tier0Result = null;
+
+  // Tier 1 Haiku: structured tasks that need an LLM but not full Sonnet reasoning
+  if (HAIKU_PATTERNS.some((p) => p.test(prompt)) && isAnthropicAvailable()) {
+    process.stderr.write("[R] Haiku pattern hit — routing to Haiku\n");
+    return {
+      providerOverride: MODELS.haiku.providerOverride,
+      modelOverride: MODELS.haiku.modelOverride,
+    };
+  }
 
   const features = extractFeatures(prompt);
   const scores = computeScores(features);
