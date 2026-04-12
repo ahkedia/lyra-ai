@@ -3,7 +3,8 @@
  * InsightEngine — Content Draft Generator
  *
  * Runs as a detached child_process spawned by OpenClaw at 08:00 daily.
- * Reads ideas from Content Ideas DB (status=backlog, priority=high),
+ * Legacy path (disabled by default). Canonical intake is Content Topic Pool + projects/content-engine.
+ * When INSIGHT_ENGINE_ENABLED=true, reads from CONTENT_TOPIC_POOL_DB (Topic Pool) with Status=Candidate — align filters with your Notion schema or keep disabled.
  * fetches wiki evidence, drafts via Sonnet, humanizes via Haiku,
  * runs plagiarism check, writes to Content Drafts DB.
  *
@@ -26,7 +27,10 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "YOUR_CHAT_ID";
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 
-const CONTENT_IDEAS_DB = "27fc8e00643a4b9390f7ce8b9a345c62";
+const CONTENT_TOPIC_POOL_DB =
+  process.env.CONTENT_TOPIC_POOL_DB || "33f780089100812aacaec0a61d8caf3a";
+/** @deprecated Old Content Ideas DB; Topic Pool is canonical */
+const CONTENT_IDEAS_DB = CONTENT_TOPIC_POOL_DB;
 const CONTENT_DRAFTS_DB = "8135676dd15c4ef4925336cf484567ac";
 const CONTENT_JOB_LOG_DB = "33d780089100815 0b18fd9967447d1fb".replace(/\s/g, "");
 // Personal Wiki Notion DB (standard database query API)
@@ -393,7 +397,7 @@ async function main() {
     console.log(`[insight-engine] Voice Canon: ${voiceCanonText ? "fetched" : "using fallback"}`);
 
     // Step 2: Fetch content ideas (status=backlog, limit MAX_IDEAS)
-    const ideasRes = await notionRequest("POST", `/databases/${CONTENT_IDEAS_DB}/query`, {
+    const ideasRes = await notionRequest("POST", `/databases/${CONTENT_TOPIC_POOL_DB}/query`, {
       filter: {
         and: [
           { property: "Status", select: { equals: "Idea" } },
@@ -515,6 +519,13 @@ async function main() {
   } finally {
     releaseLock();
   }
+}
+
+if (process.env.INSIGHT_ENGINE_ENABLED !== "true") {
+  console.log(
+    "[insight-engine] Skipped (INSIGHT_ENGINE_ENABLED!=true). Canonical pipeline: projects/content-engine (Topic Pool → Shortlisted → Content Drafts)."
+  );
+  process.exit(0);
 }
 
 main();

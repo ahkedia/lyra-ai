@@ -1,5 +1,24 @@
 # Lyra Memory
 
+## Cold start & derisking (read with SOUL)
+`config/SOUL.md` stays short on purpose. Use this section when something feels ambiguous.
+
+**Session 0**
+1. Read `config/SOUL.md` (identity, boundaries, exec preflight, tools map).
+2. Skim **this file** for live schedules, Notion rules, and persistent fixes below.
+3. Open the **skill** for the task (`skills/.../SKILL.md`) before improvising.
+
+**Research paths** — `research/` is a **directory** (do not `read` it as a file). Run `python3` on `.../research/research.py` with an **absolute** path. Canonical details: `workspace/research/README.md`. Typical locations: repo `.../lyra-ai/research/research.py`; gateway workspace `.../.openclaw/workspace/research/research.py` (match your deploy).
+
+**Chief of Staff** — EA / morning prep / triage. **Does not replace** Tier-0 reminder/list CRUD (`crud/cli.py` per router) or **Abhigna** access rules in SOUL. For those, use the right skill or CRUD, not chief-of-staff orchestration.
+
+**Health** — Never create standalone Notion pages for meals/workouts/metrics. Log via `python3 /root/lyra-ai/crud/cli.py ...` only; full commands in `skills/health-coach/SKILL.md`. Rows on Lyra Health Coach / DBs — not emoji-titled one-off pages.
+
+**Twitter bookmarks → Notion** — After `fetch-twitter-bookmarks.sh`, process `/tmp/lyra-bookmarks-*.json` per `skills/twitter-synthesis/SKILL.md`. **User corrections in Notion** to classifications override your prior output.
+
+## Incident notes (append-only)
+_Add one line: date, symptom, fix / pointer to PR or skill change._
+
 ## Notion
 Read `references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b935-dc1810971e87`
 - Use `$NOTION_API_KEY` env var (already loaded from .env via systemd)
@@ -26,7 +45,7 @@ Log rotation: Enabled for all /tmp/lyra-*.log and /var/log/lyra-evals.log (daily
 Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not infrastructure)
 
 ## Model Routing
-- Default: MiniMax M2.5 (all crons + DMs)
+- Default: MiniMax M2.7 (all crons + DMs)
 - Fallback: Claude Haiku 4.5 (auto-escalation on MiniMax failure)
 - Escalation: Claude Sonnet 4.6 (on-demand via chat command only)
 - Anthropic spending limit hit March 20, 2026 — router v14 handles gracefully
@@ -40,7 +59,7 @@ Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not i
 - Self-edits auto-sync to GitHub within 5 minutes
 
 ## Notion API Access — Critical
-- NOTION_API_KEY in .env grants full access to ALL databases (Second Brain, Recruiter Tracker, Content Ideas, Relocation Tasks, etc.)
+- NOTION_API_KEY in .env grants full access to ALL databases (Second Brain, Recruiter Tracker, Content Topic Pool, Relocation Tasks, etc.)
 - **DO NOT ask Akash to "share databases" in Notion UI** — that is for human collaborators, not API access
 - API key access is INDEPENDENT of Notion sharing settings — you have access via API even if databases aren't "shared" in the UI
 - All database IDs are documented in references/notion.md — use them directly

@@ -112,10 +112,10 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Env:** `TWITTER_INSIGHTS_DB_ID` (no dashes)
 - **Setup:** `node scripts/setup-twitter-insights-db.cjs` — see `docs/NOTION-TWITTER-INSIGHTS-SETUP.md`
 
-### Content Ideas
-- **database_id:** `27fc8e00643a4b9390f7ce8b9a345c62`
-- **data_source_id:** `f008d0bb-ac81-401d-889d-4e8f508ab134`
-- **Properties:** Idea (title), Channel (select), Status (select), Tags (multi_select), Rough Notes (rich_text), Notes (rich_text), Link (url)
+### Content Topic Pool (canonical content intake; merged former Content Ideas DB)
+- **database_id:** `33f780089100812aacaec0a61d8caf3a` (with dashes: `33f78008-9100-812a-acae-c0a61d8caf3a`)
+- **Purpose:** Single queue for topic candidates (Candidate → Shortlisted) feeding `projects/content-engine` and Content Drafts. Bookmark `content_create` rows land here via `twitter-bookmarks-pipeline/scripts/classify-and-route.sh` (`CONTENT_TOPIC_POOL_DB_ID`). Old **Content Ideas** DB `27fc8e00643a4b9390f7ce8b9a345c62` — archive/delete in Notion after migrating any rows.
+- **Properties (expected):** Topic (title), Source (select), Domain (select), Score (number), Status (select), Week (date), Source Reference (url), Shortlisted on (date), Quality score (number), Author brief (rich_text), …
 - **Who can access:** Akash only
 
 ### Content Drafts
@@ -141,7 +141,7 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **data_source_id:** `df3f6ffe-e48d-40d1-a5df-d81b1d2d423c`
 - **Properties:** Name (title, topic), Topic Key (rich_text), Week (date), Recommendation Rank (number), Selection Reason (rich_text), Chosen By (select), Advance To Content Ideas (checkbox), Status (select), Topic Library Page ID (rich_text), Candidate Format (select), Content Idea URL (url), Notes (rich_text)
 - **Who can access:** Akash only
-- **Purpose:** Explicit weekly queue pulled from Topic Library before promotion into Content Ideas.
+- **Purpose:** Explicit weekly queue pulled from Topic Library before promotion into Content Topic Pool / drafts pipeline.
 
 ### US Relocation Tasks
 - **database_id:** `6138e85b5d9d4ccab7ff741c75d3e63a`
