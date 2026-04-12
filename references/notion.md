@@ -117,10 +117,10 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Env:** `TWITTER_INSIGHTS_DB_ID` = database_id without dashes
 - **Create / recreate:** `node scripts/setup-twitter-insights-db.cjs` (requires integration access to Lyra Hub parent page)
 
-### Content Ideas
-- **database_id:** `27fc8e00643a4b9390f7ce8b9a345c62`
-- **data_source_id:** `f008d0bb-ac81-401d-889d-4e8f508ab134`
-- **Properties:** Idea (title), Channel (select), Status (select), Tags (multi_select), Rough Notes (rich_text), Notes (rich_text), Link (url)
+### Content Topic Pool (canonical; merged former Content Ideas DB)
+- **database_id:** `33f780089100812aacaec0a61d8caf3a` (with dashes: `33f78008-9100-812a-acae-c0a61d8caf3a`)
+- **Purpose:** Topic queue (Candidate → Shortlisted) for `projects/content-engine`. Old Content Ideas id `27fc8e00643a4b9390f7ce8b9a345c62` — archive after migration.
+- **Properties:** Topic (title), Source (select), Domain (select), Score (number), Status (select), Week (date), Source Reference (url), Shortlisted on (date), Quality score (number), Author brief (rich_text), …
 - **Who can access:** Akash only
 
 ### Content Drafts
