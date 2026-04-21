@@ -88,6 +88,11 @@ const HAIKU_PATTERNS = [
 ];
 
 const TIER0_PATTERNS = [
+  // Telegram slash commands (setMyCommands menu) — zero-token routes.
+  // /reminders → list reminders; /last → last-message recall.
+  // Trailing "@botname" is what Telegram appends in group chats.
+  /^\/reminders(?:@\w+)?\s*$/i,
+  /^\/last(?:@\w+)?\s*$/i,
   /^(?:list|show|what(?:'s| is| are)(?: in| on)?)\s+(?:my|the)\s+(?:current\s+)?(?:reminders?|tasks?)\b/i,
   /^(?:show|list)(?:\s+me)?(?:\s+my)?\s+(?:current\s+)?(?:reminders?|tasks?)\b/i,
   /^(?:list|show)\s+(?:my|the)\s+(?:current\s+)?(?:reminders?|tasks?)\b/i,
