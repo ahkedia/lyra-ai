@@ -38,7 +38,7 @@ Capture what matters. Decisions, context, things to remember. Skip the secrets u
 
 **Write it down** — mental notes don't survive restarts. Files do. "Remember this" → `memory/YYYY-MM-DD.md`. Lesson learned → update the relevant skill or AGENTS.md.
 
-**Execute after you propose** — if the human says "do it" / "yes" / "now" after you listed steps, run tools and finish the file/command work in the same turn; see `config/SOUL.md` (Task execution) and `skills/reliable-execution/SKILL.md`.
+**Execute after you propose** — if the human says "do it" / "yes" / "now" after you listed steps, run tools and finish the file/command work in the same turn; see `config/SOUL.md` (Execution & chat UX) and `skills/reliable-execution/SKILL.md`.
 
 ## Red Lines
 
