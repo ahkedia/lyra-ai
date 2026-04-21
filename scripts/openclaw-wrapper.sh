@@ -19,21 +19,6 @@ SHUTDOWN_IN_PROGRESS=false
 
 log() { echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') $1"; }
 
-# Any openclaw-gateway whose parent is PID 1 (init/systemd) is not supervised by this
-# wrapper and fights Telegram long-poll + port ownership with the real child.
-remove_orphan_openclaw_gateways() {
-    local pid ppid
-    while read -r pid ppid; do
-        [ -z "$pid" ] && continue
-        [ "$ppid" = "1" ] || continue
-        if [ -n "${GATEWAY_PID:-}" ] && [ "$pid" = "$GATEWAY_PID" ]; then
-            kill -0 "$pid" 2>/dev/null && continue
-        fi
-        log "WARN/supervisor: Terminating orphan openclaw-gateway pid=$pid (PPID=1)"
-        kill -TERM "$pid" 2>/dev/null || true
-    done < <(ps -eo pid=,ppid=,args= 2>/dev/null | awk '/[o]penclaw-gateway/ {print $1,$2}')
-}
-
 cleanup_port() {
     fuser -k "$GATEWAY_PORT/tcp" 2>/dev/null || true
     sleep 1
@@ -81,15 +66,11 @@ export DBUS_SESSION_BUS_ADDRESS=disabled:
 
 log "INFO/supervisor: Starting — port=$GATEWAY_PORT"
 cleanup_port
-remove_orphan_openclaw_gateways
 
 while true; do
-    remove_orphan_openclaw_gateways
     /usr/bin/openclaw gateway --allow-unconfigured &
     GATEWAY_PID=$!
     log "INFO/supervisor: Gateway started (PID=$GATEWAY_PID)"
-    sleep 2
-    remove_orphan_openclaw_gateways
 
     wait "$GATEWAY_PID" || EXIT_CODE=$?
     EXIT_CODE=${EXIT_CODE:-0}
