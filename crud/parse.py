@@ -33,6 +33,8 @@ CRUD_PATTERNS = [
             r"^(list|show|what(?:'s| is| are)(?: in| on)?)\s+(?:my|the)\s+(?:current\s+)?(?:reminders?|tasks?)\b",
             r"^(?:show|list)(?:\s+me)?(?:\s+my)?\s+(?:current\s+)?(?:reminders?|tasks?)\b",
             r"^(?:list|show)\s+(?:my|the)\s+(?:current\s+)?(?:reminders?|tasks?)\b",
+            # Telegram slash command (setMyCommands menu)
+            r"^/reminders(?:@\w+)?\s*$",
         ],
         "action": "notion list-reminders",
     },
@@ -60,6 +62,9 @@ CRUD_PATTERNS = [
         "patterns": [
             r"^remind me (?:to |about )?(.+?)(?: (?:on|by|at|tomorrow|today|next|this) .+)?$",
             r"^set (?:a )?reminder (?:to |for |about )?(.+)$",
+            # Common natural phrasing that previously missed Tier 0 → LLM hallucinated writes
+            r"^add (?:a )?reminder(?:\s*:\s*|\s+to\s+|\s+for\s+|\s+about\s+|\s+)(.+)$",
+            r"^create (?:a )?reminder(?:\s*:\s*|\s+to\s+|\s+for\s+|\s+about\s+|\s+)(.+)$",
         ],
         "action": "notion add-reminder",
     },
@@ -127,14 +132,29 @@ def extract_reminder_args(message: str) -> dict:
     Parses 'remind me to/about X on/by/at DATE' into text + when.
     Returns {"text": str, "when": str}
     """
-    # "remind me to call the dentist on Friday"
+    s = message.strip()
+    prefix_m = re.match(
+        r"(?i)^(?:"
+        r"remind me (?:to |about )?"
+        r"|set (?:a )?reminder (?:to |for |about )?"
+        r"|add (?:a )?reminder(?:\s*:\s*|\s+to\s+|\s+for\s+|\s+about\s+|\s+)"
+        r"|create (?:a )?reminder(?:\s*:\s*|\s+to\s+|\s+for\s+|\s+about\s+|\s+)"
+        r")",
+        s,
+    )
+    if prefix_m:
+        s = s[prefix_m.end() :].strip()
+
+    if not s:
+        return {"text": message.strip(), "when": ""}
+
     m = re.match(
-        r"(?:remind me (?:to |about )?|set (?:a )?reminder (?:to |for |about )?)(.+?)"
-        r"(?:\s+(?:on|by|at|before)\s+(.+))?$",
-        message.strip(), re.IGNORECASE
+        r"(.+?)(?:\s+(?:on|by|at|before)\s+(.+))?$",
+        s,
+        re.IGNORECASE,
     )
     if not m:
-        return {"text": message, "when": ""}
+        return {"text": s, "when": ""}
 
     text = m.group(1).strip()
     when = (m.group(2) or "").strip()
