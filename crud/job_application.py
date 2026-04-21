@@ -77,7 +77,14 @@ _JOB_TRIGGER_RE = re.compile(
     r'|draft\s+.*?outreach\s+(?:to|for)\b'
     r'|linkedin\.com/jobs'
     r'|write\s+.*?cover\s+letter\b'
-    r'|message\s+.*?(?:and|plus)\s+cover\s+letter\b)',
+    r'|message\s+.*?(?:and|plus)\s+cover\s+letter\b'
+    # Person-centric outreach / Gmail drafts — must hit Tier-0 (wiki + himalaya), not chat LLM
+    r'|(?:draft|write|creating)\s+(?:an?\s+)?(?:outreach\s+)?message\s+(?:to|for)\b'
+    r'|outreach\s+(?:message\s+)?(?:to|for)\b'
+    r'|gmail\s+draft\b'
+    r'|\bmessage\s+(?:to|for)\s+[A-Za-z]'  # e.g. "message for Rajneesh"
+    r'|help\s+(?:me\s+)?(?:with\s+)?(?:a\s+)?(?:outreach\s+)?message\b'
+    r')',
     re.IGNORECASE,
 )
 
@@ -135,18 +142,36 @@ def _extract_company(msg: str) -> str:
     return ''
 
 
+def _normalize_person(name: str) -> str:
+    """Strip trailing ' at Company' fragments; keywords use IGNORECASE but names must not absorb 'at'."""
+    if not name:
+        return ''
+    name = name.strip()
+    parts = re.split(r'\s+at\s+', name, maxsplit=1, flags=re.IGNORECASE)
+    return parts[0].strip()
+
+
 def _extract_person(msg: str) -> str:
-    # Patterns: "to X", "message X", "outreach to X", "draft to X"
-    m = re.search(
-        r'(?:message|outreach|draft|write)\s+(?:to\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})',
-        msg
-    )
-    if m:
-        return m.group(1).strip()
-    # "to [Person Name] at"
-    m = re.search(r'to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:at|from)', msg)
-    if m:
-        return m.group(1).strip()
+    """First/last names; single-token names (e.g. Rajneesh) are valid. Name tokens use (?-i:...) so 'at' is not matched."""
+    # (?-i:...) turns off IGNORECASE for the capture — otherwise [A-Z] matches 'a' in 'at' and sucks in company.
+    _nm = r'((?-i:[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*))'
+    patterns = [
+        # "draft a message for Sarah Chen", "write outreach message to Pat"
+        r'(?:message|outreach|draft|write|creating)\s+(?:an?\s+)?(?:outreach\s+)?(?:a\s+)?message\s+(?:to|for)\s+'
+        + _nm,
+        # "message to Pat", "outreach for Jane", "outreach to Jane Doe at N26"
+        r'(?:message|outreach|draft|write)\s+(?:to|for)\s+' + _nm,
+        # "with a message for Rajneesh", "help me with message for X"
+        r'(?:with\s+(?:a\s+)?|help\s+(?:me\s+)?(?:with\s+)?(?:a\s+)?)message\s+(?:to|for)\s+' + _nm,
+        # standalone "message for Name" / "message to Name"
+        r'\bmessage\s+(?:to|for)\s+' + _nm,
+        # "to Name at Company" (two+ name parts before at)
+        r'(?:to|for)\s+((?-i:[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+))\s+(?:at|from)\b',
+    ]
+    for pat in patterns:
+        m = re.search(pat, msg, re.IGNORECASE)
+        if m:
+            return _normalize_person(m.group(1))
     return ''
 
 
