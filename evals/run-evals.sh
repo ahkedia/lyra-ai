@@ -157,9 +157,15 @@ if [ "$IS_FULL_EVAL_DAY" = true ]; then
       echo "  No changes to push."
     else
       git add docs/dashboard/data/
-      git commit -m "Update eval dashboard data $(date +%Y-%m-%d)" > /dev/null 2>&1 || true
-      git push origin main > /dev/null 2>&1 || echo "[warn] Git push failed (non-fatal)"
-      echo "  Dashboard data pushed to GitHub."
+      if git commit -m "Update eval dashboard data $(date +%Y-%m-%d)" >/dev/null 2>&1; then
+        if git push origin main >/dev/null 2>&1; then
+          echo "  Dashboard data committed and pushed to GitHub."
+        else
+          echo "[warn] Git push failed (non-fatal) — GitHub still has old dashboard; check deploy key / branch protection."
+        fi
+      else
+        echo "  [warn] Git commit failed or nothing to commit after cp (non-fatal)."
+      fi
     fi
   fi
 else
