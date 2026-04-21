@@ -279,7 +279,7 @@ cat > "$STATUS_HTML" << ENDHTML
   <div class="card">
     <div class="card-title">Last 24 Hours</div>
     <div class="row"><span class="key">Messages Processed</span><span class="val">${MSGS_24H}</span></div>
-    <div class="row"><span class="key">MiniMax M2.5</span><span class="val">${MINIMAX_24H}</span></div>
+    <div class="row"><span class="key">MiniMax M2.7</span><span class="val">${MINIMAX_24H}</span></div>
     <div class="row"><span class="key">Haiku</span><span class="val">${HAIKU_24H}</span></div>
     <div class="row"><span class="key">Sonnet</span><span class="val">${SONNET_24H}</span></div>
   </div>

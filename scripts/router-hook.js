@@ -50,7 +50,7 @@ async function processStdin() {
     };
 
     if (!message) {
-      outputResult({ error: 'No message in request', default_model: 'minimax/minimax-m2-5' });
+      outputResult({ error: 'No message in request', default_model: 'minimax/MiniMax-M2.7' });
       return;
     }
 
@@ -68,7 +68,7 @@ async function processStdin() {
   } catch (err) {
     outputResult({
       error: `Parse error: ${err.message}`,
-      default_model: 'minimax/minimax-m2-5',
+      default_model: 'minimax/MiniMax-M2.7',
     });
   }
 }

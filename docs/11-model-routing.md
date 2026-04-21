@@ -40,7 +40,7 @@ User message
             │
             ▼
     ┌───────────────┐
-    │ MiniMax M2.5  │  87% — simple tasks
+    │ MiniMax M2.7  │  87% — simple tasks
     │ Haiku 4.5     │   9% — moderate tasks
     │ Sonnet 4.6    │   4% — complex tasks
     └───────────────┘
@@ -48,7 +48,7 @@ User message
 
 ## Three tiers
 
-### Tier 1: MiniMax M2.5 (fast, cheap)
+### Tier 1: MiniMax M2.7 (fast, cheap)
 - Single Notion reads/writes
 - Reminders, calendar adds
 - Weather lookups

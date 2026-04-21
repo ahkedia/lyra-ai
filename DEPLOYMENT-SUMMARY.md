@@ -74,7 +74,7 @@ curl http://localhost:9000/api/v1/messages/qrcode?instance=lyra-whatsapp
 │  │                                                    │   │
 │  │  ┌──────────────────┐      ┌──────────────────┐  │   │
 │  │  │ OpenClaw Agent   │      │  Evolution API   │  │   │
-│  │  │ (MiniMax M2.5)   │◄────►│  (WhatsApp)      │  │   │
+│  │  │ (MiniMax M2.7)   │◄────►│  (WhatsApp)      │  │   │
 │  │  │ Claude fallback  │      │                  │  │   │
 │  │  └──────────────────┘      └──────────────────┘  │   │
 │  │           ▲                                        │   │

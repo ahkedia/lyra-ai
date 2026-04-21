@@ -1,6 +1,6 @@
 # Contributing to Lyra
 
-Lyra is a personal AI agent that runs 24/7 on a cloud VPS, coordinates a household, and integrates with Notion, Telegram, email, and calendar. It's built on [OpenClaw](https://openclaw.ai) and uses a 3-tier model router (MiniMax M2.5 → Claude Haiku → Claude Sonnet) to keep costs low while maintaining quality.
+Lyra is a personal AI agent that runs 24/7 on a cloud VPS, coordinates a household, and integrates with Notion, Telegram, email, and calendar. It's built on [OpenClaw](https://openclaw.ai) and uses a 3-tier model router (MiniMax M2.7 → Claude Haiku → Claude Sonnet) to keep costs low while maintaining quality.
 
 This guide helps you contribute — whether that's a new skill, better routing rules, more eval cases, or infrastructure improvements.
 

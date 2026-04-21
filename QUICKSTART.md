@@ -117,7 +117,7 @@ Once deployed:
 ✅ **Cost Efficient** - ~$13-17/month total
 ✅ **Auto-Restart** - Systemd service restarts on crash
 ✅ **Health Monitoring** - Cron checks every 15 min
-✅ **Fast Responses** - MiniMax M2.5 is quick + reliable
+✅ **Fast Responses** - MiniMax M2.7 is quick + reliable
 
 ---
 

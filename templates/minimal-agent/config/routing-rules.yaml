@@ -8,7 +8,7 @@ confidence_threshold: 0.7
 tiers:
   cheap:
     description: "Simple, single-action commands"
-    model: "minimax/minimax-m2-5"  # Replace with your cheap model
+    model: "minimax/MiniMax-M2.7"  # Replace with your cheap model
     max_tokens: 2048
     categories:
       simple_commands:
