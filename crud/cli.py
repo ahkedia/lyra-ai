@@ -18,6 +18,8 @@ def usage():
   cli.py snapshot [weight=X] [bodyfat=X] [waist=X] [notes=...]
   cli.py parse "<natural language message>"
   cli.py job-application "<message>"
+  cli.py content-draft draft <x|outreach|generic> "<task...>"
+  cli.py content-draft revise <x|outreach|generic> --prior "..." --feedback "..."
 """)
 
 def cmd_weight(args):
@@ -113,6 +115,13 @@ def cmd_parse(args):
     if not raw:
         print("parse requires a message")
         sys.exit(1)
+
+    # --- Content draft / revise (shared wiki + channel rules — Sonnet) ---
+    from content_draft import try_content_draft_tier0
+
+    if try_content_draft_tier0(raw):
+        return
+    # --- End content draft ---
 
     # --- Job application workflow (Phase A: trigger, Phase B: clarification reply) ---
     from job_application import (
@@ -328,6 +337,13 @@ def cmd_daily_summary(args):
     print(json.dumps(out, indent=2))
 
 
+def cmd_content_draft(args):
+    """Draft or revise content with shared Personal Wiki + channel rules (Sonnet)."""
+    from content_draft import main_from_cli
+
+    sys.exit(main_from_cli(args))
+
+
 def cmd_job_application(args):
     """Directly invoke the job application workflow (parse + trigger or reply)."""
     from job_application import is_job_trigger, is_clarification_reply, has_recent_state, handle_trigger, handle_clarification_reply
@@ -355,6 +371,7 @@ COMMANDS = {
     'parse': cmd_parse,
     'daily-summary': cmd_daily_summary,
     'job-application': cmd_job_application,
+    'content-draft': cmd_content_draft,
 }
 
 if __name__ == '__main__':
