@@ -66,11 +66,17 @@ Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not i
 - If a Notion query fails: check error message. DO NOT assume it's a sharing issue. Common causes: wrong database_id, malformed query, API rate limit
 
 ## Persistent Fixes (DO NOT REVERT)
+- [2026-04-21] Job application pipeline: Personal Wiki fetch uses `/databases/{id}/query` (primary) + explicit Voice Canon query; injects original Telegram `raw` message into prompts; SOUL/MEMORY updated for revision + wiki access — do not claim wiki “unlisted.”
 - [2026-03-21] Disabled built-in web_search tool (Brave not configured). Use Tavily curl instead.
 - [2026-03-21] Fixed notion.md API key pattern: use $NOTION_API_KEY env var, not cat ~/.config/notion/api_key.
 - [2026-03-21] Removed invalid gateway.env key from openclaw.json (crashed gateway). Config sanitizer script now auto-fixes before restarts.
 - [2026-03-21] Router v14 deployed: rate-limit-aware, MiniMax fallback when Anthropic unavailable.
 - [2026-03-21] Systemd: RestartSec=30, StartLimitBurst=5, graceful shutdown wrapper.
+
+## Personal Wiki & content revision
+- **Wiki IDs:** database_id `33d78008-9100-8183-850d-e7677ac46b63`, data_source_id `33d78008-9100-8197-9f0f-000b205edfe8`. Prefer `POST /v1/databases/{database_id}/query`, then `GET /blocks/{page_id}/children`. Voice Canon: filter `Type` = `Voice Canon`.
+- Never claim the wiki is “not listed” without having queried with these IDs.
+- After draft feedback, re-apply Voice Canon + channel rules (`config/SOUL.md`, `skills/content-revision/SKILL.md`).
 
 ## Personal Context
 - Akash's sister is named Priya

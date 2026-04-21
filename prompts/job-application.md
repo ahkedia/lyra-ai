@@ -11,6 +11,7 @@ Akash's background (from his personal wiki):
 {wiki_context}
 
 Voice rules (non-negotiable):
+- The wiki begins with **VOICE CANON** when available — treat it as the style contract for every sentence. Do not drift into generic consultant voice after the first paragraph.
 - Lead with insight or a concrete claim, not "I am writing to apply for..."
 - 3 paragraphs max. Each paragraph earns its place.
 - Name the specific role and company in the first sentence.
@@ -32,6 +33,9 @@ Write a cover letter for this role:
 **Job context:**
 {job_context}
 
+**Same-conversation context from Akash (metrics, links, names — use these; do not ask him to repeat):**
+{thread_context}
+
 Use Akash's background above to draw the most relevant experience and connect it specifically to what this role needs.
 
 ---
@@ -43,6 +47,7 @@ Akash's background (from his personal wiki):
 {wiki_context}
 
 Voice rules (non-negotiable):
+- The wiki begins with **VOICE CANON** when available — match that tone in every line.
 - Max 5 lines. This is a message, not a pitch deck.
 - Open with something specific about the person or company — not "I came across your profile"
 - State who Akash is in one sentence with ONE specific credential (not a list)
@@ -62,5 +67,8 @@ Write a short outreach message to:
 **Company:** {company}
 **Context:**
 {job_context}
+
+**Same-conversation context from Akash (use facts already stated here):**
+{thread_context}
 
 Connect Akash's relevant background to why reaching out to this specific person makes sense.
