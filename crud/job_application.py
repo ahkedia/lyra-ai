@@ -28,11 +28,15 @@ STATE_FILE = '/tmp/lyra-job-state.json'
 PIPELINE_LOG = '/tmp/lyra-job-pipeline.log'
 ENV_FILE = '/root/.openclaw/.env'
 
-# Wiki DB IDs (Personal Wiki in Notion)
-WIKI_DS_ID = '33d78008-9100-8197-9f0f-000b205edfe8'  # data_source_id for queries
+# Wiki DB IDs (Personal Wiki in Notion) — see notion/notion.md
+WIKI_DS_ID = '33d78008-9100-8197-9f0f-000b205edfe8'  # data_source_id (fallback)
+PERSONAL_WIKI_DB = '33d78008-9100-8183-850d-e7677ac46b63'  # database_id — primary query API
 RECRUITER_DB_ID = '31778008910080c09b6fec080955cf00'  # database_id for page creation
 
 NOTION_VERSION = '2025-09-03'
+
+# Max wiki pages to pull bodies for (Voice Canon is always fetched first, outside this cap)
+_MAX_WIKI_BODY_PAGES = 25
 
 
 # ---------------------------------------------------------------------------
@@ -287,47 +291,159 @@ def _notion_req(method: str, path: str, body: dict = None) -> dict:
         raise ValueError(f'Notion {e.code}: {msg}') from e
 
 
-def _fetch_wiki_pages() -> str:
-    """Fetch all wiki pages (career + any domain content) and return as text."""
+def _voice_canon_from_local_file() -> str:
+    """Last-resort voice text when Notion is empty (repo snapshot)."""
     try:
-        r = _notion_req('POST', f'/data_sources/{WIKI_DS_ID}/query', {'page_size': 20})
+        voice_path = os.path.join(os.path.dirname(__file__), '..', 'voice-system', 'VOICE.md')
+        voice_path = os.path.normpath(voice_path)
+        with open(voice_path, encoding='utf-8') as f:
+            return f.read().strip()[:8000]
+    except OSError:
+        return ''
+
+
+def _fetch_voice_canon_notion() -> str:
+    """Always fetch Voice Canon page(s) explicitly (Type = Voice Canon)."""
+    try:
+        r = _notion_req(
+            'POST',
+            f'/databases/{PERSONAL_WIKI_DB}/query',
+            {
+                'filter': {'property': 'Type', 'select': {'equals': 'Voice Canon'}},
+                'page_size': 10,
+            },
+        )
         pages = r.get('results', [])
     except Exception as e:
-        return f'[Wiki unavailable: {e}]'
+        return f'[Voice Canon Notion query failed: {e}]'
+
+    parts = []
+    for page in pages:
+        pid = page.get('id', '')
+        body = _fetch_page_content(pid)
+        if body:
+            parts.append(body)
+    return '\n\n'.join(parts) if parts else ''
+
+
+def _wiki_pages_via_database_query() -> list:
+    """Primary path: same API as insight-engine / MEMORY.md (database query)."""
+    all_results = []
+    cursor = None
+    for _ in range(5):
+        body: dict = {'page_size': 100}
+        if cursor:
+            body['start_cursor'] = cursor
+        r = _notion_req('POST', f'/databases/{PERSONAL_WIKI_DB}/query', body)
+        batch = r.get('results', [])
+        all_results.extend(batch)
+        if not r.get('has_more') or not r.get('next_cursor'):
+            break
+        cursor = r['next_cursor']
+    return all_results
+
+
+def _wiki_pages_via_data_source() -> list:
+    """Fallback if database query fails (legacy data_sources API)."""
+    try:
+        r = _notion_req('POST', f'/data_sources/{WIKI_DS_ID}/query', {'page_size': 100})
+        return r.get('results', [])
+    except Exception:
+        return []
+
+
+def _sort_wiki_pages_for_job(pages: list) -> list:
+    """Career / interview / domain content first; skip Voice Canon here (handled separately)."""
+    priority = {
+        'Career': 0,
+        'Interview Story': 1,
+        'Domain Knowledge': 2,
+        'Mental Model': 3,
+        'Lenny Synthesis': 4,
+        'Voice Canon': 99,
+        'Inbox': 98,
+    }
+
+    def key(p):
+        pt = (p.get('properties') or {}).get('Type', {}).get('select', {}) or {}
+        name = pt.get('name') or ''
+        return (priority.get(name, 5), name)
+
+    filtered = []
+    for p in pages:
+        props = p.get('properties', {})
+        page_type = props.get('Type', {}).get('select', {}).get('name', '')
+        if page_type in ('Inbox', 'Voice Canon'):
+            continue
+        filtered.append(p)
+    filtered.sort(key=key)
+    return filtered[:_MAX_WIKI_BODY_PAGES]
+
+
+def _fetch_wiki_pages() -> str:
+    """Fetch Voice Canon + prioritized wiki pages. Database query first; data_sources fallback."""
+    voice_notion = _fetch_voice_canon_notion()
+    voice_local = _voice_canon_from_local_file()
+    voice_block = ''
+    if voice_notion and not voice_notion.startswith('[Voice Canon Notion query failed'):
+        voice_block = voice_notion
+    elif voice_local:
+        voice_block = voice_local
+
+    pages = []
+    try:
+        pages = _wiki_pages_via_database_query()
+    except Exception as e:
+        pages = _wiki_pages_via_data_source()
+        if not pages:
+            return (
+                f'[Wiki unavailable: {e}]\n\n'
+                f'=== VOICE (partial) ===\n{voice_block or "[none]"}'
+            )
+
+    if not pages:
+        pages = _wiki_pages_via_data_source()
+
+    ordered = _sort_wiki_pages_for_job(pages)
 
     sections = []
-    for page in pages:
-        props = page.get('properties', {})
+    if voice_block:
+        sections.append('=== VOICE CANON — apply to every sentence; non-negotiable ===\n' + voice_block)
 
-        # Extract title
+    for page in ordered:
+        props = page.get('properties', {})
         title_rt = props.get('Title', {}).get('title', [])
         title = ''.join(t.get('plain_text', '') for t in title_rt).strip()
-
-        # Get type and domain for labeling
         page_type = props.get('Type', {}).get('select', {}).get('name', '')
         domain = props.get('Domain', {}).get('select', {}).get('name', '')
-
-        # Skip non-relevant types (Voice Canon etc.)
-        if page_type in ('Inbox',):
-            continue
-
         page_id = page.get('id', '')
         content = _fetch_page_content(page_id)
         if content:
-            label = f'### {title}'
+            label = f'### {title or "Untitled"}'
             if domain:
                 label += f' [{domain}]'
             if page_type:
                 label += f' ({page_type})'
             sections.append(f'{label}\n{content}')
 
-    return '\n\n'.join(sections) if sections else '[No wiki pages found]'
+    if not sections:
+        fallback = voice_block or _voice_canon_from_local_file()
+        if fallback:
+            return '=== VOICE CANON ===\n' + fallback + '\n\n[No other wiki pages returned bodies]'
+        return '[No wiki pages found]'
+
+    return '\n\n'.join(sections)
+
+
+def get_personal_wiki_bundle() -> str:
+    """Voice Canon + prioritized Personal Wiki pages — shared by job and content pipelines."""
+    return _fetch_wiki_pages()
 
 
 def _fetch_page_content(page_id: str) -> str:
     """Fetch text content from a Notion page's blocks."""
     try:
-        r = _notion_req('GET', f'/blocks/{page_id}/children?page_size=50')
+        r = _notion_req('GET', f'/blocks/{page_id}/children?page_size=100')
         blocks = r.get('results', [])
     except Exception:
         return ''
@@ -535,6 +651,8 @@ def execute_pipeline(state_file: str) -> None:
     person_email = state.get('person_email', '')
     needs = state.get('needs', 'both')
     tone = state.get('tone', "direct, specific, no fluff — Akash's natural voice")
+    raw_msg = (state.get('raw') or '').strip()
+    thread_context = raw_msg[:6000] if raw_msg else '_(none — no extra thread text in state)_'
 
     print(f'[job_application] Starting pipeline: needs={needs}, company={company}', file=sys.stderr)
 
@@ -565,6 +683,7 @@ def execute_pipeline(state_file: str) -> None:
                 company=company or 'the company',
                 role=role,
                 job_context=job_context_text,
+                thread_context=thread_context,
             )
             cover_letter = _call_anthropic(system, user, max_tokens=1200)
             subject = f'Application — {role} at {company}' if company else f'Application — {role}'
@@ -585,6 +704,7 @@ def execute_pipeline(state_file: str) -> None:
                 person=person or (company + ' team'),
                 company=company or 'the company',
                 job_context=job_context_text,
+                thread_context=thread_context,
             )
             outreach = _call_anthropic(system, user, max_tokens=500)
             to_addr = person_email or ''

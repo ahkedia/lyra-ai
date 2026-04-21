@@ -99,6 +99,26 @@ tier0_python_jobs:
       models_used: "Sonnet 4.6 (for cover letter + outreach generation)"
       integrations: "Tavily (job/company research), Notion (wiki pages), himalaya (Gmail drafts)"
 
+    content_draft:
+      description: >
+        Single Sonnet path for X / outreach / generic drafts and revisions. Pulls Voice Canon +
+        Personal Wiki from Notion (same bundle as job pipeline) plus FORMAT_PLAYBOOK / NEGATIVE_STYLE
+        excerpts for channel rules. Tier 0 via `cli.py parse` — not token-free (Sonnet), but
+        deterministic routing from explicit prefixes.
+      script: "/root/lyra-ai/crud/cli.py parse + /root/lyra-ai/crud/content_draft.py"
+      patterns:
+        - "^(?:lyra )?content draft (x|outreach|generic)"
+        - "^(?:lyra )?content revise (x|outreach|generic)"
+      telegram_examples:
+        - "content draft x: why operator UX still matters in 2026"
+        - "lyra content draft outreach: 3-line hook for a Series B PM intro"
+        - "content revise x\nPRIOR:\n(old draft)\nFEEDBACK:\n(shorter, less jargon)"
+      cli_examples:
+        - "python3 /root/lyra-ai/crud/cli.py content-draft draft x \"topic\""
+        - "python3 /root/lyra-ai/crud/cli.py content-draft revise x --prior \"...\" --feedback \"...\""
+      models_used: "Claude Sonnet 4.6"
+      integrations: "Notion (Personal Wiki), voice-system markdown (FORMAT_PLAYBOOK, NEGATIVE_STYLE)"
+
 # RULE: When adding new CRUD operations to Lyra, always ask:
 #   1. Is this deterministic given the input? → add to tier0_python_jobs
 #   2. Does it need NL understanding/reasoning? → add to tier1 (minimax) or higher

@@ -110,6 +110,9 @@ const TIER0_PATTERNS = [
   /(?:apply(?:ing)?\s+to\b|job\s+(?:link|post|opening|at)\b|cover\s+letter\s+(?:for|to)\b|draft\s+.*?outreach\s+(?:to|for)\b|linkedin\.com\/jobs|write\s+.*?cover\s+letter\b|message\s+.*?(?:and|plus)\s+cover\s+letter\b)/i,
   // Job application workflow — Phase B (clarification reply; Python validates state file exists)
   /^(?:[1-3]|both|outreach(?:\s+only)?|cover(?:\s+letter)?(?:\s+only)?|message(?:\s+only)?)(?:\s+.{0,120})?$/i,
+  // Content draft / revise — shared wiki + channel rules (cli.py parse → content_draft.py)
+  /(?:^|\n)(?:lyra\s+)?content\s+draft\s+(?:x|outreach|generic)\b/i,
+  /(?:^|\n)(?:lyra\s+)?content\s+revise\s+(?:x|outreach|generic)\b/i,
 ];
 
 const CRUD_CLI = "/root/lyra-ai/crud/cli.py";
