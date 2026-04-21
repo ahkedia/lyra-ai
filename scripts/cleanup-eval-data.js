@@ -11,9 +11,27 @@
  */
 
 import https from 'https';
+import { execFileSync } from 'child_process';
+import { readFileSync, existsSync } from 'fs';
 
 const NOTION_VERSION = '2025-09-03';
 const DRY_RUN = !process.argv.includes('--apply');
+
+// Load /root/.openclaw/.env if running on the server and the var isn't already
+// in the environment. Before this fix, the cleanup script was silently doing
+// nothing because NOTION_API_KEY was never set. (Root cause of eval pollution
+// persisting across runs.)
+if (!process.env.NOTION_API_KEY) {
+  const envPath = '/root/.openclaw/.env';
+  if (existsSync(envPath)) {
+    for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+      const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/);
+      if (m && !process.env[m[1]]) {
+        process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+      }
+    }
+  }
+}
 
 function uuidWithDashes(raw) {
   const hex = String(raw).replace(/[^a-fA-F0-9]/g, '');
@@ -216,11 +234,64 @@ async function main() {
   }
 
   console.log('\n' + '='.repeat(40));
-  console.log(`Total found: ${totalFound}`);
+  console.log(`Total pages found: ${totalFound}`);
+  if (!DRY_RUN) {
+    console.log(`Total pages archived: ${totalArchived}`);
+  }
+
+  // --- Cron cleanup ---------------------------------------------------------
+  // Every cron created during an eval run has sessionKey prefixed with `eval-`
+  // (see runner.js: sessionKey = `eval-${RUN_ID}-${id}`). That's the
+  // definitive eval-provenance marker — no pattern matching required.
+  console.log('\nScanning openclaw crons for eval-spawned jobs...');
+  let cronList = null;
+  try {
+    const raw = execFileSync('openclaw', ['cron', 'list', '--json'], {
+      timeout: 15000,
+      encoding: 'utf8',
+    });
+    cronList = JSON.parse(raw);
+  } catch (err) {
+    console.error(`  Could not list crons (openclaw CLI unavailable?): ${err.message}`);
+  }
+
+  let cronsFound = 0;
+  let cronsRemoved = 0;
+  if (cronList) {
+    const evalCrons = (cronList.jobs || []).filter((j) => {
+      const sk = String(j.sessionKey || '');
+      return sk.includes(':eval-') || sk.startsWith('eval-');
+    });
+
+    if (evalCrons.length === 0) {
+      console.log('  No eval-spawned crons found.');
+    } else {
+      console.log(`  Found ${evalCrons.length} eval-spawned crons:`);
+      cronsFound = evalCrons.length;
+      for (const job of evalCrons) {
+        const desc = job.description || job.name;
+        console.log(`    - "${job.name}" (${job.id}) — sessionKey=${job.sessionKey}`);
+        if (desc && desc !== job.name) console.log(`      note: ${desc}`);
+        if (!DRY_RUN) {
+          try {
+            execFileSync('openclaw', ['cron', 'remove', job.id], {
+              timeout: 15000,
+              stdio: ['ignore', 'ignore', 'pipe'],
+            });
+            cronsRemoved++;
+            console.log('      ✓ Removed');
+          } catch (err) {
+            console.log(`      ✗ Failed: ${err.message}`);
+          }
+        }
+      }
+    }
+  }
+
+  console.log('\n' + '='.repeat(40));
+  console.log(`Summary: pages=${totalFound}${DRY_RUN ? '' : `/${totalArchived} archived`}, crons=${cronsFound}${DRY_RUN ? '' : `/${cronsRemoved} removed`}`);
   if (DRY_RUN) {
-    console.log(`\nTo archive these pages, run: node scripts/cleanup-eval-data.js --apply`);
-  } else {
-    console.log(`Total archived: ${totalArchived}`);
+    console.log(`\nTo apply, re-run with: node scripts/cleanup-eval-data.js --apply`);
   }
 }
 
