@@ -181,7 +181,7 @@ function buildArchitecture() {
       version: 'v2026.3.13',
     },
     models: {
-      default: 'MiniMax M2.5',
+      default: 'MiniMax M2.7',
       fallback: 'Claude Haiku 4.5',
       escalation: 'Claude Sonnet 4.6',
     },

@@ -274,7 +274,7 @@ Two users → one gateway → 4-tier routing → 13 Notion databases
 | Tier | Model | Use case | Cost |
 |------|-------|----------|------|
 | 0 | Python (no LLM) | CRUD ops | $0 |
-| 1 | MiniMax M2.5 | Most requests | $0.0001 |
+| 1 | MiniMax M2.7 | Most requests | $0.0001 |
 | 2 | Claude Haiku | Reasoning tasks | $0.0005 |
 | 3 | Claude Sonnet | Complex synthesis | ~$0.01 |
 

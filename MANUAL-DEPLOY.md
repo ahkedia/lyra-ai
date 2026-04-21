@@ -64,7 +64,7 @@ Create the .env file:
 cat > /opt/lyra-agent/.env << 'EOF'
 # LLM Configuration
 MINIMAX_API_KEY=sk-cp-7JYMSMXn4fPEn-MXB3IZEqBQ1GbbMMIE4aH_-Idfv9fTGiYQ-nwpl200hhG0Xm9Gye0LWNfBf0rEvMelcjhvVZXDNcQe18yvlu0c55Jq6yp5T-Wn9sBegLA
-OPENCLAW_MODEL=minimax/minimax-m2-5
+OPENCLAW_MODEL=minimax/MiniMax-M2.7
 
 # Telegram Configuration
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here

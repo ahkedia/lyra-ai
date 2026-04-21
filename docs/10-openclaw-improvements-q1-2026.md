@@ -109,7 +109,7 @@ Based on latest OpenClaw releases (v2026.3.7 to v2026.3.13), here are the improv
 
 **What changed:** Official support for GPT-5.4, Gemini 2 Pro, Claude 3.5 updates.
 
-**Current Lyra setup:** MiniMax M2.5 primary, Claude Sonnet fallback.
+**Current Lyra setup:** MiniMax M2.7 primary, Claude Sonnet fallback.
 
 **Opportunity:**
 

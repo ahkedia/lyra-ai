@@ -10,7 +10,7 @@
 #
 # Reads from: logs/routing-decisions.jsonl
 # Cost rates per message (approximate):
-#   MiniMax M2.5:    $0.0001/msg
+#   MiniMax M2.7:    $0.0001/msg
 #   Claude Haiku:    $0.001/msg
 #   Claude Sonnet:   $0.01/msg
 

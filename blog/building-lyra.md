@@ -62,7 +62,7 @@ When you hire someone, you don't hand them the keys to everything on day one. Yo
 
 **The access levels** are explicit. I get full access to all 13 databases. Abhigna gets household databases only — health, meals, trips, shopping, shared reminders. The boundary isn't a suggestion in a prompt. It's structural: Abhigna's queries physically cannot retrieve my professional databases because the retrieval path doesn't include them.
 
-**The escalation policy** is: handle it yourself unless it needs real judgment. Lyra's default model is MiniMax M2.5 — fast, cheap, handles 90% of requests. When she detects something that needs synthesis or nuance, she routes to Claude Sonnet. She doesn't try and fail first. She routes correctly from the start.
+**The escalation policy** is: handle it yourself unless it needs real judgment. Lyra's default model is MiniMax M2.7 — fast, cheap, handles 90% of requests. When she detects something that needs synthesis or nuance, she routes to Claude Sonnet. She doesn't try and fail first. She routes correctly from the start.
 
 This is the same mental model I apply to product teams: context before access, escalation before failure. The agent — like the hire — is only as good as the system it operates in.
 

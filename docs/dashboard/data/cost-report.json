@@ -4,7 +4,7 @@
     "plan": "Coding Plan ($9.99/mo)",
     "daily_plan_cost_usd": 0.333,
     "coding_plan_quota": {
-      "model": "MiniMax-M2.5",
+      "model": "MiniMax-M2.7",
       "used": 1247,
       "total": 1500,
       "remaining": 253,

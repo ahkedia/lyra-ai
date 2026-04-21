@@ -33,7 +33,7 @@ services:
     environment:
       # LLM Configuration
       - MINIMAX_API_KEY=${MINIMAX_API_KEY}
-      - OPENCLAW_MODEL=minimax/minimax-m2-5
+      - OPENCLAW_MODEL=minimax/MiniMax-M2.7
 
       # Agent Configuration
       - OPENCLAW_WORKSPACE=/home/openclaw/workspace

@@ -172,8 +172,8 @@ function renderModelRouting(mc, costReport) {
         </div>
         <div class="funnel-meta">
           <div class="funnel-model">
-            <span class="funnel-model-badge mm">M2.5</span>
-            <span class="funnel-model-name">MiniMax M2.5</span>
+            <span class="funnel-model-badge mm">M2.7</span>
+            <span class="funnel-model-name">MiniMax M2.7</span>
           </div>
           <div class="funnel-stats">
             <span class="funnel-rate">${mmRate}%</span>
