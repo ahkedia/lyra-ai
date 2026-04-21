@@ -7,7 +7,7 @@ description: Edit Lyra's own config, memory, and personality files from Telegram
 
 You have permission to modify your own workspace files when Akash instructs you to. This is how you stay up to date and improve without needing Cursor every time.
 
-After you propose an edit and Akash says **do it** / **yes** / **now**, complete the **`read` → `write`** (or append) **in that same turn**—see **`skills/reliable-execution/SKILL.md`** and **SOUL.md** (Task execution).
+After you propose an edit and Akash says **do it** / **yes** / **now**, complete the **`read` → `write`** (or append) **in that same turn**—see **`skills/reliable-execution/SKILL.md`** and **SOUL.md** (Execution & chat UX).
 
 ## Your Files and What They Control
 

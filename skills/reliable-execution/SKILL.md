@@ -1,11 +1,11 @@
 ---
 name: reliable-execution
-description: Complete multi-step tasks after approval; avoid empty "Let me…" messages; never leak raw JSON parse errors to Telegram. Use when Akash says "do it" after you proposed steps, or when execution feels stuck.
+description: Complete approved work in the same turn—no hollow "I'll update" replies; never paste JSON parse noise to chat. Use on "do it" or stuck runs.
 ---
 
 # Reliable execution
 
-Canonical rules live in **`config/SOUL.md`** — sections **Task execution & follow-through** and **User-facing errors (Telegram)**.
+Canonical rules live in **`config/SOUL.md`** → **Execution & chat UX**.
 
 ## Checklist
 1. Akash approved → run tools **in the same turn** (read → write/edit or one allowed command) before saying "Done."
