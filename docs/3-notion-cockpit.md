@@ -12,6 +12,8 @@ Notion is not a filing cabinet — it is the live state of everything. Lyra read
 | Competitor Tracker | Weekly updates on competitors, relevance-tagged | Personal |
 | Content Ideas | Post and article ideas with status | Personal |
 | Content Drafts | Drafts in progress with platform and schedule | Personal |
+| Topic Library | Visible pool of Lenny-derived topic candidates | Personal |
+| Weekly Shortlist | Small weekly queue selected from Topic Library | Personal |
 | Second Brain | Voice-captured thoughts, decisions, insights, patterns | Personal |
 | Health & Meds | Daily logs, supplements, sleep, workouts | Shared |
 | Meal Planning | Weekly meal plans and grocery lists | Shared |
@@ -60,6 +62,21 @@ Status options: `Idea`, `Drafting`, `Ready`, `Published`
 ```
 Draft (title) | Platform (select) | Status (select) | Content (rich_text)
 Target date (date) | Scheduled Date (date) | Notes (rich_text) | Performance (rich_text)
+```
+
+### Topic Library
+```
+Name (title, topic) | Topic Key (rich_text) | Status (select) | Pillar (select)
+Angle Type (select) | Source Count (number) | Primary Source (rich_text)
+One-Line Thesis (rich_text) | Why Now (rich_text) | Candidate Format (select)
+Score (number) | Selected This Week (checkbox) | Notes (rich_text)
+```
+
+### Weekly Shortlist
+```
+Name (title, topic) | Topic Key (rich_text) | Week (date) | Recommendation Rank (number)
+Selection Reason (rich_text) | Chosen By (select) | Advance To Content Ideas (checkbox)
+Status (select) | Candidate Format (select) | Content Idea URL (url) | Notes (rich_text)
 ```
 
 ### Second Brain

@@ -2,6 +2,14 @@
 
 Analyze bookmarked tweets and generate 3-style content bytes + Claude setup improvement suggestions.
 
+## When to use / when not
+| Use this skill | Use something else |
+|----------------|-------------------|
+| You have **bookmark JSON** from `fetch-twitter-bookmarks.sh` (e.g. `/tmp/lyra-bookmarks-*.json`) and need **workflow classification** + Notion writes per below | Ad-hoc “what did X tweet” without a batch JSON file → web/Tavily path in `references/web_search.md`, not this pipeline |
+| Batch **synthesis** (themes, bytes, Notion **Twitter Insights**) | Changing SOUL/access rules — follow `config/SOUL.md`; user edits in Notion **override** your classifications |
+
+**Ground truth:** If the user fixes a row in Notion (workflow, tags, etc.), treat that as authoritative going forward.
+
 ## FrontMatter
 
 ```yaml

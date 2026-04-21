@@ -55,13 +55,13 @@ You register a small “app” on X, prove who you are once in the browser, and 
 
 X does not give you a long-lived refresh token until you **authorize the app once**.
 
-1. **Easiest:** from your `lyra-ai` clone, run `./scripts/get-twitter-oauth-refresh-token.sh` after setting `TWITTER_CLIENT_ID` and `TWITTER_CLIENT_SECRET` (see **[`skills/twitter-bookmarks/oauth-setup.md`](../skills/twitter-bookmarks/oauth-setup.md)** Option A).
-2. That flow does roughly:
+1. Pick **one** path — **[`oauth-setup.md`](../skills/twitter-bookmarks/oauth-setup.md)** Option A (terminal `exchange`) or **Option B** (Postman for the token `POST` only; still run `start` + browser first).
+2. **What happens in both paths:**
    - Build an **authorize URL** with your Client ID, redirect URI, scopes, and PKCE.
    - Open it in the browser → log in → **Authorize**.
    - X redirects to `http://localhost:3000/auth/callback?code=...` (the page may “error” if nothing listens on 3000 — **that is OK**).
    - Copy the **`code`** from the address bar.
-   - Exchange `code` for tokens using `POST` to `https://oauth2.twitter.com/2/oauth2/token` (see oauth-setup for exact body).
+   - Exchange `code` for tokens using `POST` to `https://oauth2.twitter.com/2/oauth2/token` (Option A: helper script; Option B: Postman + fields from `pkce-state.json` — see oauth doc).
 3. From the JSON response, save **`refresh_token`** (long string). That is what the server uses from then on.
 
 If anything says **invalid_grant** or **code expired**, run the browser step again and use the new `code` within a few minutes.

@@ -99,16 +99,19 @@ node scripts/gcal-helper.js delete --event-id "abc123" --calendar primary
 3. Enable **Google Calendar API**
 4. Create OAuth 2.0 credentials (Desktop app type)
 5. Download the client ID and secret
-6. Add to `.env`:
+6. Add to OpenClaw env (`~/.openclaw/.env` on local installs, `/root/.openclaw/.env` on VPS):
    ```
    GOOGLE_CLIENT_ID=your_client_id
    GOOGLE_CLIENT_SECRET=your_client_secret
+   # Optional override if needed:
+   # GOOGLE_REDIRECT_URI=http://127.0.0.1:53682/oauth2callback
    ```
 7. Run the auth script to get a refresh token:
    ```bash
    node scripts/gcal-auth.js
    ```
-8. Follow the URL, authorize, paste the code. The script saves `GOOGLE_REFRESH_TOKEN` to `.env`.
+8. Follow the URL, authorize, and paste either the code or the full redirected URL.  
+   The script saves `GOOGLE_REFRESH_TOKEN` to the detected env file.
 
 ## After Adding/Updating an Event
 
