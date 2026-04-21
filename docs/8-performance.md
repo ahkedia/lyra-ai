@@ -76,15 +76,15 @@ Update SOUL.md to reference `~/.openclaw/references/notion.md` instead.
 
 `AGENTS.md`, `IDENTITY.md`, `TOOLS.md`, `USER.md` are OpenClaw system templates with generic instructions. Replace with tight, purpose-specific versions. The default AGENTS.md alone has full sections on Discord formatting, group chat emoji reactions, and TTS voice storytelling — none of which apply.
 
-### 5. Switch default model to MiniMax M2.5
+### 5. Switch default model to MiniMax M2.7
 
-OpenClaw defaults to Sonnet. For ~87% of Lyra's tasks — reminders, Notion writes, weather, quick replies — MiniMax M2.5 is sufficient and dramatically cheaper.
+OpenClaw defaults to Sonnet. For ~87% of Lyra's tasks — reminders, Notion writes, weather, quick replies — MiniMax M2.7 is sufficient and dramatically cheaper.
 
 ```json
 {
   "agents": {
     "defaults": {
-      "model": "minimax/minimax-m2-5"
+      "model": "minimax/MiniMax-M2.7"
     }
   }
 }
@@ -96,7 +96,7 @@ OpenClaw defaults to Sonnet. For ~87% of Lyra's tasks — reminders, Notion writ
 
 Not all tasks are equal. A rule-based classifier + LLM fallback routes each message to the cheapest capable model. See `config/routing-rules.yaml` and `scripts/model-router.js`.
 
-### MiniMax M2.5 (default, ~87% of tasks)
+### MiniMax M2.7 (default, ~87% of tasks)
 - Single-action commands: add reminder, write to Notion, check weather
 - Lookups: query database, check calendar
 - Quick replies, status confirmations, simple Q&A

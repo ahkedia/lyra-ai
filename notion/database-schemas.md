@@ -86,6 +86,56 @@ Drafts in progress with scheduling.
 
 ---
 
+### Topic Library
+
+Visible inventory of Lenny-derived topics before they become execution candidates.
+
+| Property | Type | Options |
+|----------|------|---------|
+| Name | title (topic) | — |
+| Topic Key | rich_text | — |
+| Status | select | Backlog, Curated, Selected, Rejected, Archived |
+| Pillar | select | AI Product, Product Strategy, Growth/Distribution, Operator Lessons, Build in Public |
+| Angle Type | select | ai_update, operator_disagreement, growth_system, builder_workflow, reference_to_claim |
+| Source Count | number | — |
+| Primary Source | rich_text | — |
+| Supporting Sources | rich_text | — |
+| One-Line Thesis | rich_text | — |
+| Why Now | rich_text | — |
+| Proof From Me Prompt | rich_text | — |
+| Candidate Format | select | Post, Thread, Essay |
+| Score | number | — |
+| Reviewed Week | date | — |
+| Selected This Week | checkbox | — |
+| Notes | rich_text | — |
+
+**How Lyra uses it:** This is the visible 50-ish topic pool. Agents can refresh computed fields and scores, while Akash can manually curate, select, reject, or archive rows without touching code.
+
+---
+
+### Weekly Shortlist
+
+Explicit weekly queue pulled from Topic Library before promotion into Content Ideas.
+
+| Property | Type | Options |
+|----------|------|---------|
+| Name | title (topic) | — |
+| Topic Key | rich_text | — |
+| Week | date | — |
+| Recommendation Rank | number | — |
+| Selection Reason | rich_text | — |
+| Chosen By | select | Agent, Akash, Both |
+| Advance To Content Ideas | checkbox | — |
+| Status | select | Queued, Approved for Idea, Skipped, Merged |
+| Topic Library Page ID | rich_text | — |
+| Candidate Format | select | Post, Thread, Essay |
+| Content Idea URL | url | — |
+| Notes | rich_text | — |
+
+**How Lyra uses it:** Agents or Akash can create a small weekly review queue here. Only rows explicitly approved move onward into Content Ideas.
+
+---
+
 ### Second Brain
 
 The long-term knowledge capture database. See [`docs/5-second-brain.md`](../docs/5-second-brain.md) for full details.
