@@ -7,6 +7,7 @@
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { execFileSync } from 'child_process';
 import https from 'https';
 import YAML from 'yaml';
 import { runValidators } from './validators.js';
@@ -131,13 +132,25 @@ function deriveEvalLane(testCase) {
  * @param {string|null} sessionKey - Session key for multi-turn conversations
  * @param {boolean} dryRun - If true, prepends EVAL MODE prefix to prevent writes
  */
+// Prepended to every eval prompt when dryRun=true. The server ignores the
+// `dryRun` opts flag (no handler in plugins/scripts), so the only reliable
+// way to prevent writes is to tell the LLM in the prompt itself.
+const EVAL_DRY_RUN_PREFIX =
+  '[EVAL MODE — read-only dry run. Do NOT create, update, or archive any ' +
+  'Notion pages, cron jobs, scheduled tasks, reminders, calendar events, ' +
+  'emails, or external writes. Do NOT call any tool whose effect persists ' +
+  'outside this conversation. Instead, describe exactly what you WOULD do ' +
+  '(which tool, which database, which fields). Read-only tool calls ' +
+  '(list/search/query) are permitted.]\n\n';
+
 async function sendToLyra(message, timeoutMs = 30000, sessionKey = null, dryRun = false) {
   await ensureConnected(); // reconnects if gateway restarted mid-run
   const startTime = Date.now();
   try {
     const opts = { timeout: timeoutMs, dryRun };
     if (sessionKey) opts.sessionKey = sessionKey;
-    const result = await wsClient.chat(message, opts);
+    const payload = dryRun ? EVAL_DRY_RUN_PREFIX + message : message;
+    const result = await wsClient.chat(payload, opts);
     return {
       text: result.text,
       durationMs: result.latencyMs,
@@ -365,6 +378,40 @@ async function runGlobalCleanupSweep() {
     console.log(`[global-cleanup] Archived ${totalArchived} leaked eval pages.`);
   } else {
     console.log('[global-cleanup] No leaked eval data found.');
+  }
+
+  // Cron cleanup — every eval-spawned cron has sessionKey prefixed with
+  // `eval-` (see sendToLyra callers). Definitive provenance marker; no
+  // pattern matching. Catches trip/reminder/research crons the LLM created
+  // in response to eval prompts, which would otherwise keep firing in prod.
+  let cronsRemoved = 0;
+  try {
+    const raw = execFileSync('openclaw', ['cron', 'list', '--json'], {
+      timeout: 15000,
+      encoding: 'utf8',
+    });
+    const parsed = JSON.parse(raw);
+    const evalCrons = (parsed.jobs || []).filter((j) => {
+      const sk = String(j.sessionKey || '');
+      return sk.includes(':eval-') || sk.startsWith('eval-');
+    });
+    for (const job of evalCrons) {
+      try {
+        execFileSync('openclaw', ['cron', 'remove', job.id], {
+          timeout: 15000,
+          stdio: ['ignore', 'ignore', 'pipe'],
+        });
+        cronsRemoved++;
+        console.log(`  [global-cleanup] Removed eval cron: ${job.name} (${job.id})`);
+      } catch (err) {
+        console.warn(`  [global-cleanup] Failed to remove cron ${job.id}: ${err.message}`);
+      }
+    }
+  } catch (err) {
+    console.warn(`  [global-cleanup] Cron sweep skipped: ${err.message}`);
+  }
+  if (cronsRemoved > 0) {
+    console.log(`[global-cleanup] Removed ${cronsRemoved} leaked eval crons.`);
   }
 }
 
