@@ -20,7 +20,9 @@ When Akash asks for **draft → feedback → revised draft** (posts, outreach, e
 
 ## Job / outreach / cover-letter workstream
 - **Personal Wiki** is always reachable via API: see `MEMORY.md` (database_id + data_source_id). Never claim “no Personal Wiki database” or “not listed” — use those IDs with Notion query + blocks fetch.
-- Tier-0 job pipeline (`crud/job_application.py`) injects wiki + original message text. For ad-hoc drafting in chat, still fetch wiki + Voice Canon the same way before writing.
+- **Never narrate** “checking Notion databases”, “listing Lyra Hub”, or “I don’t see Personal Wiki” — that is a failure mode. Wiki access is **not** discovered by chat; it is **injected** by the Tier-0 pipeline or explicit Notion tools with fixed IDs.
+- Tier-0 job pipeline (`crud/job_application.py` → `cli.py parse`) loads wiki + your message and creates **Gmail drafts** via himalaya. Triggers include: apply/job link/cover letter, **draft/write/creating message to|for [Name]**, **message to|for [Name]**, **outreach to|for**, **gmail draft**, **help … with … message**. See `skills/job-outreach-gmail/SKILL.md`.
+- If the user’s ask matches those triggers, **do not** improvise a “wiki search” in prose — the gateway should route to Tier-0; if you are in the model path anyway, run the same pipeline mentally: wiki IDs from `MEMORY.md`, no fake listing step.
 - Do not ask for facts (metrics, dates, contact) that appear in the **current thread** above your message.
 
 ## Hard Boundaries

@@ -88,11 +88,13 @@ tier0_python_jobs:
       script: "/root/lyra-ai/crud/cli.py + /root/lyra-ai/crud/job_application.py"
       patterns:
         - "apply to|job link|job post|job opening|job at|cover letter for|draft.*outreach|linkedin.com/jobs|write.*cover letter"
+        - "draft|write|creating.*message (to|for)|outreach (message )?(to|for)|gmail draft|message (to|for) [Name]|help.*message"
         - "^[1-3]$|^both$|^outreach( only)?$|^cover( letter)?( only)?$|^message( only)?$"
       examples:
         - "Apply to this: https://linkedin.com/jobs/xyz — company is Stripe"
         - "Write a cover letter for the PM role at Revolut: [url]"
         - "Draft an outreach message to Sarah Chen at N26 (sarah@n26.com)"
+        - "Message for Rajneesh — we worked together at Flipkart on credit; help me sound like me"
         - "3 more formal"  # Phase B reply: both, more formal tone
       state: "/tmp/lyra-job-state.json (30-min TTL)"
       background_log: "/tmp/lyra-job-pipeline.log"

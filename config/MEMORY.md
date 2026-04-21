@@ -76,6 +76,7 @@ Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not i
 ## Personal Wiki & content revision
 - **Wiki IDs:** database_id `33d78008-9100-8183-850d-e7677ac46b63`, data_source_id `33d78008-9100-8197-9f0f-000b205edfe8`. Prefer `POST /v1/databases/{database_id}/query`, then `GET /blocks/{page_id}/children`. Voice Canon: filter `Type` = `Voice Canon`.
 - Never claim the wiki is “not listed” without having queried with these IDs.
+- **Job/outreach Tier-0:** expanded triggers include `draft message for [Name]`, `message for [Name]`, `outreach to [Name]`, `gmail draft`, `help me with a message` — see `crud/job_application.py` `_JOB_TRIGGER_RE` and `skills/job-outreach-gmail/SKILL.md`.
 - After draft feedback, re-apply Voice Canon + channel rules (`config/SOUL.md`, `skills/content-revision/SKILL.md`).
 
 ## Personal Context
