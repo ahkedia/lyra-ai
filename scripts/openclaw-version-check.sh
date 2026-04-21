@@ -35,6 +35,23 @@ send_telegram() {
 
 log "=== openclaw version check ==="
 
+# Poll /health until ok or timeout (OpenClaw 2026.4.x can take 30–45s after start).
+wait_for_gateway_health() {
+    local max_wait="${1:-90}"
+    local elapsed=0
+    while [ "$elapsed" -lt "$max_wait" ]; do
+        local HEALTH HEALTHY
+        HEALTH=$(curl -s --max-time 10 http://localhost:18789/health 2>/dev/null || echo '{}')
+        HEALTHY=$(echo "$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('ok') or d.get('status')=='live' else 'no')" 2>/dev/null || echo "no")
+        if [ "$HEALTHY" = "yes" ]; then
+            return 0
+        fi
+        sleep 3
+        elapsed=$((elapsed + 3))
+    done
+    return 1
+}
+
 # ── Step 1: Get versions ──
 INSTALLED=$(openclaw --version 2>/dev/null | grep -oP '\d{4}\.\d+\.\d+[-\w]*' | head -1 || echo "unknown")
 LATEST=$(npm show openclaw version 2>/dev/null | tr -d ' \n' || echo "unknown")
@@ -80,7 +97,7 @@ This takes ~30 seconds. Gateway will restart."
 systemctl stop openclaw 2>/dev/null || true
 sleep 3
 
-# Install new version
+# Install new version (in-place; occasionally leaves a broken tree on npm — see clean reinstall below)
 npm install -g "openclaw@$LATEST" >> "$LOG_FILE" 2>&1
 UPGRADED_VERSION=$(openclaw --version 2>/dev/null | grep -oP '\d{4}\.\d+\.\d+[-\w]*' | head -1 || echo "unknown")
 
@@ -91,11 +108,26 @@ rm -rf /var/tmp/openclaw-compile-cache/* 2>/dev/null || true
 
 # Restart gateway
 systemctl start openclaw 2>/dev/null || true
-sleep 10
 
-# ── Step 4: Verify ──
-HEALTH=$(curl -s --max-time 10 http://localhost:18789/health 2>/dev/null || echo '{}')
-HEALTHY=$(echo "$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('ok') or d.get('status')=='live' else 'no')" 2>/dev/null || echo "no")
+# ── Step 4: Verify (poll — gateway often needs 30–45s to become live)
+HEALTHY="no"
+if wait_for_gateway_health 90; then
+    HEALTHY="yes"
+else
+    log "Health not OK after in-place install — trying clean global reinstall of $LATEST"
+    systemctl stop openclaw 2>/dev/null || true
+    sleep 2
+    npm uninstall -g openclaw >> "$LOG_FILE" 2>&1 || true
+    rm -rf /usr/lib/node_modules/openclaw
+    npm install -g "openclaw@$LATEST" >> "$LOG_FILE" 2>&1
+    UPGRADED_VERSION=$(openclaw --version 2>/dev/null | grep -oP '\d{4}\.\d+\.\d+[-\w]*' | head -1 || echo "unknown")
+    log "Post-clean-reinstall version: $UPGRADED_VERSION"
+    rm -rf /var/tmp/openclaw-compile-cache/* 2>/dev/null || true
+    systemctl start openclaw 2>/dev/null || true
+    if wait_for_gateway_health 90; then
+        HEALTHY="yes"
+    fi
+fi
 
 log "Post-upgrade health check: $HEALTHY"
 
@@ -139,9 +171,10 @@ else
     log "ERROR: Gateway unhealthy after upgrade — attempting rollback to $INSTALLED"
     npm install -g "openclaw@$INSTALLED" >> "$LOG_FILE" 2>&1 || true
     systemctl restart openclaw 2>/dev/null || true
-    sleep 10
-    ROLLBACK_HEALTH=$(curl -s --max-time 10 http://localhost:18789/health 2>/dev/null || echo '{}')
-    ROLLBACK_OK=$(echo "$ROLLBACK_HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('ok') or d.get('status')=='live' else 'no')" 2>/dev/null || echo "no")
+    ROLLBACK_OK="no"
+    if wait_for_gateway_health 90; then
+        ROLLBACK_OK="yes"
+    fi
 
     if [ "$ROLLBACK_OK" = "yes" ]; then
         send_telegram "⚠️ *Lyra — openclaw upgrade failed, rolled back*

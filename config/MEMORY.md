@@ -20,6 +20,7 @@
 _Add one line: date, symptom, fix / pointer to PR or skill change._
 
 - **2026-04-21 — Telegram raw JSON parse errors** (`Expected ',' or ']' at position N`): gateway/session or tool payload occasionally surfaces V8-style parse messages to chat. **SOUL** forbids pasting those raw; prefer shorter replies, smaller file edits, or a fresh thread. Persistent → check `journalctl -u openclaw` on Hetzner.
+- **2026-04-21 — openclaw upgraded Hetzner** `2026.4.11` → **`2026.4.20`**. First `npm install -g` left broken `node_modules` (missing `zod`/dist chunks); fixed with **clean** uninstall + `rm -rf /usr/lib/node_modules/openclaw` + reinstall. Weekly script `scripts/openclaw-version-check.sh` now **polls health up to 90s** and retries **clean reinstall** before rollback.
 
 ## Notion
 Read `references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b935-dc1810971e87`
