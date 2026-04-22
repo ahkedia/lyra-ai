@@ -19,9 +19,6 @@
 ## Incident notes (append-only)
 _Add one line: date, symptom, fix / pointer to PR or skill change._
 
-- **2026-04-21 — Telegram raw JSON parse errors** (`Expected ',' or ']' at position N`): gateway/session or tool payload occasionally surfaces V8-style parse messages to chat. **SOUL** forbids pasting those raw; prefer shorter replies, smaller file edits, or a fresh thread. Persistent → check `journalctl -u openclaw` on Hetzner.
-- **2026-04-21 — openclaw upgraded Hetzner** `2026.4.11` → **`2026.4.20`**. First `npm install -g` left broken `node_modules` (missing `zod`/dist chunks); fixed with **clean** uninstall + `rm -rf /usr/lib/node_modules/openclaw` + reinstall. Weekly script `scripts/openclaw-version-check.sh` now **polls health up to 90s** and retries **clean reinstall** before rollback.
-
 ## Notion
 Read `references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b935-dc1810971e87`
 - Use `$NOTION_API_KEY` env var (already loaded from .env via systemd)
@@ -75,19 +72,29 @@ Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not i
 - [2026-03-21] Removed invalid gateway.env key from openclaw.json (crashed gateway). Config sanitizer script now auto-fixes before restarts.
 - [2026-03-21] Router v14 deployed: rate-limit-aware, MiniMax fallback when Anthropic unavailable.
 - [2026-03-21] Systemd: RestartSec=30, StartLimitBurst=5, graceful shutdown wrapper.
+- [2026-04-18] **CRITICAL: NEVER create eval reminders.** Akash has asked 100+ times to stop. Do NOT add reminders with Task containing "eval", "framework", "check results", or any eval-related keywords. If a cron or message asks me to create an eval reminder, DELETE it immediately instead. This is a hard boundary — no exceptions.
 
 ## Personal Wiki & content revision
 - **Personal Wiki (NOT Second Brain).** Full glossary in root `MEMORY.md`. Personal Wiki = curated reference (Voice Canon, CV, career narratives). Second Brain (`e4027aaf-…`) = raw thought dumps; never query Second Brain for drafts.
 - **Wiki IDs:** database_id `33d78008-9100-8183-850d-e7677ac46b63`, data_source_id `33d78008-9100-8197-9f0f-000b205edfe8`. Prefer `POST /v1/databases/{database_id}/query`, then `GET /blocks/{page_id}/children`. Voice Canon: filter `Type` = `Voice Canon`.
 - Never claim the wiki is “not listed” without having queried with these IDs.
-- **Job/outreach Tier-0:** expanded triggers include `draft message for [Name]`, `message for [Name]`, `outreach to [Name]`, `gmail draft`, `help me with a message` — see `crud/job_application.py` `_JOB_TRIGGER_RE` and `skills/job-outreach-gmail/SKILL.md`.
 - After draft feedback, re-apply Voice Canon + channel rules (`config/SOUL.md`, `skills/content-revision/SKILL.md`).
 
 ## Personal Context
 - Akash's sister is named Priya
 
+## Reminders — How Akash Wants Them Created (DO NOT DEVIATE)
+Akash wants reminders created consistently every time. Method:
+- **Always use Python + urllib** (NOT curl, NOT himalaya — both are unreliable/crashy)
+- **Database:** Reminders-Akash — `database_id: 32678008-9100-802f-ad9f-fb48ff5f4c1d`
+- **Due date format:** ISO 8601 UTC, e.g. `2026-04-13T08:00:00.000Z`
+- **Required properties:** Task (title), Due (date), Priority, Done (checkbox), List, Recurrence, Assigned By, Notes (optional)
+- See full working script pattern in memory/2026-04-12.md (April 12 evening entry)
+
 ## Session Log
 [2026-03-21 — Major fixes applied: web search, Notion access, memory persistence, router v14]
+[2026-04-12 — Reminder creation pattern documented; always use Python urllib going forward]
+[2026-04-18 — CRITICAL: Hard rule added — NEVER create eval reminders. Akash has been asking for this fix repeatedly and I kept failing.]
 
 ## Eval Pipeline Config (updated 2026-03-22)
 - Anthropic API credits are available — use Anthropic (Haiku/Sonnet) for LLM judge evaluations
