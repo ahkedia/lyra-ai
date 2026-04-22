@@ -13,10 +13,24 @@
 
 import { execFileSync } from "child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
-import { dirname } from "path";
+import { dirname, join as pathJoin } from "path";
+import { fileURLToPath } from "url";
 
 const ABHIGNA_ID = "5003298152";
-const LOG_PATH = process.env.LYRA_ROUTING_LOG_PATH || "/root/lyra-ai/logs/routing-decisions.jsonl";
+
+const _pluginDir = dirname(fileURLToPath(import.meta.url));
+const _repoRoot = pathJoin(_pluginDir, "..", "..");
+
+function resolveLogPath() {
+  if (process.env.LYRA_ROUTING_LOG_PATH) return process.env.LYRA_ROUTING_LOG_PATH;
+  const serverLogs = "/root/lyra-ai/logs/routing-decisions.jsonl";
+  if (existsSync(dirname(serverLogs))) return serverLogs;
+  return pathJoin(_repoRoot, "logs", "routing-decisions.jsonl");
+}
+
+/** Resolved path used for routing JSONL (CLI/evals and plugin). */
+export const ROUTING_DECISIONS_LOG = resolveLogPath();
+const LOG_PATH = ROUTING_DECISIONS_LOG;
 const LOG_DIR = dirname(LOG_PATH);
 const POLICY_VERSION = process.env.LYRA_ROUTING_POLICY_VERSION || "routing_thresholds_v1";
 const THRESHOLD_SET = process.env.LYRA_ROUTING_THRESHOLD_SET || "routing_thresholds_v1";
@@ -115,7 +129,14 @@ const TIER0_PATTERNS = [
   /(?:^|\n)(?:lyra\s+)?content\s+revise\s+(?:x|outreach|generic)\b/i,
 ];
 
-const CRUD_CLI = "/root/lyra-ai/crud/cli.py";
+function resolveCrudCli() {
+  if (process.env.LYRA_CRUD_CLI) return process.env.LYRA_CRUD_CLI;
+  const serverCrud = "/root/lyra-ai/crud/cli.py";
+  if (existsSync(serverCrud)) return serverCrud;
+  return pathJoin(_repoRoot, "crud", "cli.py");
+}
+
+const CRUD_CLI = resolveCrudCli();
 const SONNET_ALLOWLIST = [
   /\b(?:weekly review|brain brief|competitor digest|content strategy)\b/i,
   /\b(?:trade.?off|pros and cons|priorit(?:ize|ise)|what should i)\b/i,
@@ -160,6 +181,20 @@ function isAnthropicAvailable() {
   if (!anthropicAvailable) return false;
   if (Date.now() - lastAnthropicFailure < ANTHROPIC_COOLDOWN_MS) return false;
   return true;
+}
+
+/** Eval/test harnesses: tier policy without live Anthropic gate. Production uses rate-limit state. */
+function isEvalLikeContext(ctx) {
+  const s = String(ctx?.sender || "");
+  const ch = String(ctx?.channel || "");
+  return s === "eval" || ch === "eval" || s === "test" || ch === "test";
+}
+
+function anthropicAllowedForPolicy(ctx) {
+  if (process.env.LYRA_ROUTING_ASSUME_ANTHROPIC_AVAILABLE === "1") return true;
+  if (process.env.LYRA_ROUTING_ASSUME_ANTHROPIC_AVAILABLE === "0") return false;
+  if (isEvalLikeContext(ctx)) return true;
+  return isAnthropicAvailable();
 }
 
 function markAnthropicFailed() {
@@ -411,24 +446,48 @@ function logDecision(event, ctx, chosen, scores, features, modeState) {
   }
 }
 
-function routeQuery(event, ctx) {
+/**
+ * Single decision path shared by OpenClaw hook (routeQuery) and CLI/evals (routeForCli).
+ * @returns {{ type: 'skip_cron' } | { type: 'tier0', direct: string } | { type: 'haiku_early' } | { type: 'scored', chosen: object, scores: object, features: object, modeState: object }}
+ */
+function resolveRoutingCore(event, ctx) {
   const prompt = event?.prompt || "";
   const sessionKey = ctx?.sessionKey || "";
   const trigger = ctx?.trigger || "";
 
-  // Crons use their own model config
-  if (trigger === "cron" || trigger === "scheduled") return undefined;
+  if (trigger === "cron" || trigger === "scheduled") {
+    return { type: "skip_cron" };
+  }
 
   const tier0 = tryTier0(prompt);
   if (tier0 !== null) {
-    _tier0Result = tier0;
+    return { type: "tier0", direct: tier0 };
+  }
+
+  if (HAIKU_PATTERNS.some((p) => p.test(prompt)) && anthropicAllowedForPolicy(ctx)) {
+    return { type: "haiku_early" };
+  }
+
+  const features = extractFeatures(prompt);
+  const scores = computeScores(features);
+  const modeState = getRoutingMode();
+  const chosen = decideTier(features, scores, sessionKey, modeState);
+  return { type: "scored", chosen, scores, features, modeState };
+}
+
+function routeQuery(event, ctx) {
+  const r = resolveRoutingCore(event, ctx);
+
+  if (r.type === "skip_cron") return undefined;
+
+  if (r.type === "tier0") {
+    _tier0Result = r.direct;
     process.stderr.write("[R] Tier0 hit — bypassing LLM\n");
-    return { __tier0: true, directResponse: tier0 };
+    return { __tier0: true, directResponse: r.direct };
   }
   _tier0Result = null;
 
-  // Tier 1 Haiku: structured tasks that need an LLM but not full Sonnet reasoning
-  if (HAIKU_PATTERNS.some((p) => p.test(prompt)) && isAnthropicAvailable()) {
+  if (r.type === "haiku_early") {
     process.stderr.write("[R] Haiku pattern hit — routing to Haiku\n");
     return {
       providerOverride: MODELS.haiku.providerOverride,
@@ -436,13 +495,11 @@ function routeQuery(event, ctx) {
     };
   }
 
-  const features = extractFeatures(prompt);
-  const scores = computeScores(features);
-  const modeState = getRoutingMode();
-  const chosen = decideTier(features, scores, sessionKey, modeState);
+  const chosen = { ...r.chosen };
+  const { scores, features, modeState } = r;
 
   let route = undefined;
-  if (chosen.tier !== "minimax" && !isAnthropicAvailable()) {
+  if (chosen.tier !== "minimax" && !anthropicAllowedForPolicy(ctx)) {
     chosen.tier = "minimax";
     chosen.reason = "anthropic_unavailable_fallback_minimax";
   }
@@ -455,6 +512,102 @@ function routeQuery(event, ctx) {
 
   logDecision(event, ctx, chosen, scores, features, modeState);
   return route;
+}
+
+/**
+ * Same routing policy as production (plugin), formatted for CLI and eval harnesses.
+ * Sync — no duplicate YAML/LLM path (L-9 split-brain fix).
+ * @param {string} message
+ * @param {{ sessionKey?: string, sender?: string, channel?: string, trigger?: string }} [ctx]
+ */
+export function routeForCli(message, ctx = {}) {
+  const startTime = Date.now();
+  const event = { prompt: message };
+  const r = resolveRoutingCore(event, ctx);
+
+  if (r.type === "skip_cron") {
+    return {
+      model: MODELS.minimax.model,
+      tier: "minimax",
+      category: "cron_skip",
+      confidence: 0,
+      reason: "cron_uses_gateway_config",
+      classifier: "plugin_v16",
+      latency_ms: Date.now() - startTime,
+      policy_version: POLICY_VERSION,
+      threshold_set_id: THRESHOLD_SET,
+      anthropic_call: false,
+    };
+  }
+
+  if (r.type === "tier0") {
+    process.stderr.write("[R] Tier0 hit — bypassing LLM\n");
+    return {
+      model: MODELS.minimax.model,
+      tier: "minimax",
+      category: "tier0_python",
+      confidence: 0.99,
+      reason: "tier0_python_bypass",
+      classifier: "plugin_v16",
+      latency_ms: Date.now() - startTime,
+      policy_version: POLICY_VERSION,
+      threshold_set_id: THRESHOLD_SET,
+      anthropic_call: false,
+    };
+  }
+
+  if (r.type === "haiku_early") {
+    process.stderr.write("[R] Haiku pattern hit — routing to Haiku\n");
+    return {
+      model: MODELS.haiku.model,
+      tier: "haiku",
+      category: "haiku_pattern",
+      confidence: 0.95,
+      reason: "haiku_pattern_fast_path",
+      classifier: "plugin_v16",
+      latency_ms: Date.now() - startTime,
+      policy_version: POLICY_VERSION,
+      threshold_set_id: THRESHOLD_SET,
+      anthropic_call: true,
+    };
+  }
+
+  const chosen = { ...r.chosen };
+  const { scores, features, modeState } = r;
+
+  if (chosen.tier !== "minimax" && !anthropicAllowedForPolicy(ctx)) {
+    chosen.tier = "minimax";
+    chosen.reason = "anthropic_unavailable_fallback_minimax";
+  }
+
+  logDecision(event, ctx, chosen, scores, features, modeState);
+
+  const mapped = MODELS[chosen.tier] || MODELS.minimax;
+  const confidence = Math.max(scores.minimax, scores.haiku, scores.sonnet);
+
+  return {
+    model: mapped.model,
+    tier: chosen.tier,
+    category: chosen.reason,
+    confidence: Number(confidence.toFixed(3)),
+    reason: chosen.reason,
+    classifier: "plugin_v16",
+    latency_ms: Date.now() - startTime,
+    policy_version: POLICY_VERSION,
+    threshold_set_id: THRESHOLD_SET,
+    threshold_mode: modeState.mode,
+    anthropic_call: chosen.tier === "haiku" || chosen.tier === "sonnet",
+    semantic_scores: {
+      minimax: Number(scores.minimax.toFixed(3)),
+      haiku: Number(scores.haiku.toFixed(3)),
+      sonnet: Number(scores.sonnet.toFixed(3)),
+    },
+    rolling: {
+      h24: modeState.roll24h ? { n: modeState.roll24h.n, share: Number(modeState.roll24h.share.toFixed(4)) } : null,
+      d3: modeState.roll3d ? { n: modeState.roll3d.n, share: Number(modeState.roll3d.share.toFixed(4)) } : null,
+      d7: modeState.roll7d ? { n: modeState.roll7d.n, share: Number(modeState.roll7d.share.toFixed(4)) } : null,
+    },
+  };
 }
 
 let patchCount = 0;
