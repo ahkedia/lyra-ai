@@ -807,5 +807,34 @@
       "judge": 12,
       "assertion": 1
     }
+  },
+  {
+    "date": "2026-04-22",
+    "total": 8,
+    "passed": 4,
+    "failed": 4,
+    "pass_rate": 0.5,
+    "avg_latency_ms": 25383,
+    "p95_latency_ms": 90006,
+    "by_tier": {
+      "architectural": {
+        "total": 6,
+        "passed": 4,
+        "pass_rate": 0.67
+      },
+      "showcase": {
+        "total": 2,
+        "passed": 0,
+        "pass_rate": 0
+      }
+    },
+    "capability_pass_rate": 0.5714,
+    "infra_failure_rate": 0.125,
+    "eval_lane": "diagnostic",
+    "failure_breakdown": {
+      "timeout": 1,
+      "judge": 2,
+      "heartbeat_leak": 1
+    }
   }
 ]
