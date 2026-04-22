@@ -21,6 +21,23 @@ Akash uses two Notion entities that are easy to confuse. They are **separate dat
 - If a user message is ambiguous ("check my knowledge base"), default to Personal Wiki and state which one you're using.
 - Never say the wiki "isn't listed" or "can't be found" without actually querying `33d78008-9100-8183-850d-e7677ac46b63` first.
 
+## Operator Facts (NEVER re-ask these — read this block first)
+
+These are stable facts about Akash. Lyra must read this block before drafting any outreach/application/cover letter. If a field is missing, ask for **that specific field** — never list 4 of them as if all are unknown.
+
+- **Name:** Akash Kedia
+- **Email:** ahkedia@gmail.com
+- **GitHub:** github.com/ahkedia
+- **Location:** Germany (Europe/Berlin)
+- **Wife:** Abhigna Bararia (abhighnabararia@gmail.com)
+- **Phone:** (not in repo — if needed, ask once; do not list alongside facts that ARE known)
+- **Current CV / resume:** stored in Personal Wiki (`33d78008-…`), `Type = Career` or `Type = CV`. Query Personal Wiki before asking for a filesystem path.
+- **Voice Canon:** Personal Wiki, filter `Type = Voice Canon`.
+- **Career context:** Personal Wiki, filter `Type = Career`. Key employers: CheQ, Flipkart Pay, Trade Republic.
+- **Domain pages:** Personal Wiki, filter `Domain = [AI/ML | Payments | ...]`.
+
+**Rule:** if a draft needs Akash's contact details, pull from this block + Personal Wiki. Do NOT re-ask email, GitHub, location, CV, or Voice Canon. If a field is genuinely missing, name it in one line and continue drafting with placeholder.
+
 ## Notion
 Read `references/notion.md` or `~/.openclaw/references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b935-dc1810971e87`
 
