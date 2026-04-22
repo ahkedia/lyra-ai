@@ -487,6 +487,7 @@ async function runTest(testCase) {
     prompt,
     timeout_ms = 30000,
     side_effects = 'none',
+    skip_dry_run_prefix = false,
     validators: validatorConfigs = [],
     cleanup,
     multi_turn,
@@ -503,9 +504,13 @@ async function runTest(testCase) {
   const transcript = [];
 
   // Determine if this test should use dry-run mode to prevent accidental writes.
-  // Tests with side_effects: 'none' get dry-run protection.
-  // Tests with side_effects: 'write' or 'read_only' run normally.
-  const useDryRun = side_effects === 'none';
+  // Tests with side_effects: 'none' get the dry-run prefix by default.
+  // Tests can opt out via `skip_dry_run_prefix: true` — intended for
+  // conversational / edge / meta-introspection tests where the prompt has no
+  // write intent and the ~400-char prefix dominates the LLM's attention,
+  // causing it to respond to the meta-instructions instead of the user prompt.
+  // (Root cause of edge-empty-message regression, Apr 2026.)
+  const useDryRun = side_effects === 'none' && !skip_dry_run_prefix;
 
   if (multi_turn && Array.isArray(turns) && turns.length > 0) {
     // Multi-turn: send each user turn, validate only the final response.
