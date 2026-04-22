@@ -1,0 +1,53 @@
+{
+  "_comment": "Labeled exemplars injected into the Sonnet classifier prompt. Grown by learn_exemplars.py whenever you set 'Correct route' on a Twitter Insights row. Keep under ~20 entries (trimmed automatically).",
+  "exemplars": [
+    {
+      "tweet": "New MCP server for Figma just dropped — lets Claude Code read design specs directly from a selection. Repo link inside.",
+      "primary_workflow": "work_claude_setup",
+      "secondary_workflows": ["tool_eval"],
+      "rationale": "MCP servers for dev tooling belong in Claude Setup; also worth a tool eval."
+    },
+    {
+      "tweet": "Hot take: most 'AI agents' are just glorified if/else chains. The real unlock is long-horizon memory with user correction loops.",
+      "primary_workflow": "content_create",
+      "secondary_workflows": [],
+      "rationale": "Contrarian take adjacent to Lyra voice. Clear hook for a thread."
+    },
+    {
+      "tweet": "Built a personal AI that runs my calendar, reminders, and ingests my bookmarks. Here's the architecture — gateway + routing + memory file.",
+      "primary_workflow": "content_create",
+      "secondary_workflows": ["lyra_capability"],
+      "rationale": "Directly adjacent to Lyra. Great teaching post AND capability idea."
+    },
+    {
+      "tweet": "Anthropic just shipped prompt caching with 90% cost reduction on repeated context. Docs: [link]",
+      "primary_workflow": "lyra_capability",
+      "secondary_workflows": ["content_create"],
+      "rationale": "Directly applicable to Lyra cost profile; also a 'how I cut costs 10x' post."
+    },
+    {
+      "tweet": "Deep dive into how Cursor's agent mode actually works under the hood — 12-minute read.",
+      "primary_workflow": "research_read_later",
+      "secondary_workflows": [],
+      "rationale": "Long-form reading, no immediate action or hook."
+    },
+    {
+      "tweet": "Linear just launched AI triage. Auto-assigns, auto-labels, suggests duplicates. Free tier available.",
+      "primary_workflow": "tool_eval",
+      "secondary_workflows": ["market_competitor"],
+      "rationale": "Concrete tool to evaluate; also competitive signal in PM tooling space."
+    },
+    {
+      "tweet": "The job market for senior AI engineers in Europe is brutal right now. 300+ applicants per role, most filtered by keyword match.",
+      "primary_workflow": "market_competitor",
+      "secondary_workflows": ["content_create"],
+      "rationale": "Market intel relevant to job search; strong hook for a candid post."
+    },
+    {
+      "tweet": "Thread: 5 prompts I run every Monday to plan my week. Includes the 'what would I regret not doing' question.",
+      "primary_workflow": "personal_claude_setup",
+      "secondary_workflows": ["content_create"],
+      "rationale": "Personal Claude workflow; inspires own content on AI routines."
+    }
+  ]
+}

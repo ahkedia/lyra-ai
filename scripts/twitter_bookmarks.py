@@ -1,31 +1,45 @@
 #!/usr/bin/env python3
 """
-Unified Twitter bookmark pipeline: fetch → classify → write to Notion.
+Unified Twitter bookmark pipeline: fetch → classify (multi-label) → write → route → wiki.
 
-Replaces the old 4-script chain (fetch-twitter-bookmarks.sh + bookmarks-to-notion.sh
-+ ghost classify-and-route.sh + apply-claude-setup.sh). One script, one log, one
-error path.
+One script, one log, one error path.
 
-Classification is two-tier:
-  1. Regex keywords → Primary workflow + confidence=high (80% of cases, free)
-  2. Anthropic Haiku fallback for ambiguous tweets (confidence=medium/low)
+Classification:
+  Tier-1 regex → primary workflow (free, 80% of cases).
+  Tier-2 Sonnet with voice-aware prompt + exemplars → primary + multi-label secondary workflows.
+  Secondary-label regex pass runs on every bookmark to catch content_create / tool_eval overlaps
+  the primary classifier missed.
 
-Reads env from /root/.openclaw/.env (or current shell):
-  TWITTER_USER_ID, TWITTER_ACCESS_TOKEN (or REFRESH_TOKEN + CLIENT_ID/SECRET),
-  NOTION_API_KEY, TWITTER_INSIGHTS_DB_ID, ANTHROPIC_API_KEY (optional for tier-2).
+Side effects:
+  - Writes the bookmark row to Twitter Insights (source DB).
+  - Fans out to every matched destination DB (Lyra Backlog / Claude Setup / Tool Eval / Content Topic Pool).
+  - Writes a markdown stub to $PERSONAL_KB_PATH/raw/bookmarks/ for content_create routes.
+  - Appends a row to $CLASSIFICATION_LOG_PATH (CSV audit trail).
+
+Reads env from /root/.openclaw/.env:
+  TWITTER_USER_ID, TWITTER_REFRESH_TOKEN, TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET
+  NOTION_API_KEY, TWITTER_INSIGHTS_DB_ID
+  LYRA_BACKLOG_DB_ID, CLAUDE_SETUP_DB_ID, TOOL_EVAL_DB_ID, CONTENT_TOPIC_POOL_DB_ID
+  ANTHROPIC_API_KEY (required for tier-2 & multi-label)
+  PERSONAL_KB_PATH (default /root/projects/personal-kb-raw)
+  CLASSIFICATION_LOG_PATH (default /var/log/lyra-classification.csv)
+  WIKI_GIT_AUTOCOMMIT (default off)
 
 Usage:
-  python3 twitter_bookmarks.py               # fetch + classify + write
-  python3 twitter_bookmarks.py --dry-run     # fetch + classify, print only
-  python3 twitter_bookmarks.py --max 10      # override max_results (default 10)
+  python3 twitter_bookmarks.py               # fetch + classify + write + route
+  python3 twitter_bookmarks.py --dry-run     # classify + print, no writes
+  python3 twitter_bookmarks.py --max 10      # X API max_results (default 10)
+  python3 twitter_bookmarks.py --no-route    # skip fan-out and wiki
 """
 from __future__ import annotations
 
 import argparse
 import base64
+import csv
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -39,9 +53,17 @@ ENV_FILE = Path("/root/.openclaw/.env")
 NOTION_VERSION = "2022-06-28"
 DEFAULT_MAX_RESULTS = 10
 BOOKMARKS_TMP = Path(f"/tmp/lyra-bookmarks-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json")
+SCRIPT_DIR = Path(__file__).resolve().parent
+EXEMPLARS_FILE = Path(os.environ.get("EXEMPLARS_FILE", SCRIPT_DIR / "classifier-exemplars.json"))
+DEFAULT_KB_PATH = "/root/projects/personal-kb-raw"
+DEFAULT_LOG_PATH = "/var/log/lyra-classification.csv"
 
-# Tier-1 regex classifier. Ordered by specificity: first match wins.
-# Each entry: (workflow_name, [patterns])
+VALID_WORKFLOWS = {
+    "lyra_capability", "work_claude_setup", "personal_claude_setup",
+    "work_productivity", "content_create", "research_read_later",
+    "tool_eval", "market_competitor",
+}
+
 REGEX_RULES: list[tuple[str, list[str]]] = [
     ("lyra_capability", [
         r"\b(MCP|Model Context Protocol)\b",
@@ -59,10 +81,12 @@ REGEX_RULES: list[tuple[str, list[str]]] = [
         r"\bhome\s+automation\b.*\b(AI|agent)\b",
     ]),
     ("content_create", [
-        r"\b(write|writing|thread|essay|post|newsletter|blog|article)\b.*\b(about|on)\b",
-        r"\bhow\s+i\s+(built|made|shipped|wrote)\b",
         r"\bhot\s+take\b",
-        r"\b(story|narrative)\b.*\b(product|founder|engineering)\b",
+        r"\bunpopular opinion\b",
+        r"\bhow\s+i\s+(built|made|shipped|wrote|cut|automated)\b",
+        r"\b(thread|essay|newsletter|blog|article)\b.*\b(about|on|how|why)\b",
+        r"\bhere'?s\s+(how|why|what)\b",
+        r"\b(story|narrative)\b.*\b(product|founder|engineering|building)\b",
     ]),
     ("tool_eval", [
         r"\b(benchmark|eval|evaluation)\b.*\b(model|LLM|agent)\b",
@@ -78,10 +102,76 @@ REGEX_RULES: list[tuple[str, list[str]]] = [
     ]),
 ]
 
-VALID_WORKFLOWS = {
-    "lyra_capability", "work_claude_setup", "personal_claude_setup",
-    "work_productivity", "content_create", "research_read_later",
-    "tool_eval", "market_competitor",
+# Secondary-label signals. Adds additional workflows on top of the primary.
+SECONDARY_SIGNALS: list[tuple[str, list[str]]] = [
+    ("content_create", [
+        r"\bhot\s+take\b",
+        r"\bunpopular opinion\b",
+        r"\bcontrarian\b",
+        r"\bhow\s+i\s+(built|made|shipped|wrote|cut|automated|scaled)\b",
+        r"\blessons?\s+(learned|from)\b",
+        r"\b(thread|essay)\b",
+        r"\bhere'?s\s+(how|why|what)\b",
+        r"\b(behind the scenes|BTS)\b",
+        r"\bmost people (don'?t|get this wrong|miss)\b",
+    ]),
+    ("tool_eval", [
+        r"\b(launched|released|ships?|available now|free tier|public beta|open[- ]?sourced?)\b",
+        r"\bnew\s+(tool|app|platform|service|SDK|CLI|extension|plugin)\b",
+    ]),
+    ("lyra_capability", [
+        r"\b(prompt caching|tool use|batch API|memory (file|system))\b",
+    ]),
+    ("market_competitor", [
+        r"\b(YC|Y Combinator|raised|funding|acquired|IPO|valuation)\b",
+    ]),
+]
+
+# Destination DB routing. Keyed by workflow.
+ROUTING_CONFIG = {
+    "lyra_capability": {
+        "db_env": "LYRA_BACKLOG_DB_ID",
+        "title_field": "Idea",
+        "url_field": "Source",
+        "extra": {"Status": {"select": {"name": "Idea"}}, "From Bookmark": {"checkbox": True}},
+    },
+    "work_claude_setup": {
+        "db_env": "CLAUDE_SETUP_DB_ID",
+        "title_field": "Idea",
+        "url_field": "Source",
+        "extra": {
+            "Scope": {"select": {"name": "work"}},
+            "Status": {"select": {"name": "Ready"}},
+            "From Bookmark": {"checkbox": True},
+        },
+    },
+    "personal_claude_setup": {
+        "db_env": "CLAUDE_SETUP_DB_ID",
+        "title_field": "Idea",
+        "url_field": "Source",
+        "extra": {
+            "Scope": {"select": {"name": "personal"}},
+            "Status": {"select": {"name": "Idea"}},
+            "From Bookmark": {"checkbox": True},
+        },
+    },
+    "tool_eval": {
+        "db_env": "TOOL_EVAL_DB_ID",
+        "title_field": "Tool",
+        "url_field": "Source",
+        "extra": {"Decision": {"select": {"name": "Evaluate"}}, "From Bookmark": {"checkbox": True}},
+    },
+    "content_create": {
+        "db_env": "CONTENT_TOPIC_POOL_DB_ID",
+        "title_field": "Topic",
+        "url_field": "Source Reference",
+        "extra": {
+            "Source": {"select": {"name": "Twitter"}},
+            "Domain": {"select": {"name": "General"}},
+            "Score": {"number": 6},
+            "Status": {"select": {"name": "Candidate"}},
+        },
+    },
 }
 
 # ---------- env loading ----------
@@ -98,35 +188,42 @@ def load_env() -> dict:
 # ---------- http helpers ----------
 
 def http(method: str, url: str, headers: dict | None = None, body: dict | None = None,
-         params: dict | None = None) -> tuple[int, dict]:
+         params: dict | None = None, retries: int = 2) -> tuple[int, dict]:
     if params:
         url = url + "?" + urllib.parse.urlencode(params)
     data = None
     if body is not None:
         data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8") or "{}")
-    except urllib.error.HTTPError as e:
+    last_err: tuple[int, dict] = (0, {"error": "no attempt"})
+    for attempt in range(retries + 1):
+        req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
         try:
-            return e.code, json.loads(e.read().decode("utf-8") or "{}")
-        except Exception:
-            return e.code, {"error": str(e)}
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return resp.status, json.loads(resp.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as e:
+            try:
+                payload = json.loads(e.read().decode("utf-8") or "{}")
+            except Exception:
+                payload = {"error": str(e)}
+            last_err = (e.code, payload)
+            if e.code in (429, 500, 502, 503, 504) and attempt < retries:
+                time.sleep(2 ** attempt)
+                continue
+            return last_err
+        except Exception as e:
+            last_err = (0, {"error": str(e)})
+            if attempt < retries:
+                time.sleep(2 ** attempt)
+                continue
+            return last_err
+    return last_err
 
 # ---------- X API ----------
 
 ACCESS_TOKEN_CACHE = Path("/tmp/twitter-access-token")
-ACCESS_TOKEN_TTL_SEC = 3600  # X access tokens valid ~2h; be conservative
+ACCESS_TOKEN_TTL_SEC = 3600
 
 def refresh_twitter_token(env: dict) -> str | None:
-    """Return a valid X OAuth2 access token, using /tmp cache when fresh.
-
-    X requires HTTP Basic Auth (client_id:client_secret) for confidential clients,
-    and rotates refresh tokens on every refresh — new one must be written back
-    to .env or subsequent runs will 401.
-    """
-    # Cache hit
     if ACCESS_TOKEN_CACHE.exists():
         age = time.time() - ACCESS_TOKEN_CACHE.stat().st_mtime
         if age < ACCESS_TOKEN_TTL_SEC:
@@ -171,7 +268,6 @@ def refresh_twitter_token(env: dict) -> str | None:
         log(f"token refresh returned no access_token: {payload}")
         return None
 
-    # X rotates refresh tokens — persist new one or next run 401s.
     new_rt = payload.get("refresh_token")
     if new_rt and new_rt != rt and ENV_FILE.exists():
         content = ENV_FILE.read_text()
@@ -214,24 +310,119 @@ def fetch_bookmarks(env: dict, max_results: int) -> dict:
 # ---------- classifier ----------
 
 def classify_tier1(text: str) -> tuple[str | None, str, str]:
-    """Returns (workflow, confidence, rationale) or (None, 'low', '') if no match."""
-    lower = text.lower()
     for workflow, patterns in REGEX_RULES:
         for pat in patterns:
             if re.search(pat, text, re.IGNORECASE):
                 return workflow, "high", f"tier-1 regex: /{pat}/"
     return None, "low", ""
 
-def classify_tier2(text: str, env: dict) -> tuple[str, str, str]:
-    """Anthropic Haiku fallback. Returns (workflow, confidence, rationale)."""
+def detect_secondary_labels(text: str, primary: str) -> list[str]:
+    sec: list[str] = []
+    for workflow, patterns in SECONDARY_SIGNALS:
+        if workflow == primary:
+            continue
+        for pat in patterns:
+            if re.search(pat, text, re.IGNORECASE):
+                if workflow not in sec:
+                    sec.append(workflow)
+                break
+    return sec
+
+def load_exemplars() -> list[dict]:
+    if not EXEMPLARS_FILE.exists():
+        return []
+    try:
+        data = json.loads(EXEMPLARS_FILE.read_text())
+        return data.get("exemplars", [])
+    except Exception as e:
+        log(f"failed to load exemplars: {e}")
+        return []
+
+SYSTEM_PROMPT = """You classify tweet bookmarks for Akash Kedia into workflow routes so they can be auto-filed in Notion and the personal wiki.
+
+Akash's voice and focus:
+- Technical founder, product-minded engineer, based in Germany
+- Builds Lyra (personal AI assistant on Hetzner), runs Claude Code/Cursor setups
+- Writes contrarian, teachable, builder-first content — hooks, concrete examples, honest takes
+- Currently: job hunting, building MVPs, evaluating AI tooling, publishing on AI/agents/dev workflows
+
+Routing rules — MULTI-LABEL. A bookmark can belong to multiple workflows. Always return a primary (highest-confidence) and a secondary_workflows array (can be empty).
+
+Categories:
+- lyra_capability: Improves Lyra, OpenClaw, Telegram bot, home automation. Concrete capability idea.
+- work_claude_setup: Improves Claude Code / Cursor / MCP setup usable at work.
+- personal_claude_setup: Personal dev-env Claude tweaks (prompts, aliases, launchd, routines).
+- work_productivity: Non-AI work habits, processes, leadership.
+- content_create: Worth a post / thread / article. Be GENEROUS — if the tweet is a hook, a contrarian take, a teaching moment, a behind-the-scenes build story, a candid career/market take, a 'how I do X' angle, or directly adjacent to Lyra/agents/dev workflows, include it. Default-lean toward content_create when in doubt and the topic matches Akash's voice.
+- research_read_later: Pure long-form reading with no actionable angle and no content hook.
+- tool_eval: A specific tool/vendor/product worth evaluating for adoption.
+- market_competitor: Market intel, competitor moves, industry signal.
+
+Heuristics for content_create (add as primary OR secondary whenever any apply):
+- Has a hook, contrarian take, or surprising claim
+- About Lyra-adjacent topics (agents, memory, MCP, personal AI, prompt engineering)
+- A 'how I built X' or 'here's the architecture' story
+- Candid market/job/career angle that Akash can comment on
+- Teaches a concept a builder audience would save
+
+Output: STRICT JSON only, no prose.
+{"primary_workflow": "<category>", "secondary_workflows": ["<category>", ...], "confidence": "High|Medium|Low", "rationale": "<one sentence>"}"""
+
+def classify_tier2(text: str, env: dict) -> tuple[str, list[str], str, str]:
     key = env.get("ANTHROPIC_API_KEY")
     if not key:
-        return "research_read_later", "low", "tier-2 skipped (no ANTHROPIC_API_KEY)"
+        return "research_read_later", [], "low", "tier-2 skipped (no ANTHROPIC_API_KEY)"
+
+    exemplars = load_exemplars()
+    exemplar_block = "\n".join(
+        f'Tweet: {e["tweet"]}\nOutput: {{"primary_workflow": "{e["primary_workflow"]}", "secondary_workflows": {json.dumps(e.get("secondary_workflows", []))}, "confidence": "High", "rationale": "{e["rationale"]}"}}\n'
+        for e in exemplars[:12]
+    )
+    user_prompt = (
+        (f"Exemplars (for calibration):\n{exemplar_block}\n\n" if exemplar_block else "")
+        + f"Tweet to classify:\n{text}\n\nReturn JSON only."
+    )
+
+    status, body = http("POST", "https://api.anthropic.com/v1/messages",
+        headers={
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        body={
+            "model": "claude-sonnet-4-6-20251001",
+            "max_tokens": 400,
+            "system": SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content": user_prompt}],
+        })
+    if status != 200:
+        return _haiku_fallback(text, env, f"tier-2 sonnet error {status}")
+    try:
+        raw = body["content"][0]["text"].strip()
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.MULTILINE).strip()
+        parsed = json.loads(raw)
+    except Exception as e:
+        return _haiku_fallback(text, env, f"tier-2 parse error: {e}")
+
+    primary = parsed.get("primary_workflow", "research_read_later")
+    secondary = parsed.get("secondary_workflows", []) or []
+    confidence = (parsed.get("confidence") or "Medium").lower()
+    rationale = parsed.get("rationale", "tier-2 Sonnet")
+
+    if primary not in VALID_WORKFLOWS:
+        primary = "research_read_later"
+    secondary = [s for s in secondary if s in VALID_WORKFLOWS and s != primary]
+
+    return primary, secondary, confidence, f"tier-2 sonnet: {rationale}"
+
+def _haiku_fallback(text: str, env: dict, note: str) -> tuple[str, list[str], str, str]:
+    key = env.get("ANTHROPIC_API_KEY")
+    if not key:
+        return "research_read_later", [], "low", note
     prompt = (
         "Classify this tweet into exactly ONE workflow. Reply with the workflow name only.\n\n"
         f"Workflows: {', '.join(sorted(VALID_WORKFLOWS))}\n\n"
-        f"Tweet: {text}\n\n"
-        "Workflow:"
+        f"Tweet: {text}\n\nWorkflow:"
     )
     status, body = http("POST", "https://api.anthropic.com/v1/messages",
         headers={
@@ -245,25 +436,29 @@ def classify_tier2(text: str, env: dict) -> tuple[str, str, str]:
             "messages": [{"role": "user", "content": prompt}],
         })
     if status != 200:
-        return "research_read_later", "low", f"tier-2 error {status}"
+        return "research_read_later", [], "low", f"{note}; haiku also failed {status}"
     try:
         reply = body["content"][0]["text"].strip().lower()
     except Exception:
-        return "research_read_later", "low", "tier-2 parse error"
+        return "research_read_later", [], "low", f"{note}; haiku parse error"
     if reply in VALID_WORKFLOWS:
-        return reply, "medium", "tier-2 Haiku"
-    return "research_read_later", "low", f"tier-2 returned invalid: {reply[:40]}"
+        return reply, [], "medium", f"{note}; haiku fallback"
+    return "research_read_later", [], "low", f"{note}; haiku invalid: {reply[:40]}"
 
-def classify(text: str, env: dict) -> tuple[str, str, str]:
-    wf, conf, rat = classify_tier1(text)
-    if wf:
-        return wf, conf, rat
-    return classify_tier2(text, env)
+def classify(text: str, env: dict) -> tuple[str, list[str], str, str]:
+    primary, confidence, rationale = classify_tier1(text)
+    if primary:
+        secondary = detect_secondary_labels(text, primary)
+        return primary, secondary, confidence, rationale
+    primary, secondary, confidence, rationale = classify_tier2(text, env)
+    for s in detect_secondary_labels(text, primary):
+        if s not in secondary:
+            secondary.append(s)
+    return primary, secondary, confidence, rationale
 
-# ---------- notion ----------
+# ---------- notion: source DB ----------
 
 def fetch_existing_urls(env: dict) -> set[str]:
-    """Fetch all existing tweet URLs from Twitter Insights for dedup."""
     urls: set[str] = set()
     cursor = None
     while True:
@@ -291,12 +486,15 @@ def fetch_existing_urls(env: dict) -> set[str]:
     return urls
 
 def write_to_notion(env: dict, tweet: dict, author: dict,
-                    workflow: str, confidence: str, rationale: str) -> bool:
+                    primary: str, secondary: list[str],
+                    confidence: str, rationale: str,
+                    wiki_stub: str) -> tuple[bool, str]:
     url = f"https://x.com/{author.get('username', 'unknown')}/status/{tweet['id']}"
     title = tweet["text"][:100].replace("\n", " ")
     bookmarked_date = tweet.get("created_at", "").split("T")[0]
     needs_review = confidence != "high"
     author_str = f"{author.get('name', 'Unknown')} (@{author.get('username', 'unknown')})"
+    multi = sorted(set([primary] + secondary))
     props = {
         "Content Byte": {"title": [{"text": {"content": title}}]},
         "Original Tweet URL": {"url": url},
@@ -304,12 +502,16 @@ def write_to_notion(env: dict, tweet: dict, author: dict,
         "Author": {"rich_text": [{"text": {"content": author_str}}]},
         "Status": {"select": {"name": "Draft"}},
         "Needs review": {"checkbox": needs_review},
-        "Primary workflow": {"select": {"name": workflow}},
+        "Primary workflow": {"select": {"name": primary}},
         "Workflow confidence": {"select": {"name": confidence}},
         "Workflow rationale": {"rich_text": [{"text": {"content": rationale[:2000]}}]},
+        "Workflow": {"multi_select": [{"name": w} for w in multi]},
     }
     if bookmarked_date:
         props["Bookmarked Date"] = {"date": {"start": bookmarked_date}}
+    if wiki_stub:
+        props["Wiki stub path"] = {"rich_text": [{"text": {"content": wiki_stub}}]}
+
     status, body = http("POST", "https://api.notion.com/v1/pages",
         headers={
             "Authorization": f"Bearer {env['NOTION_API_KEY']}",
@@ -320,10 +522,173 @@ def write_to_notion(env: dict, tweet: dict, author: dict,
             "parent": {"database_id": env["TWITTER_INSIGHTS_DB_ID"]},
             "properties": props,
         })
+
+    # Retry without new optional columns if the Twitter Insights schema isn't migrated yet.
+    if status != 200 and "does not exist" in json.dumps(body).lower():
+        log(f"  schema mismatch, retrying without optional columns: {body.get('message', '')[:120]}")
+        props.pop("Workflow", None)
+        props.pop("Wiki stub path", None)
+        status, body = http("POST", "https://api.notion.com/v1/pages",
+            headers={
+                "Authorization": f"Bearer {env['NOTION_API_KEY']}",
+                "Notion-Version": NOTION_VERSION,
+                "Content-Type": "application/json",
+            },
+            body={
+                "parent": {"database_id": env["TWITTER_INSIGHTS_DB_ID"]},
+                "properties": props,
+            })
+
     if status != 200:
         log(f"notion write failed for {tweet['id']}: {body.get('message', body)}")
+        return False, ""
+    return True, body.get("id", "")
+
+# ---------- routing: destination DBs ----------
+
+def _dedup_query(env: dict, db_id: str, url_field: str, url: str) -> bool:
+    status, data = http("POST",
+        f"https://api.notion.com/v1/databases/{db_id}/query",
+        headers={
+            "Authorization": f"Bearer {env['NOTION_API_KEY']}",
+            "Notion-Version": NOTION_VERSION,
+            "Content-Type": "application/json",
+        },
+        body={"filter": {"property": url_field, "url": {"equals": url}}, "page_size": 1})
+    if status != 200:
+        log(f"  dedup query failed on {db_id}: {data.get('message', data)}")
         return False
-    return True
+    return len(data.get("results", [])) > 0
+
+def route_to_db(env: dict, workflow: str, title: str, tweet_url: str, notes: str) -> str:
+    cfg = ROUTING_CONFIG.get(workflow)
+    if not cfg:
+        return ""
+    db_id = env.get(cfg["db_env"])
+    if not db_id:
+        log(f"  [{workflow}] skipped — {cfg['db_env']} not set")
+        return ""
+    if _dedup_query(env, db_id, cfg["url_field"], tweet_url):
+        log(f"  [{workflow}] already in {cfg['db_env']}, skipped")
+        return ""
+
+    props = {
+        cfg["title_field"]: {"title": [{"text": {"content": title[:200]}}]},
+        cfg["url_field"]: {"url": tweet_url},
+    }
+    props.update(cfg.get("extra", {}))
+    if notes and "Notes" not in props and workflow != "content_create":
+        props["Notes"] = {"rich_text": [{"text": {"content": notes[:2000]}}]}
+    if workflow == "content_create":
+        props["Week"] = {"date": {"start": datetime.now(timezone.utc).strftime("%Y-%m-%d")}}
+
+    status, body = http("POST", "https://api.notion.com/v1/pages",
+        headers={
+            "Authorization": f"Bearer {env['NOTION_API_KEY']}",
+            "Notion-Version": NOTION_VERSION,
+            "Content-Type": "application/json",
+        },
+        body={"parent": {"database_id": db_id}, "properties": props})
+    if status != 200:
+        log(f"  [{workflow}] route failed: {body.get('message', body)}")
+        return ""
+    log(f"  [{workflow}] routed to {cfg['db_env']}")
+    return cfg["db_env"]
+
+# ---------- wiki stub ----------
+
+def write_wiki_stub(env: dict, title: str, tweet_url: str, tweet_text: str,
+                     rationale: str, primary: str, secondary: list[str]) -> str:
+    kb_path = Path(env.get("PERSONAL_KB_PATH", DEFAULT_KB_PATH))
+    if not kb_path.exists():
+        log(f"  wiki stub skipped — {kb_path} does not exist")
+        return ""
+    bookmarks_dir = kb_path / "raw" / "bookmarks"
+    bookmarks_dir.mkdir(parents=True, exist_ok=True)
+
+    for existing in bookmarks_dir.glob("*.md"):
+        try:
+            if f'tweet_url: "{tweet_url}"' in existing.read_text():
+                return str(existing.relative_to(kb_path))
+        except Exception:
+            continue
+
+    slug_src = title or tweet_url
+    slug = re.sub(r"[^a-z0-9]+", "-", slug_src.lower()).strip("-")[:60] or "bookmark"
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    file_path = bookmarks_dir / f"{date}-{slug}.md"
+
+    if secondary:
+        sec_yaml = "\n" + "\n".join(f"  - {s}" for s in secondary)
+    else:
+        sec_yaml = " []"
+
+    summary_lines = "\n".join("> " + line for line in tweet_text.splitlines())
+
+    content = f"""---
+source: twitter-bookmark
+tweet_url: "{tweet_url}"
+captured_at: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+primary_workflow: {primary}
+secondary_workflows:{sec_yaml}
+status: idea
+published: false
+---
+
+# {title[:120]}
+
+**Source:** [tweet]({tweet_url})
+
+## Summary
+{summary_lines}
+
+## Why it matters
+{rationale}
+
+## Angles / hooks
+- (fill in when drafting)
+
+## Related
+- (link to other wiki notes)
+"""
+    file_path.write_text(content)
+
+    if env.get("WIKI_GIT_AUTOCOMMIT", "").lower() == "true" and (kb_path / ".git").exists():
+        try:
+            subprocess.run(["git", "-C", str(kb_path), "add", str(file_path.relative_to(kb_path))],
+                           check=False, capture_output=True, timeout=10)
+            subprocess.run(["git", "-C", str(kb_path), "commit", "-m", f"bookmark: {date}-{slug}"],
+                           check=False, capture_output=True, timeout=10)
+            subprocess.run(["git", "-C", str(kb_path), "push"],
+                           check=False, capture_output=True, timeout=30)
+        except Exception as e:
+            log(f"  wiki auto-commit failed: {e}")
+
+    return str(file_path.relative_to(kb_path))
+
+# ---------- audit log ----------
+
+def append_audit(env: dict, tweet_id: str, tweet_url: str, title: str,
+                 primary: str, secondary: list[str], confidence: str,
+                 rationale: str, wiki_stub: str, routed_to: list[str]) -> None:
+    log_path = Path(env.get("CLASSIFICATION_LOG_PATH", DEFAULT_LOG_PATH))
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    new = not log_path.exists()
+    try:
+        with log_path.open("a", newline="") as f:
+            w = csv.writer(f)
+            if new:
+                w.writerow(["timestamp", "tweet_id", "tweet_url", "title",
+                           "primary", "secondary", "confidence",
+                           "rationale", "wiki_stub", "routed_to"])
+            w.writerow([
+                datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                tweet_id, tweet_url, title[:200],
+                primary, ";".join(secondary), confidence,
+                rationale[:400], wiki_stub, ";".join(routed_to),
+            ])
+    except Exception as e:
+        log(f"  audit log write failed: {e}")
 
 # ---------- main ----------
 
@@ -333,12 +698,11 @@ def log(msg: str) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--max", type=int, default=DEFAULT_MAX_RESULTS,
-                    help=f"X API max_results (default {DEFAULT_MAX_RESULTS})")
-    ap.add_argument("--dry-run", action="store_true",
-                    help="fetch + classify, don't write to Notion")
-    ap.add_argument("--since-hours", type=int, default=24,
-                    help="only process tweets bookmarked in the last N hours (default 24)")
+    ap.add_argument("--max", type=int, default=DEFAULT_MAX_RESULTS)
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--since-hours", type=int, default=24)
+    ap.add_argument("--no-route", action="store_true",
+                    help="skip fan-out to destination DBs and wiki stub")
     args = ap.parse_args()
 
     env = load_env()
@@ -352,31 +716,26 @@ def main() -> int:
     BOOKMARKS_TMP.write_text(json.dumps(payload))
     tweets = payload.get("data", [])
     log(f"X API returned {len(tweets)} bookmark(s)")
-
     if not tweets:
         log("done (nothing to process)")
         return 0
 
-    # Author lookup
     authors = {u["id"]: u for u in payload.get("includes", {}).get("users", [])}
 
-    # Client-side date filter (X API doesn't support start_time on bookmarks)
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=args.since_hours)).isoformat()
     tweets = [t for t in tweets if t.get("created_at", "") >= cutoff]
     log(f"after {args.since_hours}h filter: {len(tweets)} bookmark(s)")
     if not tweets:
         return 0
 
-    # Warn if we hit the ceiling — may be missing older bookmarks
     if len(payload.get("data", [])) == args.max:
         log(f"WARN: X API returned max_results={args.max}, may have older bookmarks truncated")
 
-    # Dedup
     existing_urls = fetch_existing_urls(env) if not args.dry_run else set()
     log(f"existing URLs in Notion: {len(existing_urls)}")
 
     created = skipped = errored = 0
-    tier1_count = tier2_count = 0
+    tier1_count = tier2_count = routed_count = 0
     for t in tweets:
         author = authors.get(t.get("author_id", ""), {})
         url = f"https://x.com/{author.get('username', 'unknown')}/status/{t['id']}"
@@ -384,22 +743,46 @@ def main() -> int:
             log(f"  skip (dup): {t['id']}")
             skipped += 1
             continue
-        wf, conf, rat = classify(t["text"], env)
+        primary, secondary, conf, rat = classify(t["text"], env)
         if rat.startswith("tier-1"):
             tier1_count += 1
         elif rat.startswith("tier-2"):
             tier2_count += 1
-        log(f"  classified {t['id']} → {wf} ({conf}) [{rat}]")
+        all_labels = [primary] + secondary
+        log(f"  classified {t['id']} → {primary} + {secondary} ({conf}) [{rat}]")
+
         if args.dry_run:
             continue
-        if write_to_notion(env, t, author, wf, conf, rat):
-            created += 1
-        else:
+
+        wiki_stub = ""
+        if not args.no_route and "content_create" in all_labels:
+            wiki_stub = write_wiki_stub(env, t["text"][:100].replace("\n", " "),
+                                        url, t["text"], rat, primary, secondary)
+            if wiki_stub:
+                log(f"  wiki stub: {wiki_stub}")
+
+        ok, _ = write_to_notion(env, t, author, primary, secondary, conf, rat, wiki_stub)
+        if not ok:
             errored += 1
+            continue
+        created += 1
+
+        routed_to: list[str] = []
+        if not args.no_route:
+            title_for_route = t["text"][:100].replace("\n", " ")
+            for wf in all_labels:
+                tgt = route_to_db(env, wf, title_for_route, url, rat)
+                if tgt:
+                    routed_to.append(tgt)
+            if routed_to:
+                routed_count += 1
+
+        append_audit(env, t["id"], url, t["text"][:100].replace("\n", " "),
+                     primary, secondary, conf, rat, wiki_stub, routed_to)
         time.sleep(0.3)
 
     log(f"done: created={created} skipped={skipped} errored={errored} "
-        f"tier1={tier1_count} tier2={tier2_count}")
+        f"tier1={tier1_count} tier2={tier2_count} routed={routed_count}")
     return 0 if errored == 0 else 2
 
 if __name__ == "__main__":
