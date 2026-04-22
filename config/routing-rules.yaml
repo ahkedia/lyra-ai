@@ -77,6 +77,45 @@ tier0_python_jobs:
         - "Mark dentist call done"
         - "Mark the visa task as complete"
 
+    # Personal Wiki (crud/wiki_notion.py) — same entrypoint as health: `cli.py parse "<msg>"`
+    wiki_lenny_search:
+      description: "Query Personal Wiki (Type=Lenny Synthesis) by title; return excerpts."
+      command: "parse (try_tier0_wiki_text → lenny_wiki_search)"
+      patterns:
+        - "(?i)what (does|did) lenny say (about )?.+"
+        - "(?i)lenny (wiki )?(on|about) .+"
+        - "(?i)lenny says (about )?.+"
+        - "(?i)wiki lenny[:\s].+"
+      examples:
+        - "What does Lenny say about pricing?"
+        - "Lenny on activation metrics"
+    wiki_lint:
+      description: "Orphan / stale / missing My take scan (excludes Inbox; Lenny Synthesis not flagged for 'My take')."
+      command: "parse (try_tier0_wiki_text → wiki_lint_report)"
+      patterns:
+        - "(?i)(run |monthly )?wiki[- ]?lint"
+        - "(?i)lint (my )?personal wiki"
+        - "(?i)wiki health( check)?"
+        - "(?i)personal wiki lint"
+      examples:
+        - "Run wiki-lint"
+        - "wiki health check"
+    wiki_dedup:
+      description: "List existing wiki pages with overlapping titles (skip Inbox) before creating a new page."
+      command: "parse (try_tier0_wiki_text → wiki_dedup_suggest)"
+      patterns:
+        - "(?i)wiki[- ]?dedup( for| on)?[: ].+"
+        - "(?i)deduplicate wiki[: ].+"
+        - "(?i)existing wiki pages? (for|on|about).+"
+      examples:
+        - "wiki dedup for product analytics"
+    news_inbox_rss:
+      description: "Ingest latest arXiv CS.LG into News Inbox; skip if Link already exists."
+      command: "news-inbox-rss [max_new]"
+      patterns: []  # cron/CLI; not in natural-language parse
+      examples:
+        - "python3 /root/lyra-ai/crud/cli.py news-inbox-rss 15"
+
     job_application:
       description: >
         Two-phase job application pipeline. Phase A detects a job link/company/person and
@@ -129,6 +168,9 @@ tier0_python_jobs:
 #   Implemented in plugins/lyra-model-router/index.js as HEALTH_TIER0_PATTERNS + same
 #   script path: `python3 /root/lyra-ai/crud/cli.py parse "<message>"`.
 #   Keep patterns aligned with crud/cli.py cmd_parse() health regexes.
+#
+# Personal Wiki Tier 0: WIKI_TIER0_PATTERNS in plugins/lyra-model-router/index.js — must stay
+# aligned with crud/wiki_notion.try_tier0_wiki_text. News Inbox RSS: crud/news_inbox_rss.py (CLI: news-inbox-rss).
 
 # --- TIER 1: MiniMax (simple, single-action) ---
 tiers:

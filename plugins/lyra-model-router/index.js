@@ -101,6 +101,24 @@ const HAIKU_PATTERNS = [
   /^promote to wiki:/i,
 ];
 
+// Personal Wiki — crud/wiki_notion.try_tier0_wiki_text (Lenny search, lint, dedup)
+const WIKI_TIER0_PATTERNS = [
+  /what does lenny say (?:about )?.{2,}/i,
+  /what did lenny say (?:about )?.{2,}/i,
+  /lenny says (?:about )?.{2,}/i,
+  /lenny (?:wiki )?(?:on|about) .{2,}/i,
+  /wiki lenny[:\s].{2,}/i,
+  /(?:run |monthly )?wiki[- ]?lint/i,
+  /lint (?:my )?personal wiki/i,
+  /wiki health(?: check)?/i,
+  /personal wiki lint/i,
+  /wiki[- ]?dedup/i,
+  /deduplicate wiki/i,
+  /deduplication wiki/i,
+  /existing (?:wiki )?pages? (?:for|on|about)/i,
+  /any (?:existing )?wiki (?:page )?about/i,
+];
+
 const TIER0_PATTERNS = [
   // Telegram slash commands (setMyCommands menu) — zero-token routes.
   // /reminders → list reminders; /last → last-message recall.
@@ -160,7 +178,8 @@ function tryTier0(prompt) {
   const trimmed = normalizeTier0Prompt(prompt);
   const matched =
     TIER0_PATTERNS.some((p) => p.test(trimmed)) ||
-    HEALTH_TIER0_PATTERNS.some((p) => p.test(trimmed));
+    HEALTH_TIER0_PATTERNS.some((p) => p.test(trimmed)) ||
+    WIKI_TIER0_PATTERNS.some((p) => p.test(trimmed));
   if (!matched) return null;
   if (!existsSync(CRUD_CLI)) return null;
 

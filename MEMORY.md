@@ -51,7 +51,11 @@ Read `references/notion.md` or `~/.openclaw/references/notion.md` for schemas an
 
 (IDs are in the glossary above. Never confuse this with Second Brain.)
 
-When answering career / domain / positioning / voice questions:
+**Lenny episode synthesis (Type = Lenny Synthesis):** The wiki stores curated “Lenny Synthesis” pages (per-episode and theme notes) alongside other types. For **zero-token** lookups from Telegram, messages matching natural phrases (e.g. *what does Lenny say about …*) route to `crud/cli.py parse` → `wiki_notion.lenny_wiki_search`, which queries the Personal Wiki data source for `Type = Lenny Synthesis` and `Title` contains the topic, then pulls block text for excerpts. **CLI (debug):** `python3 crud/cli.py wiki-lenny "<topic>"`. **Related Tier 0:** `wiki-lint` (orphan / stale / “My take” scan) and `wiki-dedup "<keywords>"` (similar titles before creating a new page). Router patterns live in `plugins/lyra-model-router/index.js` (`WIKI_TIER0_PATTERNS`).
+
+**News Inbox — arXiv auto-intake (dedupe on Link):** `python3 crud/cli.py news-inbox-rss [max_new]` runs `crud/news_inbox_rss.py` (latest **cs.LG** from arXiv Atom, skip if `Link` already exists). Suitable for a daily cron on Hetzner.
+
+When answering career / domain / positioning / voice questions (general LLM path):
   - **Primary:** `POST /v1/databases/33d78008-9100-8183-850d-e7677ac46b63/query` (same path as job pipeline). For Voice Canon only: filter `Type` = `Voice Canon`. Filter examples: `Domain = [relevant domain]` or `Type = Career | Voice Canon`.
   - **Alternate:** `POST /v1/data_sources/33d78008-9100-8197-9f0f-000b205edfe8/query`.
   - **Step 2:** For each page_id, `GET /v1/blocks/{page_id}/children` — page body is required; titles alone are not enough.
