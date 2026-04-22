@@ -15,8 +15,10 @@ tests:
         rubric: "Does the response confirm creating the reminder in Notion with correct details? It should parse 'tomorrow' to a date, include 3pm, and include the task text. Planning without completion is a FAIL."
     cleanup:
       action: notion_delete_matching
-      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
+      database: "32678008-9100-802f-ad9f-fb48ff5f4c1d"
+      data_source: "32678008-9100-8171-8940-000b30243ddd"
       title_contains: "[eval]"
+      title_properties: ["Task"]
     tags: [multi-step, reminder]
 
   - id: multi-cross-user-task
@@ -31,8 +33,10 @@ tests:
         rubric: "Does the response complete both parts: (1) notify Abhigna and (2) confirm writing the shared [eval] reminder in Notion? Missing either step is a FAIL."
     cleanup:
       action: notion_delete_matching
-      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
+      database: "2054e39c-3f09-431d-8821-0e6a7513913a"
+      data_source: "9f206d71-7b25-408b-ad20-02daf0b43da0"
       title_contains: "[eval]"
+      title_properties: ["Task"]
     tags: [multi-step, cross-user, write]
 
   - id: multi-insight-capture
@@ -107,9 +111,10 @@ tests:
     prompt: "."
     timeout_ms: 45000
     side_effects: none
+    skip_dry_run_prefix: true   # empty prompt — any meta prefix dominates and derails the response
     validators:
       - type: llm_judge
-        rubric: "Does the response handle a near-empty/meaningless message gracefully? It should ask what the user needs help with, not crash or return an error. A friendly prompt like 'What can I help with?' scores high."
+        rubric: "Does the response handle a near-empty/meaningless message gracefully? It should ask what the user needs help with, not crash or return an error. A friendly prompt like 'What can I help with?' scores high. The response must NOT mention 'eval mode', 'dry run', or any internal/meta instructions."
     tags: [edge, empty]
 
   - id: edge-long-message
