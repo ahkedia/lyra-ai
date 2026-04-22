@@ -20,6 +20,10 @@ def usage():
   cli.py job-application "<message>"
   cli.py content-draft draft <x|outreach|generic> "<task...>"
   cli.py content-draft revise <x|outreach|generic> --prior "..." --feedback "..."
+  cli.py wiki-lenny "<topic>"              # search Lenny Synthesis pages by title
+  cli.py wiki-lint                         # automated orphan/stale/take check
+  cli.py wiki-dedup "<title or keywords>"  # list similar existing wiki rows
+  cli.py news-inbox-rss [max_new]         # arXiv CS.LG → News Inbox (dedupe on Link)
 """)
 
 def cmd_weight(args):
@@ -122,6 +126,15 @@ def cmd_parse(args):
     if try_content_draft_tier0(raw):
         return
     # --- End content draft ---
+
+    # --- Personal Wiki Tier 0 (Lenny search, wiki lint, dedup suggestions) ---
+    from wiki_notion import try_tier0_wiki_text
+
+    wiki_out = try_tier0_wiki_text(raw)
+    if wiki_out is not None:
+        print(wiki_out)
+        return
+    # --- End Personal Wiki ---
 
     # --- Job application workflow (Phase A: trigger, Phase B: clarification reply) ---
     from job_application import (
@@ -344,6 +357,41 @@ def cmd_content_draft(args):
     sys.exit(main_from_cli(args))
 
 
+def cmd_wiki_lenny(args):
+    from wiki_notion import lenny_wiki_search
+
+    q = " ".join(args).strip()
+    if not q:
+        print("wiki-lenny requires a topic, e.g. python3 cli.py wiki-lenny pricing")
+        sys.exit(1)
+    print(lenny_wiki_search(q))
+
+
+def cmd_wiki_lint(_args):
+    from wiki_notion import wiki_lint_report
+
+    print(wiki_lint_report())
+
+
+def cmd_wiki_dedup(args):
+    from wiki_notion import wiki_dedup_suggest
+
+    q = " ".join(args).strip()
+    if not q:
+        print("wiki-dedup requires keywords, e.g. python3 cli.py wiki-dedup activation metrics")
+        sys.exit(1)
+    print(wiki_dedup_suggest(q))
+
+
+def cmd_news_inbox_rss(args):
+    from news_inbox_rss import ingest_arxiv_cs_lg
+
+    n = 20
+    if args and str(args[0]).isdigit():
+        n = int(args[0])
+    print(ingest_arxiv_cs_lg(max_new=n))
+
+
 def cmd_job_application(args):
     """Directly invoke the job application workflow (parse + trigger or reply)."""
     from job_application import is_job_trigger, is_clarification_reply, has_recent_state, handle_trigger, handle_clarification_reply
@@ -372,6 +420,10 @@ COMMANDS = {
     'daily-summary': cmd_daily_summary,
     'job-application': cmd_job_application,
     'content-draft': cmd_content_draft,
+    'wiki-lenny': cmd_wiki_lenny,
+    'wiki-lint': cmd_wiki_lint,
+    'wiki-dedup': cmd_wiki_dedup,
+    'news-inbox-rss': cmd_news_inbox_rss,
 }
 
 if __name__ == '__main__':
