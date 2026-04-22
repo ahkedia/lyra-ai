@@ -2,6 +2,8 @@
 
 This file is your single reference for all Notion operations. Read it before any Notion API call.
 
+> **Disambiguation:** **Second Brain** (`e4027aaf-d2ff-49e1-babf-7487725e2ef4`) and **Personal Wiki** (`33d78008-9100-8183-850d-e7677ac46b63`) are two separate databases with distinct purposes. Second Brain = raw thought capture by Lyra. Personal Wiki = curated reference corpus (Voice Canon, CV, career, domain knowledge) authored by Akash. Never substitute one for the other. Full glossary: root `MEMORY.md`.
+
 ## API Key
 
 **Use environment variable:** `NOTION_API_KEY` (already set on server)
