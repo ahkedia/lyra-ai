@@ -1,0 +1,13 @@
+{
+  "_comment": "Domain-specific doodle style hints for visual-generator.js",
+  "basePrompt": "A clean, minimal hand-drawn doodle illustration in black ink on white paper. Style: simple sketch, no color, no shading, editorial cartoon quality. No text, no labels, no people's faces. Illustration only.",
+  "domainHints": {
+    "AI/ML": "neural network diagram, robot icon, brain with circuits, decision tree",
+    "Growth & Internationalisation": "growth chart, funnel, flywheel, globe with arrows",
+    "Strategy & GTM": "chess pieces, target with arrow, roadmap path, positioning matrix",
+    "Payments": "payment terminal, card swipe, flow diagram with checkpoints, wallet icon",
+    "Credit & Lending": "scale/balance, risk dial, approval stamp, document with checkmarks",
+    "Leadership & Team Building": "people in formation, building blocks, handshake, team huddle icon"
+  },
+  "fallbackHint": "abstract diagram representing a concept, simple shapes and arrows"
+}

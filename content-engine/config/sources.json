@@ -1,0 +1,71 @@
+{
+  "_comment": "Topic source configuration for topic-collector.js. Former Content Ideas DB (27fc8e00-643a-4b93-90f7-ce8b9a345c62) merged into Content Topic Pool — archive the old DB in Notion after migrating rows.",
+  "sources": {
+    "personalWiki": {
+      "dbId": "33d78008-9100-8183-850d-e7677ac46b63",
+      "titleProp": "Title",
+      "sortBy": { "timestamp": "last_edited_time", "direction": "descending" },
+      "filter": {
+        "and": [
+          { "property": "Type", "select": { "does_not_equal": "Meta" } },
+          { "property": "Type", "select": { "does_not_equal": "Voice Canon" } },
+          { "property": "Type", "select": { "does_not_equal": "Lenny Synthesis" } }
+        ]
+      },
+      "weight": 1.5,
+      "description": "Career/domain pages — highest grounding potential"
+    },
+    "lennyKB": {
+      "dbId": "33d78008-9100-8183-850d-e7677ac46b63",
+      "titleProp": "Title",
+      "sortBy": { "timestamp": "last_edited_time", "direction": "descending" },
+      "filter": {
+        "property": "Type",
+        "select": { "equals": "Lenny Synthesis" }
+      },
+      "weight": 1.2,
+      "description": "Lenny podcast synthesis pages"
+    },
+    "twitterInsights": {
+      "dbId": "32d78008-9100-8191-b853-d73aea132065",
+      "titleProp": "Original Tweet Summary",
+      "sortBy": { "timestamp": "created_time", "direction": "descending" },
+      "filter": {
+        "property": "Primary workflow",
+        "select": { "equals": "content_create" }
+      },
+      "weight": 1.0,
+      "description": "Bookmarks marked for content creation"
+    },
+    "secondBrain": {
+      "dbId": "e4027aaf-d2ff-49e1-babf-7487725e2ef4",
+      "titleProp": "Name",
+      "sortBy": { "timestamp": "created_time", "direction": "descending" },
+      "filter": null,
+      "weight": 0.8,
+      "description": "Raw insights and ideas"
+    }
+  },
+  "scoring": {
+    "recencyTiers": [
+      { "maxHours": 24, "bonus": 2.0, "label": "hot" },
+      { "maxHours": 48, "bonus": 1.5, "label": "fresh" },
+      { "maxHours": 168, "bonus": 0.5, "label": "recent" }
+    ],
+    "wikiCoverageBonus": 0.5,
+    "_comment": "Topics from last 24h get +2.0 (hot), 48h +1.5 (fresh), 7d +0.5 (recent)"
+  },
+  "topicPool": {
+    "dbId": "33f78008-9100-812a-acae-c0a61d8caf3a",
+    "parentPageId": "31778008-9100-806b-b935-dc1810971e87",
+    "queue": {
+      "dailyShortlistCap": 2,
+      "ingestCap": 5,
+      "qualityMinScore": 7,
+      "maxGateEvaluationsPerRun": 15,
+      "autoPromoteSources": ["Twitter", "SecondBrain"],
+      "shortlistedOnProperty": "Shortlisted on",
+      "qualityScoreProperty": "Quality score"
+    }
+  }
+}

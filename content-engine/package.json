@@ -1,0 +1,27 @@
+{
+  "name": "content-engine",
+  "version": "0.1.0",
+  "description": "Unified content pipeline: topic collection, wiki-grounded drafts, AI visuals, Telegram approval gates",
+  "type": "module",
+  "main": "scripts/topic-collector.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "topic-collector": "node scripts/topic-collector.js",
+    "topic-quality-gate": "node scripts/topic-quality-gate.js",
+    "topic-pipeline-daily": "node scripts/topic-collector.js && node scripts/topic-quality-gate.js",
+    "draft-generator": "node scripts/draft-generator.js",
+    "visual-generator": "node scripts/visual-generator.js",
+    "approval-bot": "node scripts/approval-bot.js"
+  },
+  "keywords": ["content", "notion", "telegram", "ai"],
+  "author": "Akash Kedia <ahkedia@gmail.com>",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}

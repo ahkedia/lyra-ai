@@ -111,8 +111,8 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Status:** NOT accessible to OpenClaw integration. Need to share with OpenClaw-Lyra in Notion.
 
 ### Twitter Insights
-- **database_id:** `33a7800891008166aa55ddec1d2e5dc2` (with dashes: `33a78008-9100-8166-aa55-ddec1d2e5dc2`)
-- **data_source_id:** `33a78008-9100-81c2-9593-000b5821c87b`
+- **database_id:** `32d7800891008191b853d73aea132065` (with dashes: `32d78008-9100-8191-b853-d73aea132065`) — verified live 2026-04-22
+- **data_source_id:** `32d78008-9100-81b6-ac17-000bf4db6f2e`
 - **Parent:** [Lyra Hub](https://www.notion.so/akashkedia/Lyra-Hub-317780089100806bb935dc1810971e87) — full-page database (not inline) for sidebar navigation
 - **Properties:** Content Byte (title), Source Tweet (url), Type (select), Themes (multi_select), Original Tweet Summary / My Take / Full Byte / Recruiter Notes (rich_text), For Recruiter / Needs review (checkbox), Status (select), Generated At (date), Workflow (multi_select), Primary workflow (select), Workflow confidence (select), Content mode (select), Workflow rationale (rich_text)
 - **Workflow option names (exact):** `lyra_capability`, `work_claude_setup`, `personal_claude_setup`, `work_productivity`, `content_create`, `research_read_later`, `tool_eval`, `market_competitor`
