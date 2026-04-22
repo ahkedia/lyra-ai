@@ -142,7 +142,7 @@ BOOKMARKS=$(curl -s -X GET "https://api.twitter.com/2/users/${TWITTER_USER_ID}/b
   -H "Authorization: Bearer ${ACCESS_TOKEN}" \
   -H "Content-Type: application/json" \
   -G \
-  -d "max_results=100" \
+  -d "max_results=10" \
   -d "tweet.fields=author_id,created_at,public_metrics,context_annotations" \
   -d "expansions=author_id" \
   -d "user.fields=username,name,verified")

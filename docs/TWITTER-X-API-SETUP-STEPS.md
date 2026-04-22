@@ -98,7 +98,7 @@ Also set (if not already):
 
 ```bash
 NOTION_API_KEY="secret_..."
-TWITTER_INSIGHTS_DB_ID="33a7800891008166aa55ddec1d2e5dc2"
+TWITTER_INSIGHTS_DB_ID="32d7800891008191b853d73aea132065"
 ```
 
 Then restart OpenClaw (e.g. `sudo systemctl restart openclaw`).
