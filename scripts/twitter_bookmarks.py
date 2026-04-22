@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified Twitter bookmark pipeline: fetch → classify (multi-label) → write → route → wiki.
+Unified Twitter bookmark pipeline: fetch → classify (multi-label) → write → route.
 
 One script, one log, one error path.
 
@@ -13,7 +13,6 @@ Classification:
 Side effects:
   - Writes the bookmark row to Twitter Insights (source DB).
   - Fans out to every matched destination DB (Lyra Backlog / Claude Setup / Tool Eval / Content Topic Pool).
-  - Writes a markdown stub to $PERSONAL_KB_PATH/raw/bookmarks/ for content_create routes.
   - Appends a row to $CLASSIFICATION_LOG_PATH (CSV audit trail).
 
 Reads env from /root/.openclaw/.env:
@@ -21,15 +20,13 @@ Reads env from /root/.openclaw/.env:
   NOTION_API_KEY, TWITTER_INSIGHTS_DB_ID
   LYRA_BACKLOG_DB_ID, CLAUDE_SETUP_DB_ID, TOOL_EVAL_DB_ID, CONTENT_TOPIC_POOL_DB_ID
   ANTHROPIC_API_KEY (required for tier-2 & multi-label)
-  PERSONAL_KB_PATH (default /root/projects/personal-kb-raw)
   CLASSIFICATION_LOG_PATH (default /var/log/lyra-classification.csv)
-  WIKI_GIT_AUTOCOMMIT (default off)
 
 Usage:
   python3 twitter_bookmarks.py               # fetch + classify + write + route
   python3 twitter_bookmarks.py --dry-run     # classify + print, no writes
   python3 twitter_bookmarks.py --max 10      # X API max_results (default 10)
-  python3 twitter_bookmarks.py --no-route    # skip fan-out and wiki
+  python3 twitter_bookmarks.py --no-route    # skip fan-out to destination DBs
 """
 from __future__ import annotations
 
@@ -39,7 +36,6 @@ import csv
 import json
 import os
 import re
-import subprocess
 import sys
 import time
 import urllib.parse
@@ -55,7 +51,6 @@ DEFAULT_MAX_RESULTS = 10
 BOOKMARKS_TMP = Path(f"/tmp/lyra-bookmarks-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json")
 SCRIPT_DIR = Path(__file__).resolve().parent
 EXEMPLARS_FILE = Path(os.environ.get("EXEMPLARS_FILE", SCRIPT_DIR / "classifier-exemplars.json"))
-DEFAULT_KB_PATH = "/root/projects/personal-kb-raw"
 DEFAULT_LOG_PATH = "/var/log/lyra-classification.csv"
 
 VALID_WORKFLOWS = {
@@ -338,7 +333,7 @@ def load_exemplars() -> list[dict]:
         log(f"failed to load exemplars: {e}")
         return []
 
-SYSTEM_PROMPT = """You classify tweet bookmarks for Akash Kedia into workflow routes so they can be auto-filed in Notion and the personal wiki.
+SYSTEM_PROMPT = """You classify tweet bookmarks for Akash Kedia into workflow routes so they can be auto-filed in Notion.
 
 Akash's voice and focus:
 - Technical founder, product-minded engineer, based in Germany
@@ -487,8 +482,7 @@ def fetch_existing_urls(env: dict) -> set[str]:
 
 def write_to_notion(env: dict, tweet: dict, author: dict,
                     primary: str, secondary: list[str],
-                    confidence: str, rationale: str,
-                    wiki_stub: str) -> tuple[bool, str]:
+                    confidence: str, rationale: str) -> tuple[bool, str]:
     url = f"https://x.com/{author.get('username', 'unknown')}/status/{tweet['id']}"
     title = tweet["text"][:100].replace("\n", " ")
     bookmarked_date = tweet.get("created_at", "").split("T")[0]
@@ -509,8 +503,6 @@ def write_to_notion(env: dict, tweet: dict, author: dict,
     }
     if bookmarked_date:
         props["Bookmarked Date"] = {"date": {"start": bookmarked_date}}
-    if wiki_stub:
-        props["Wiki stub path"] = {"rich_text": [{"text": {"content": wiki_stub}}]}
 
     status, body = http("POST", "https://api.notion.com/v1/pages",
         headers={
@@ -523,11 +515,10 @@ def write_to_notion(env: dict, tweet: dict, author: dict,
             "properties": props,
         })
 
-    # Retry without new optional columns if the Twitter Insights schema isn't migrated yet.
+    # Retry without Workflow multi_select if the Twitter Insights schema isn't migrated yet.
     if status != 200 and "does not exist" in json.dumps(body).lower():
         log(f"  schema mismatch, retrying without optional columns: {body.get('message', '')[:120]}")
         props.pop("Workflow", None)
-        props.pop("Wiki stub path", None)
         status, body = http("POST", "https://api.notion.com/v1/pages",
             headers={
                 "Authorization": f"Bearer {env['NOTION_API_KEY']}",
@@ -595,82 +586,11 @@ def route_to_db(env: dict, workflow: str, title: str, tweet_url: str, notes: str
     log(f"  [{workflow}] routed to {cfg['db_env']}")
     return cfg["db_env"]
 
-# ---------- wiki stub ----------
-
-def write_wiki_stub(env: dict, title: str, tweet_url: str, tweet_text: str,
-                     rationale: str, primary: str, secondary: list[str]) -> str:
-    kb_path = Path(env.get("PERSONAL_KB_PATH", DEFAULT_KB_PATH))
-    if not kb_path.exists():
-        log(f"  wiki stub skipped — {kb_path} does not exist")
-        return ""
-    bookmarks_dir = kb_path / "raw" / "bookmarks"
-    bookmarks_dir.mkdir(parents=True, exist_ok=True)
-
-    for existing in bookmarks_dir.glob("*.md"):
-        try:
-            if f'tweet_url: "{tweet_url}"' in existing.read_text():
-                return str(existing.relative_to(kb_path))
-        except Exception:
-            continue
-
-    slug_src = title or tweet_url
-    slug = re.sub(r"[^a-z0-9]+", "-", slug_src.lower()).strip("-")[:60] or "bookmark"
-    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    file_path = bookmarks_dir / f"{date}-{slug}.md"
-
-    if secondary:
-        sec_yaml = "\n" + "\n".join(f"  - {s}" for s in secondary)
-    else:
-        sec_yaml = " []"
-
-    summary_lines = "\n".join("> " + line for line in tweet_text.splitlines())
-
-    content = f"""---
-source: twitter-bookmark
-tweet_url: "{tweet_url}"
-captured_at: {datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
-primary_workflow: {primary}
-secondary_workflows:{sec_yaml}
-status: idea
-published: false
----
-
-# {title[:120]}
-
-**Source:** [tweet]({tweet_url})
-
-## Summary
-{summary_lines}
-
-## Why it matters
-{rationale}
-
-## Angles / hooks
-- (fill in when drafting)
-
-## Related
-- (link to other wiki notes)
-"""
-    file_path.write_text(content)
-
-    if env.get("WIKI_GIT_AUTOCOMMIT", "").lower() == "true" and (kb_path / ".git").exists():
-        try:
-            subprocess.run(["git", "-C", str(kb_path), "add", str(file_path.relative_to(kb_path))],
-                           check=False, capture_output=True, timeout=10)
-            subprocess.run(["git", "-C", str(kb_path), "commit", "-m", f"bookmark: {date}-{slug}"],
-                           check=False, capture_output=True, timeout=10)
-            subprocess.run(["git", "-C", str(kb_path), "push"],
-                           check=False, capture_output=True, timeout=30)
-        except Exception as e:
-            log(f"  wiki auto-commit failed: {e}")
-
-    return str(file_path.relative_to(kb_path))
-
 # ---------- audit log ----------
 
 def append_audit(env: dict, tweet_id: str, tweet_url: str, title: str,
                  primary: str, secondary: list[str], confidence: str,
-                 rationale: str, wiki_stub: str, routed_to: list[str]) -> None:
+                 rationale: str, routed_to: list[str]) -> None:
     log_path = Path(env.get("CLASSIFICATION_LOG_PATH", DEFAULT_LOG_PATH))
     log_path.parent.mkdir(parents=True, exist_ok=True)
     new = not log_path.exists()
@@ -680,12 +600,12 @@ def append_audit(env: dict, tweet_id: str, tweet_url: str, title: str,
             if new:
                 w.writerow(["timestamp", "tweet_id", "tweet_url", "title",
                            "primary", "secondary", "confidence",
-                           "rationale", "wiki_stub", "routed_to"])
+                           "rationale", "routed_to"])
             w.writerow([
                 datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 tweet_id, tweet_url, title[:200],
                 primary, ";".join(secondary), confidence,
-                rationale[:400], wiki_stub, ";".join(routed_to),
+                rationale[:400], ";".join(routed_to),
             ])
     except Exception as e:
         log(f"  audit log write failed: {e}")
@@ -702,7 +622,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--since-hours", type=int, default=24)
     ap.add_argument("--no-route", action="store_true",
-                    help="skip fan-out to destination DBs and wiki stub")
+                    help="skip fan-out to destination DBs")
     args = ap.parse_args()
 
     env = load_env()
@@ -754,14 +674,7 @@ def main() -> int:
         if args.dry_run:
             continue
 
-        wiki_stub = ""
-        if not args.no_route and "content_create" in all_labels:
-            wiki_stub = write_wiki_stub(env, t["text"][:100].replace("\n", " "),
-                                        url, t["text"], rat, primary, secondary)
-            if wiki_stub:
-                log(f"  wiki stub: {wiki_stub}")
-
-        ok, _ = write_to_notion(env, t, author, primary, secondary, conf, rat, wiki_stub)
+        ok, _ = write_to_notion(env, t, author, primary, secondary, conf, rat)
         if not ok:
             errored += 1
             continue
@@ -778,7 +691,7 @@ def main() -> int:
                 routed_count += 1
 
         append_audit(env, t["id"], url, t["text"][:100].replace("\n", " "),
-                     primary, secondary, conf, rat, wiki_stub, routed_to)
+                     primary, secondary, conf, rat, routed_to)
         time.sleep(0.3)
 
     log(f"done: created={created} skipped={skipped} errored={errored} "
