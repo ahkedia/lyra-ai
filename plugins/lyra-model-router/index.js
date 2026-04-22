@@ -120,8 +120,17 @@ const TIER0_PATTERNS = [
   /^add .+? to (?:(?:my |the )?(?:shopping|grocery|groceries|meal|task|todo|reminder|trip|content|idea)s? (?:list|plan|db|database)?|(?:my )?reminders?)$/i,
   /^mark .+? (?:as )?(?:done|complete|finished)$/i,
   /^(?:done|complete|finished)[:\s]+.+$/i,
-  // Job application workflow — Phase A (trigger)
-  /(?:apply(?:ing)?\s+to\b|job\s+(?:link|post|opening|at)\b|cover\s+letter\s+(?:for|to)\b|draft\s+.*?outreach\s+(?:to|for)\b|linkedin\.com\/jobs|write\s+.*?cover\s+letter\b|message\s+.*?(?:and|plus)\s+cover\s+letter\b|(?:draft|write|creating)\s+(?:an?\s+)?(?:outreach\s+)?message\s+(?:to|for)\b|outreach\s+(?:message\s+)?(?:to|for)\b|gmail\s+draft\b|\bmessage\s+(?:to|for)\s+[A-Za-z]|help\s+(?:me\s+)?(?:with\s+)?(?:a\s+)?(?:outreach\s+)?message\b)/i,
+  // Job application workflow — Phase A (trigger). Keep aligned with crud/job_application.py _JOB_TRIGGER_RE.
+  /^\s*\/job\b/i,
+  /(?:apply(?:ing)?\s+to\b|job\s+(?:link|post|opening|at)\b|cover\s+letter\s+(?:for|to)\b|draft\s+.*?outreach\s+(?:to|for)\b|write\s+.*?cover\s+letter\b|message\s+.*?(?:and|plus)\s+cover\s+letter\b|(?:draft|write|creating)\s+(?:an?\s+)?(?:outreach\s+)?message\s+(?:to|for)\b|outreach\s+(?:message\s+)?(?:to|for)\b|gmail\s+draft\b|\bmessage\s+(?:to|for)\s+[A-Za-z]|help\s+(?:me\s+)?(?:with\s+)?(?:a\s+)?(?:outreach\s+)?message\b)/i,
+  // URL-based: known ATS/job hosts and LinkedIn profile URLs
+  /linkedin\.com\/(?:jobs|in)\//i,
+  /(?:jobs|careers|boards)\.[a-z0-9\-]+\.[a-z]{2,}/i,
+  /(?:lever|greenhouse|ashbyhq|workable|smartrecruiters|bamboohr|wellfound|hired|grnh\.se|myworkdayjobs|icims)\.[a-z]{2,}/i,
+  /kraken\.com\/careers/i,
+  // URL + job-intent fallback (URL in same message as role/apply/outreach/cover)
+  /https?:\/\/\S+[\s\S]{0,200}\b(?:role|position|opening|opportunity|apply|outreach|cover\s+letter)\b/i,
+  /\b(?:role|position|opening|opportunity|apply|outreach|cover\s+letter)\b[\s\S]{0,200}https?:\/\/\S+/i,
   // Job application workflow — Phase B (clarification reply; Python validates state file exists)
   /^(?:[1-3]|both|outreach(?:\s+only)?|cover(?:\s+letter)?(?:\s+only)?|message(?:\s+only)?)(?:\s+.{0,120})?$/i,
   // Content draft / revise — shared wiki + channel rules (cli.py parse → content_draft.py)

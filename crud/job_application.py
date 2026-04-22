@@ -71,11 +71,14 @@ def _get_env(key: str) -> str:
 # ---------------------------------------------------------------------------
 
 _JOB_TRIGGER_RE = re.compile(
-    r'(?:apply(?:ing)?\s+to\b'
+    r'(?:'
+    # Explicit slash command — zero-ambiguity escape hatch ("/job <url>")
+    r'^\s*/job\b'
+    # Phrase-based triggers (legacy set — preserve prior behavior)
+    r'|apply(?:ing)?\s+to\b'
     r'|job\s+(?:link|post|opening|at)\b'
     r'|cover\s+letter\s+(?:for|to)\b'
     r'|draft\s+.*?outreach\s+(?:to|for)\b'
-    r'|linkedin\.com/jobs'
     r'|write\s+.*?cover\s+letter\b'
     r'|message\s+.*?(?:and|plus)\s+cover\s+letter\b'
     # Person-centric outreach / Gmail drafts — must hit Tier-0 (wiki + himalaya), not chat LLM
@@ -84,8 +87,18 @@ _JOB_TRIGGER_RE = re.compile(
     r'|gmail\s+draft\b'
     r'|\bmessage\s+(?:to|for)\s+[A-Za-z]'  # e.g. "message for Rajneesh"
     r'|help\s+(?:me\s+)?(?:with\s+)?(?:a\s+)?(?:outreach\s+)?message\b'
+    # URL-based triggers — known ATS / job hosts (match anywhere in message)
+    r'|linkedin\.com/jobs'
+    r'|linkedin\.com/in/'                                        # profile URL → outreach context
+    r'|(?:jobs|careers|boards)\.[a-z0-9\-]+\.[a-z]{2,}'
+    r'|(?:lever|greenhouse|ashbyhq|workable|smartrecruiters'
+    r'|bamboohr|wellfound|hired|grnh\.se|myworkdayjobs|icims)\.[a-z]{2,}'
+    r'|kraken\.com/careers'
+    # URL + job-intent fallback (URL in same message as role/apply/outreach/cover)
+    r'|https?://\S+[\s\S]{0,200}\b(?:role|position|opening|opportunity|apply|outreach|cover\s+letter)\b'
+    r'|\b(?:role|position|opening|opportunity|apply|outreach|cover\s+letter)\b[\s\S]{0,200}https?://\S+'
     r')',
-    re.IGNORECASE,
+    re.IGNORECASE | re.MULTILINE,
 )
 
 _CLARIFICATION_REPLY_RE = re.compile(
@@ -185,6 +198,8 @@ def _extract_person_email(msg: str) -> str:
 # ---------------------------------------------------------------------------
 
 def handle_trigger(msg: str) -> str:
+    # Strip the explicit "/job" prefix if present — rest of pipeline expects natural text
+    msg = re.sub(r'^\s*/job\s*', '', msg, flags=re.IGNORECASE)
     url = _extract_url(msg)
     company = _extract_company(msg)
     person = _extract_person(msg)

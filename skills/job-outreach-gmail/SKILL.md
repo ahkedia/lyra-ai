@@ -27,8 +27,12 @@ If you skip step 1 or 2, you will re-ask stable facts and he will escalate — t
 
 ## Tier-0 triggers (non-exhaustive)
 
-Phrases that should route to `python3 /root/lyra-ai/crud/cli.py parse "<msg>"` / `job_application.py`:
+Phrases / URLs that should route to `python3 /root/lyra-ai/crud/cli.py parse "<msg>"` / `job_application.py`:
 
+**Explicit (always works — use when in doubt):**
+- `/job <url>` — zero-ambiguity slash command. Strip no prefix needed; pipeline parses the rest.
+
+**Phrase-based:**
 - Apply / job link / LinkedIn jobs URL / cover letter
 - `draft … outreach to|for …`
 - `draft|write|creating … message to|for [Name]`
@@ -36,6 +40,15 @@ Phrases that should route to `python3 /root/lyra-ai/crud/cli.py parse "<msg>"` /
 - `message to|for [Name]` (capitalized name works best)
 - `gmail draft`
 - `help me with … message` (outreach / job context)
+
+**URL-based (auto-detected):**
+- `linkedin.com/jobs/...`, `linkedin.com/in/...` (profiles for outreach)
+- `jobs.<company>.com`, `careers.<company>.com`, `boards.<company>.com`
+- ATS hosts: `lever.co`, `greenhouse.io`, `boards.greenhouse.io`, `ashbyhq.com`, `workable.com`, `smartrecruiters.com`, `bamboohr.com`, `wellfound.com`, `hired.com`, `grnh.se`, `myworkdayjobs.com`, `icims.com`
+- `kraken.com/careers/...`
+- **URL + one of** `role | position | opening | opportunity | apply | outreach | cover letter` in the same message
+
+If a message has a URL but no trigger word, prepend `/job` to force-route.
 
 **Phase B** (after clarification): replies like `1`, `2`, `3`, `both`, `outreach only`, `cover only`, `message only`, optionally with a short tone hint.
 
