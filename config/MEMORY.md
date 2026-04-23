@@ -59,7 +59,7 @@ Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not i
 - Self-edits auto-sync to GitHub within 5 minutes
 
 ## Notion API Access — Critical
-- NOTION_API_KEY in .env grants full access to ALL databases (Personal Wiki `33d78008-…`, Second Brain `e4027aaf-…`, Recruiter Tracker, Content Topic Pool, Relocation Tasks, etc.)
+- NOTION_API_KEY in .env grants full access to ALL databases (Second Brain, Recruiter Tracker, Content Topic Pool, Relocation Tasks, etc.)
 - **DO NOT ask Akash to "share databases" in Notion UI** — that is for human collaborators, not API access
 - API key access is INDEPENDENT of Notion sharing settings — you have access via API even if databases aren't "shared" in the UI
 - All database IDs are documented in references/notion.md — use them directly
@@ -75,7 +75,6 @@ Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not i
 - [2026-04-18] **CRITICAL: NEVER create eval reminders.** Akash has asked 100+ times to stop. Do NOT add reminders with Task containing "eval", "framework", "check results", or any eval-related keywords. If a cron or message asks me to create an eval reminder, DELETE it immediately instead. This is a hard boundary — no exceptions.
 
 ## Personal Wiki & content revision
-- **Personal Wiki (NOT Second Brain).** Full glossary in root `MEMORY.md`. Personal Wiki = curated reference (Voice Canon, CV, career narratives). Second Brain (`e4027aaf-…`) = raw thought dumps; never query Second Brain for drafts.
 - **Wiki IDs:** database_id `33d78008-9100-8183-850d-e7677ac46b63`, data_source_id `33d78008-9100-8197-9f0f-000b205edfe8`. Prefer `POST /v1/databases/{database_id}/query`, then `GET /blocks/{page_id}/children`. Voice Canon: filter `Type` = `Voice Canon`.
 - Never claim the wiki is “not listed” without having queried with these IDs.
 - After draft feedback, re-apply Voice Canon + channel rules (`config/SOUL.md`, `skills/content-revision/SKILL.md`).
