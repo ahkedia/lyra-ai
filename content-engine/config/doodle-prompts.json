@@ -1,7 +1,6 @@
 {
   "_comment": "Domain-specific doodle style hints for visual-generator.js",
-  "_style_reference": "akash-prefers-editorial-cartoon: two groups separated by a visible gap/chasm, simple cartoon people with distinct expressions (happy vs skeptical/worried), minimal color accents, hand-drawn ink aesthetic, question mark or symbol in the gap space",
-  "basePrompt": "A clean, minimal hand-drawn editorial cartoon illustration. Two distinct groups separated by a visible gap, chasm, or divide — each group with simple cartoon human figures showing clear expressions or postures. Minimal color accents only (e.g., blue tones for one group, warm tones for another). Black ink linework on white or off-white background. Style: editorial cartoon,聰 simple sketch quality, high contrast. No photorealism. No complex gradients. Illustration only. No text labels.",
+  "basePrompt": "A clean, minimal hand-drawn editorial cartoon illustration in black ink with selective color accents. Style: simple sketch, editorial cartoon quality, high contrast. Colour palette: blue tones for one group/section, warm/green tones for another group/section. Human figures are simple, cartoon-style, expressive. Subject should reflect the actual content of the piece — relatable, specific to the topic, not abstract. No photorealism. No complex gradients. Illustration only. No text labels.",
   "domainHints": {
     "AI/ML": "neural network diagram, robot icon, brain with circuits, decision tree",
     "Growth & Internationalisation": "growth chart, funnel, flywheel, globe with arrows",
