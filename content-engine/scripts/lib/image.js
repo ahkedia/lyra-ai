@@ -132,9 +132,6 @@ export async function generateImage(prompt) {
 }
 
 export function buildDoodlePrompt(concept, domain) {
-  return `A clean, minimal hand-drawn doodle illustration in black ink on white paper.
-Style: simple sketch, no color, no shading, editorial cartoon quality.
-Subject: ${concept}
-Domain context: ${domain}
-No text, no labels, no people's faces. Illustration only.`;
+  const domainHint = doodleConfig.domainHints[domain] || doodleConfig.fallbackHint;
+  return `${doodleConfig.basePrompt}\nSubject: ${concept}\nDomain context: ${domainHint}`;
 }
