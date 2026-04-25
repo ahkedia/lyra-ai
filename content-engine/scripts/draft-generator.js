@@ -307,6 +307,23 @@ Requirements:
 Output ONLY the LinkedIn post text. No preamble.`;
 }
 
+function buildVisualCaptionPrompt(topic, blogContent) {
+  return `You are a visual concept writer. Create a short, punchy caption for an editorial cartoon illustration that accompanies this piece.
+
+BLOG TOPIC: "${sanitizeInput(topic)}"
+
+BLOG SUMMARY:
+${blogContent.slice(0, 800)}...
+
+GUIDELINES:
+- Caption should be 8-15 words max
+- Must be relatable and specific to the content (not generic)
+- Should complement the blog's core thesis or hook
+- No hashtags, no jargon, no explanation
+- Output ONLY the caption text. No quotes around it, no preamble.
+`;
+}
+
 async function sonnetVoiceRewrite(draftText, topic, domain, voiceCanon, authorBrief = "") {
   const briefSection = authorBrief.trim()
     ? `\nAUTHOR BRIEF (do not contradict; keep claims aligned):\n${sanitizeInput(authorBrief)}\n`
@@ -422,10 +439,20 @@ async function generateDraft(topic, domain, authorBrief = "") {
   );
   console.log(`  LinkedIn copy generated: ${linkedinCopy.length} chars`);
 
+  // Step 4: Visual caption for image generation pipeline
+  const visualCaptionPrompt = buildVisualCaptionPrompt(topic, humanizedBlog);
+  const visualCaption = await generateWithSonnet(
+    "You are a visual concept writer. Output only the caption, no explanation.",
+    visualCaptionPrompt,
+    200
+  );
+  console.log(`  Visual caption generated: ${visualCaption.length} chars`);
+
   return {
     blog: humanizedBlog,
     tweetCopy,
     linkedinCopy,
+    visualCaption,
     score,
     fails,
     evidence: evidence.map((e) => e.title).join(", "),
@@ -461,6 +488,7 @@ async function writeToDraftsDB(topic, domain, result, authorBrief = "") {
       blog_content: { rich_text: [{ text: { content: blogPropText } }] },
       tweet_copy: { rich_text: [{ text: { content: result.tweetCopy.slice(0, 2000) } }] },
       linkedin_copy: { rich_text: [{ text: { content: result.linkedinCopy.slice(0, 2000) } }] },
+      visual_caption: { rich_text: [{ text: { content: result.visualCaption.slice(0, 500) } }] },
       Content: { rich_text: [{ text: { content: blogPropText } }] },
       humanization_score: { number: result.score },
       text_approval_status: { select: { name: "pending" } },

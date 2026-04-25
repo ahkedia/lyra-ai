@@ -55,6 +55,7 @@ async function generateVisualForDraft(pageId, redoHint = null) {
   const title = extractTitle(page);
   const domain = extractSelect(page, "Domain") || "General";
   const draftText = extractRichText(page, "Content");
+  const visualCaption = extractRichText(page, "visual_caption");
   const redoCount = extractNumber(page, "redo_count") || 0;
   
   if (redoCount >= MAX_REDO_COUNT) {
@@ -68,12 +69,16 @@ async function generateVisualForDraft(pageId, redoHint = null) {
   
   const concept = extractConcept(draftText);
   const domainHint = getDomainHint(domain);
-  
+
   let promptConcept = `${concept} — ${domainHint}`;
+  if (visualCaption) {
+    promptConcept = `${visualCaption} — ${domainHint}`;
+    console.log(`  Visual caption: ${visualCaption}`);
+  }
   if (redoHint) {
     promptConcept = `${redoHint} — ${domainHint}`;
   }
-  
+
   const prompt = buildDoodlePrompt(promptConcept, domain);
   console.log(`Prompt: ${prompt.slice(0, 100)}...`);
   
