@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+dist/
 
 # Never commit real credentials or personal config
 *.env

@@ -4,16 +4,28 @@
   "type": "module",
   "description": "Personal AI agent for work, life, and household — built on OpenClaw, Claude, Telegram, Notion",
   "private": true,
+  "bin": {
+    "lyra-minions-jobs": "dist/minions/cli.js"
+  },
   "scripts": {
     "test": "node --test test/content-machine.test.js",
     "route": "node scripts/model-router.js",
     "route:test": "node scripts/model-router.js --test",
-    "route:stats": "node scripts/model-router.js --stats"
+    "route:stats": "node scripts/model-router.js --stats",
+    "minions:build": "tsc -p tsconfig.minions.json && chmod +x dist/minions/cli.js",
+    "minions:smoke": "node dist/minions/cli.js smoke",
+    "minions:work": "node dist/minions/cli.js work --concurrency 4"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@supermemory/tools": "^1.4.0",
+    "pg": "^8.13.1",
     "ws": "^8.20.0",
     "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.2"
   }
 }
