@@ -85,69 +85,35 @@ chmod +x scripts/get-twitter-oauth-refresh-token.sh
 ```
 
 1. A browser tab opens → click **Authorize**. Localhost may show **connection refused** — normal.
-2. Run (no URL on the command line — avoids zsh `?` / `&` issues):
+2. Copy the **full URL** from the address bar, then run:
    ```bash
-   ./scripts/get-twitter-oauth-refresh-token.sh exchange
+   ./scripts/get-twitter-oauth-refresh-token.sh exchange 'PASTE_FULL_URL_HERE'
    ```
-   When prompted, paste the **full URL** from the address bar and press Enter.
 3. Copy the printed `TWITTER_REFRESH_TOKEN=...` into `.env`.
-
-   **Optional:** `exchange 'http://localhost:3000/...'` in one line works if you wrap the URL in **single quotes**.
 
 **One-shot (interactive terminal only):** `./scripts/get-twitter-oauth-refresh-token.sh interactive`
 
 If you see `invalid_grant`, the `code` expired — run `start` again, then `exchange` within a few minutes.
 
-### Option B: Postman for the token exchange (browser + PKCE still required)
+### Option B: Using Postman (Visual)
 
-**Do not paste Client ID, Client Secret, or tokens into AI chats** — treat them like passwords. If you already shared a secret somewhere public, **regenerate the Client Secret** in the X Developer Portal and update every `.env` that used the old one.
-
-X’s OAuth **requires PKCE**. A bare Postman request with only `code` (no `code_verifier`) will fail. This flow uses the helper script **only** to build the correct authorize URL and save PKCE to a local file; **Postman** does the HTTPS token request so you never run `exchange` in the terminal.
-
-#### B1 — One terminal command, then everything in browser + Postman
-
-1. Install [Postman](https://www.postman.com/) (desktop app is fine).
-
-2. On your Mac, in a terminal (same as Option A):
-
-   ```bash
-   cd /path/to/lyra-ai
-   export TWITTER_CLIENT_ID='your_client_id'
-   export TWITTER_CLIENT_SECRET='your_client_secret'
-   ./scripts/get-twitter-oauth-refresh-token.sh start
-   ```
-
-   A browser tab should open. If not, copy the long `https://twitter.com/i/oauth2/authorize?...` URL from the terminal and open it.
-
-3. In the browser: log in if asked → click **Authorize**.  
-   You may land on `http://localhost:3000/auth/callback?...` with a connection error — **that is normal**. **Copy the full URL** from the address bar (it contains `code=...`).
-
-4. Open this file in TextEdit or any editor (it was created by `start`):
-
-   `~/.cache/lyra-twitter-oauth/pkce-state.json`
-
-   It contains `verifier`, `client_id`, `client_secret`, and `redirect_uri`. You will copy from it into Postman.
-
-5. In Postman, create a **POST** request:
-
+1. Install [Postman](https://www.postman.com/)
+2. Create new request:
+   - **Method:** POST
    - **URL:** `https://oauth2.twitter.com/2/oauth2/token`
-   - **Headers:** `Content-Type: application/x-www-form-urlencoded`
-   - **Body** → **x-www-form-urlencoded** (not raw JSON), add:
-
-   | Key | Value |
-   |-----|--------|
-   | `grant_type` | `authorization_code` |
-   | `client_id` | from `pkce-state.json` |
-   | `client_secret` | from `pkce-state.json` |
-   | `redirect_uri` | from `pkce-state.json` (must match the portal, usually `http://localhost:3000/auth/callback`) |
-   | `code_verifier` | the `verifier` field from `pkce-state.json` |
-   | `code` | from your browser URL: the part after `code=` up to the next `&` (or end). URL-decode is optional; Postman usually accepts the encoded value. |
-
-6. Click **Send**. The JSON response should include **`refresh_token`**. Copy that string into your `.env` as `TWITTER_REFRESH_TOKEN="..."`.
-
-7. If you get **`invalid_grant`**, the `code` expired (a few minutes) or does not match this PKCE run — run **`start` again** (step 2), authorize again, and repeat steps 3–6 with the **new** URL and **new** `pkce-state.json`.
-
-**Why not “Postman only” from scratch?** Building `code_challenge` / `code_verifier` by hand is error-prone. `start` does that correctly in one shot.
+3. **Body** → form-data:
+   - `grant_type`: `authorization_code`
+   - `client_id`: Your Client ID
+   - `client_secret`: Your Client Secret
+   - `redirect_uri`: `http://localhost:3000/auth/callback`
+   - `code`: [Authorization code you'll get from browser]
+4. First, authorize manually by visiting (include `offline.access` for refresh tokens):
+   ```
+   https://twitter.com/i/oauth2/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=http://localhost:3000/auth/callback&response_type=code&scope=tweet.read%20bookmark.read%20users.read%20offline.access
+   ```
+   (PKCE is still required for production; use Option A unless you know how to add `code_challenge` manually.)
+5. Copy the auth code from redirect
+6. Send Postman request → get refresh token
 
 ---
 
