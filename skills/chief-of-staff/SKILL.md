@@ -8,13 +8,6 @@ metadata: {"clawdbot":{"emoji":"📋"}}
 
 Orchestration skill for **day-to-day operations**: triage, scheduling context, task focus, and outreach hygiene. This skill **does not replace** other skills — it **coordinates** them.
 
-### At a glance (use vs not)
-| Use this skill | Use something else |
-|----------------|-------------------|
-| Morning brief, EA mode, inbox/calendar **context**, recruiter hygiene, “what should I focus on” | Tier-0 reminders/lists/shopping → `crud/cli.py` + router rules |
-| Cross-tool **orchestration** when Akash wants a prep pass | Abhigna requests → SOUL access matrix only |
-| Pipeline / `tasks/current.md` / Notion alignment | Raw health metrics → `skills/health-coach/SKILL.md` |
-
 ## When to load this skill
 
 - Akash asks for: morning brief, daily prep, "chief of staff", "EA mode", inbox triage, week plan, recruiter pipeline review
