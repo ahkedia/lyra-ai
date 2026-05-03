@@ -498,6 +498,18 @@ async function assertNoLeakage() {
   for (const l of leaks) {
     console.error(`  - [${l.db}] "${l.title}" (id=${l.pageId}, source=${l.source}, created=${l.createdTime})`);
   }
+  // Auto-archive: keep the assertion failing (exit 3) so leakage is loud, but
+  // don't let the rows accumulate. Detected + cleaned in the same run.
+  let cleaned = 0;
+  for (const l of leaks) {
+    try {
+      await notionRequest('PATCH', `/v1/pages/${l.pageId}`, { archived: true });
+      cleaned++;
+    } catch (err) {
+      console.error(`  [leakage-assert] Auto-archive failed for ${l.pageId}: ${err.message}`);
+    }
+  }
+  console.error(`[leakage-assert] Auto-archived ${cleaned}/${leaks.length} leaked page(s). Run still fails so the leak is visible.`);
   return { ok: false, leaks };
 }
 
