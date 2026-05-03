@@ -9,35 +9,6 @@ metadata: {"clawdbot":{"emoji":"📝"}}
 
 Use the Notion API to create/read/update pages, data sources (databases), and blocks.
 
-## ⛔ HARD RULE — Reminders DBs MUST go through `crud/cli.py`
-
-**NEVER write directly to these databases via curl. Always use the Python CLI:**
-
-| DB name | database_id |
-|---|---|
-| Reminders - Akash | `32678008-9100-802f-ad9f-fb48ff5f4c1d` |
-| Reminders - Shared | `2054e39c-3f09-431d-8821-0e6a7513913a` |
-| Reminders - Abhigna | `5d6732b1-7e30-4856-b56b-edbf9c3df229` |
-
-**Use this command for ANY reminder write (eval, user, cron — all of them):**
-```bash
-python3 /root/lyra-ai/crud/cli.py parse '<the user's reminder request verbatim>'
-```
-
-Examples:
-- User: "Add a reminder: call the dentist tomorrow at 3pm"
-  → `python3 /root/lyra-ai/crud/cli.py parse 'Add a reminder: call the dentist tomorrow at 3pm'`
-- User: "Remind me to pick up groceries"
-  → `python3 /root/lyra-ai/crud/cli.py parse 'Remind me to pick up groceries'`
-- Cross-user: "create a shared reminder titled X"
-  → set `NOTION_REMINDERS_DB_ID=2054e39c-3f09-431d-8821-0e6a7513913a` then run the same CLI
-
-**Why this rule exists:** the CLI auto-tags every page with a `Source` select property (`user|eval|cron`) based on the active session, which is what the eval cleanup pipeline relies on to keep test data out of prod. Writing directly via curl bypasses this and pollutes the production DBs — Akash has had to do nuclear cleanups because of this. Don't.
-
-If you genuinely cannot use the CLI (e.g., the schema needs a property the CLI doesn't set), include `"Source": {"select": {"name": "user"}}` (or `"eval"` / `"cron"`) explicitly in your `properties` payload. The Source property is REQUIRED for Reminders DB writes.
-
-
-
 ## Setup
 
 1. Create an integration at https://notion.so/my-integrations
