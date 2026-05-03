@@ -23,6 +23,10 @@ import {
 } from './lib/metrics.js';
 
 const RUN_ID = Date.now().toString(36);
+const RUN_START_ISO = new Date().toISOString();
+// Notion integration user (Openclaw-Lyra). Pages this bot creates are eval-attributable
+// when they fall inside the run window. Used by leakage assertion + nuke cleanup.
+const LYRA_INTEGRATION_USER_ID = '31778008-9100-81f5-86d2-00274e9a233a';
 
 /** Pacing — tune via env (Phase 1: reduce gateway OOM under long runs) */
 const POST_TEST_MS = Math.max(0, parseInt(process.env.EVAL_POST_TEST_MS || '2000', 10));
@@ -334,43 +338,74 @@ const EVAL_CLEANUP_TARGETS = [
   { database: '5d6732b1-7e30-4856-b56b-edbf9c3df229', data_source: '1e74f66d-cb24-40f5-8697-84a3ad8ad1bc', title_properties: ['Task'] },
 ];
 
+/** Query a database/data_source for pages where Source select == name. */
+async function queryNotionBySource(apiPath, sourceName) {
+  return await notionRequest('POST', apiPath, {
+    filter: { property: 'Source', select: { equals: sourceName } },
+  });
+}
+
+/** Query a database/data_source for pages created since iso, optionally by a specific user. */
+async function queryNotionCreatedSince(apiPath, sinceIso, createdById) {
+  const filters = [{ timestamp: 'created_time', created_time: { on_or_after: sinceIso } }];
+  if (createdById) {
+    filters.push({ property: 'Source', select: { does_not_equal: 'user' } });
+  }
+  const body = { filter: filters.length === 1 ? filters[0] : { and: filters } };
+  const r = await notionRequest('POST', apiPath, body);
+  if (!createdById) return r;
+  // Notion can't filter by created_by on every DB; post-filter results.
+  r.results = (r.results || []).filter((p) => p?.created_by?.id === createdById);
+  return r;
+}
+
 async function runGlobalCleanupSweep() {
-  console.log('\n[global-cleanup] Sweeping all databases for leaked [eval] data...');
+  console.log('\n[global-cleanup] Sweeping all databases for leaked eval data...');
   let totalArchived = 0;
 
   for (const target of EVAL_CLEANUP_TARGETS) {
-    try {
-      let result = { results: [] };
+    const seen = new Set();
+    const queries = [];
 
-      if (target.data_source) {
-        try {
-          const dsPath = `/v1/data_sources/${uuidWithDashes(target.data_source)}/query`;
-          result = await queryNotionTitleContains(dsPath, '[eval]', target.title_properties);
-        } catch {
-          // Fallback to database query
-        }
-      }
+    // Layer 1: Source=eval property (deterministic, set by Tier 0 wrapper).
+    if (target.data_source) {
+      const dsPath = `/v1/data_sources/${uuidWithDashes(target.data_source)}/query`;
+      queries.push(() => queryNotionBySource(dsPath, 'eval'));
+    }
+    queries.push(() =>
+      queryNotionBySource(`/v1/databases/${uuidWithDashes(target.database)}/query`, 'eval'),
+    );
 
-      if (!result.results?.length) {
-        const dbPath = `/v1/databases/${uuidWithDashes(target.database)}/query`;
-        try {
-          result = await queryNotionTitleContains(dbPath, '[eval]', target.title_properties);
-        } catch {
-          continue; // Skip this database if both queries fail
-        }
-      }
+    // Layer 2: [eval] title-contains (catches LLM-path writes that include the marker).
+    if (target.data_source) {
+      const dsPath = `/v1/data_sources/${uuidWithDashes(target.data_source)}/query`;
+      queries.push(() => queryNotionTitleContains(dsPath, '[eval]', target.title_properties));
+    }
+    queries.push(() =>
+      queryNotionTitleContains(
+        `/v1/databases/${uuidWithDashes(target.database)}/query`,
+        '[eval]',
+        target.title_properties,
+      ),
+    );
 
-      for (const page of result.results || []) {
-        try {
-          await notionRequest('PATCH', `/v1/pages/${page.id}`, { archived: true });
-          totalArchived++;
-          console.log(`  [global-cleanup] Archived leaked eval page: ${page.id}`);
-        } catch (err) {
-          console.warn(`  [global-cleanup] Failed to archive ${page.id}: ${err.message}`);
+    for (const q of queries) {
+      try {
+        const result = await q();
+        for (const page of result.results || []) {
+          if (seen.has(page.id)) continue;
+          seen.add(page.id);
+          try {
+            await notionRequest('PATCH', `/v1/pages/${page.id}`, { archived: true });
+            totalArchived++;
+            console.log(`  [global-cleanup] Archived leaked eval page: ${page.id}`);
+          } catch (err) {
+            console.warn(`  [global-cleanup] Failed to archive ${page.id}: ${err.message}`);
+          }
         }
+      } catch {
+        /* try next query layer */
       }
-    } catch (err) {
-      // Non-fatal: continue with other databases
     }
   }
 
@@ -413,6 +448,57 @@ async function runGlobalCleanupSweep() {
   if (cronsRemoved > 0) {
     console.log(`[global-cleanup] Removed ${cronsRemoved} leaked eval crons.`);
   }
+}
+
+/**
+ * Time-windowed leakage assertion. Runs AFTER the cleanup sweep.
+ * Queries the two Reminders DBs for any page created by the integration bot
+ * during the eval run window where Source != 'user'. If any survive cleanup,
+ * the eval run is marked failed and the runner exits non-zero. This is the
+ * regression test: it physically cannot pass while pollution remains.
+ *
+ * Returns { ok: boolean, leaks: [{db, pageId, title, createdTime}] }.
+ */
+async function assertNoLeakage() {
+  const REMINDER_TARGETS = [
+    { name: 'Reminders - Akash', database: '32678008-9100-802f-ad9f-fb48ff5f4c1d', data_source: '32678008-9100-8171-8940-000b30243ddd' },
+    { name: 'Reminders - Shared', database: '2054e39c-3f09-431d-8821-0e6a7513913a', data_source: '9f206d71-7b25-408b-ad20-02daf0b43da0' },
+  ];
+  const leaks = [];
+
+  for (const t of REMINDER_TARGETS) {
+    let result = { results: [] };
+    const dsPath = `/v1/data_sources/${uuidWithDashes(t.data_source)}/query`;
+    const dbPath = `/v1/databases/${uuidWithDashes(t.database)}/query`;
+    try {
+      result = await queryNotionCreatedSince(dsPath, RUN_START_ISO, LYRA_INTEGRATION_USER_ID);
+    } catch {
+      try {
+        result = await queryNotionCreatedSince(dbPath, RUN_START_ISO, LYRA_INTEGRATION_USER_ID);
+      } catch (err) {
+        console.warn(`[leakage-assert] Query failed for ${t.name}: ${err.message}`);
+        continue;
+      }
+    }
+    for (const p of result.results || []) {
+      const src = p?.properties?.Source?.select?.name || null;
+      if (src === 'user') continue; // legitimate user write that happened during eval window
+      const taskProp = p?.properties?.Task?.title || [];
+      const title = taskProp.map((t) => t.plain_text || '').join('') || '(untitled)';
+      leaks.push({ db: t.name, pageId: p.id, title, createdTime: p.created_time, source: src });
+    }
+  }
+
+  if (leaks.length === 0) {
+    console.log('[leakage-assert] PASS — no Reminders pollution survived cleanup.');
+    return { ok: true, leaks: [] };
+  }
+
+  console.error(`\n[leakage-assert] FAIL — ${leaks.length} eval page(s) leaked into prod Reminders DBs:`);
+  for (const l of leaks) {
+    console.error(`  - [${l.db}] "${l.title}" (id=${l.pageId}, source=${l.source}, created=${l.createdTime})`);
+  }
+  return { ok: false, leaks };
 }
 
 function errorMeta(error) {
@@ -805,6 +891,12 @@ async function main() {
   // Global cleanup sweep — catch any leaked [eval] data from all databases
   await runGlobalCleanupSweep();
 
+  // Regression assertion: nothing the bot wrote during the eval window may remain
+  // in Reminders DBs unless explicitly tagged Source=user. Fails the run on leaks.
+  const leakage = await assertNoLeakage();
+  summary.leakage = { ok: leakage.ok, leaks: leakage.leaks };
+  writeFileSync(summaryFile, JSON.stringify(summary, null, 2));
+
   // Print summary
   console.log('\n' + '='.repeat(50));
   console.log(`Legacy pass rate: ${passed}/${results.length} (${Math.round(summary.pass_rate * 100)}%) — includes infra failures`);
@@ -841,7 +933,11 @@ async function main() {
   console.log(`Results: ${outputFile}`);
   console.log(`Summary: ${summaryFile}`);
 
-  // Exit codes: 0 = green, 1 = capability/stability gate, 2 = invalid run (too unstable)
+  // Exit codes: 0 = green, 1 = capability/stability gate, 2 = invalid run, 3 = prod data leakage
+  if (!leakage.ok) {
+    console.error(`\n[exit 3] Reminders pollution detected — ${leakage.leaks.length} page(s) survived cleanup. See [leakage-assert] above. Run will exit non-zero regardless of pass rate.`);
+    process.exit(3);
+  }
   if (process.env.EVAL_LEGACY_EXIT === '1') {
     if (summary.pass_rate < 0.8) {
       console.error('\n[exit 1] EVAL_LEGACY_EXIT=1: legacy pass_rate < 80%');

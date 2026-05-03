@@ -103,6 +103,7 @@ def add_reminder_text(task: str, when: str = "") -> str:
     title = title[:2000]
     props = {
         "Task": {"title": [{"type": "text", "text": {"content": title}}]},
+        "Source": {"select": {"name": _provenance_source()}},
     }
     _notion_request(
         "POST",
@@ -110,3 +111,18 @@ def add_reminder_text(task: str, when: str = "") -> str:
         {"parent": {"database_id": db_id}, "properties": props},
     )
     return f"Added reminder to Notion: {title}"
+
+
+def _provenance_source() -> str:
+    """Determine Source tag for a reminder write.
+
+    Reads LYRA_SESSION_KEY (set by the router). Eval sessions are prefixed
+    `eval-` (see evals/runner.js sendToLyra). Cron-triggered sessions use
+    OpenClaw's `cron-` prefix. Anything else is a real user write.
+    """
+    sk = os.environ.get("LYRA_SESSION_KEY", "") or ""
+    if sk.startswith("eval-") or ":eval-" in sk:
+        return "eval"
+    if sk.startswith("cron-") or ":cron-" in sk:
+        return "cron"
+    return "user"

@@ -174,7 +174,7 @@ const SONNET_ALLOWLIST = [
 const ACK_PATTERNS = [/^(?:hi|hello|hey|gm|ok|okay|thanks|thank you|done|yes|no|sure|got it|cool|great|perfect|👍|🙏)\s*$/i];
 let _rollingCache = { at: 0, state: null };
 
-function tryTier0(prompt) {
+function tryTier0(prompt, sessionKey = "") {
   const trimmed = normalizeTier0Prompt(prompt);
   const matched =
     TIER0_PATTERNS.some((p) => p.test(trimmed)) ||
@@ -186,7 +186,7 @@ function tryTier0(prompt) {
   try {
     const result = execFileSync("python3", [CRUD_CLI, "parse", prompt.trim()], {
       timeout: 8000,
-      env: { ...process.env },
+      env: { ...process.env, LYRA_SESSION_KEY: sessionKey || "" },
     });
     return result.toString().trim();
   } catch (e) {
@@ -487,7 +487,7 @@ function resolveRoutingCore(event, ctx) {
     return { type: "skip_cron" };
   }
 
-  const tier0 = tryTier0(prompt);
+  const tier0 = tryTier0(prompt, sessionKey);
   if (tier0 !== null) {
     return { type: "tier0", direct: tier0 };
   }
