@@ -85,7 +85,7 @@ tier0_python_jobs:
         - "(?i)what (does|did) lenny say (about )?.+"
         - "(?i)lenny (wiki )?(on|about) .+"
         - "(?i)lenny says (about )?.+"
-        - "(?i)wiki lenny[:\s].+"
+        - "(?i)wiki lenny[:\\s].+"
       examples:
         - "What does Lenny say about pricing?"
         - "Lenny on activation metrics"
