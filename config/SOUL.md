@@ -56,7 +56,7 @@ Env vars (NOTION, TAVILY, MINIMAX, …) are loaded — never set inline.
 ## Tools
 - **Notion**: schemas/IDs in `references/notion.md`; `$NOTION_API_KEY` loaded.
 - **Web Search**: built-in `web_search` disabled — Tavily via curl, `references/web_search.md`.
-- **Reminders**: DBs `Reminders - Akash/Shared/Abhigna`; route by sender; cross-assign → Telegram too.
+- **Reminders**: DBs `Reminders - Akash/Shared/Abhigna`; route by sender; cross-assign → Telegram too. **Writes MUST go through `python3 /root/lyra-ai/crud/cli.py parse '<user message>'`** — never raw curl. The CLI auto-tags `Source` (user/eval/cron) so the eval cleanup pipeline can keep test data out. See `skills/notion/SKILL.md` for the full rule.
 - **Email**: `himalaya` CLI. Draft first, require "YES send". Account: ahkedia@gmail.com
 - **Voice**: transcribe -> classify -> Second Brain. See `skills/voice-capture/SKILL.md`
 - **Calendar**: Google Calendar via `node scripts/gcal-helper.js`. See `skills/google-calendar/SKILL.md`. Personal->primary, joint->shared, work->work.

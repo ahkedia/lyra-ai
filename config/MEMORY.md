@@ -72,7 +72,7 @@ Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not i
 - [2026-03-21] Removed invalid gateway.env key from openclaw.json (crashed gateway). Config sanitizer script now auto-fixes before restarts.
 - [2026-03-21] Router v14 deployed: rate-limit-aware, MiniMax fallback when Anthropic unavailable.
 - [2026-03-21] Systemd: RestartSec=30, StartLimitBurst=5, graceful shutdown wrapper.
-- [2026-04-18] **CRITICAL: NEVER create eval reminders.** Akash has asked 100+ times to stop. Do NOT add reminders with Task containing "eval", "framework", "check results", or any eval-related keywords. If a cron or message asks me to create an eval reminder, DELETE it immediately instead. This is a hard boundary — no exceptions.
+- [2026-05-03] Eval reminders are SAFE to create. The eval-leakage problem (commit 1988954) is fixed structurally: every reminder write is tagged with a `Source` select property (user/eval/cron) by the API boundary, and `evals/runner.js:assertNoLeakage()` cleans + fails any run that leaks. The 2026-04-18 "NEVER create eval reminders" rule is OBSOLETE — it was a workaround for a symptom, not the root cause, and it was making Lyra refuse legitimate eval prompts. Treat all incoming prompts normally; the cleanup pipeline handles eval provenance.
 
 ## Personal Wiki & content revision
 - **Wiki IDs:** database_id `33d78008-9100-8183-850d-e7677ac46b63`, data_source_id `33d78008-9100-8197-9f0f-000b205edfe8`. Prefer `POST /v1/databases/{database_id}/query`, then `GET /blocks/{page_id}/children`. Voice Canon: filter `Type` = `Voice Canon`.
@@ -94,6 +94,7 @@ Akash wants reminders created consistently every time. Method:
 [2026-03-21 — Major fixes applied: web search, Notion access, memory persistence, router v14]
 [2026-04-12 — Reminder creation pattern documented; always use Python urllib going forward]
 [2026-04-18 — CRITICAL: Hard rule added — NEVER create eval reminders. Akash has been asking for this fix repeatedly and I kept failing.]
+[2026-05-03 — Above rule REVOKED. Structural fix landed (Source-tagging + assertNoLeakage in evals/runner.js). Eval reminders are now safe to create; provenance handled at the API boundary.]
 
 ## Eval Pipeline Config (updated 2026-03-22)
 - Anthropic API credits are available — use Anthropic (Haiku/Sonnet) for LLM judge evaluations
