@@ -1061,27 +1061,47 @@
   },
   {
     "date": "2026-05-03",
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "pass_rate": 1,
+    "avg_latency_ms": 24837,
+    "p95_latency_ms": 27040,
+    "by_tier": {
+      "showcase": {
+        "total": 2,
+        "passed": 2,
+        "pass_rate": 1
+      }
+    },
+    "capability_pass_rate": 1,
+    "infra_failure_rate": 0,
+    "eval_lane": "production_representative",
+    "failure_breakdown": {}
+  },
+  {
+    "date": "2026-05-05",
     "total": 49,
-    "passed": 30,
-    "failed": 19,
-    "pass_rate": 0.61,
-    "avg_latency_ms": 24730,
-    "p95_latency_ms": 45014,
+    "passed": 29,
+    "failed": 20,
+    "pass_rate": 0.59,
+    "avg_latency_ms": 26900,
+    "p95_latency_ms": 45002,
     "by_tier": {
       "core_capability": {
         "total": 12,
-        "passed": 9,
-        "pass_rate": 0.75
+        "passed": 8,
+        "pass_rate": 0.67
       },
       "architectural": {
         "total": 4,
-        "passed": 2,
-        "pass_rate": 0.5
+        "passed": 3,
+        "pass_rate": 0.75
       },
       "judgment": {
         "total": 16,
-        "passed": 12,
-        "pass_rate": 0.75
+        "passed": 11,
+        "pass_rate": 0.69
       },
       "showcase": {
         "total": 6,
@@ -1094,15 +1114,13 @@
         "pass_rate": 0.55
       }
     },
-    "capability_pass_rate": 0.7143,
-    "infra_failure_rate": 0.1429,
+    "capability_pass_rate": 0.7436,
+    "infra_failure_rate": 0.2041,
     "eval_lane": "production_representative",
     "failure_breakdown": {
-      "latency_threshold": 1,
-      "infra": 1,
-      "timeout": 7,
-      "judge": 8,
-      "assertion": 2
+      "assertion": 3,
+      "judge": 7,
+      "timeout": 10
     }
   }
 ]
