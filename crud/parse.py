@@ -14,10 +14,14 @@ _TRAILING_FLUFF = re.compile(
     r"(?:briefly|quickly|shortly|concisely)\s*[\s?.!]*$",
 )
 
+# Strip leading tags like [eval], [cron], [user] from the start of messages.
+_LEADING_TAG = re.compile(r"^\s*\[[^\]]+\]\s*")
+
 
 def normalize_crud_message(message: str) -> str:
     """Trim and drop common trailing meta-instructions (keeps core CRUD phrase)."""
     s = message.strip()
+    s = _LEADING_TAG.sub("", s).strip()  # strip leading [tag] prefix
     s = _TRAILING_FLUFF.sub("", s).strip()
     return s
 
@@ -65,6 +69,8 @@ CRUD_PATTERNS = [
             # Common natural phrasing that previously missed Tier 0 → LLM hallucinated writes
             r"^add (?:a )?reminder(?:\s*:\s*|\s+to\s+|\s+for\s+|\s+about\s+|\s+)(.+)$",
             r"^create (?:a )?reminder(?:\s*:\s*|\s+to\s+|\s+for\s+|\s+about\s+|\s+)(.+)$",
+            # Bare scheduling phrase with time anchor (no trigger word) — excludes ?-initial queries
+            r"^(?![wh]hat|when|where|who|how|which|is|are|list|show)(.+?(?:tomorrow|today|at\s+\d|on\s+\d|in\s+\d|by\s+\d|next\s+|this\s+|monday|tuesday|wednesday|thursday|friday|saturday|sunday|am\s|pm\s).+)$",
         ],
         "action": "notion add-reminder",
     },
