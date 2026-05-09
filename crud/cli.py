@@ -164,11 +164,11 @@ def cmd_parse(args):
         extract_mark_done_args,
     )
 
-    crud = detect_intent(raw)
+    norm = normalize_crud_message(raw)
+    crud = detect_intent(norm)
     if crud:
         intent = crud["intent"]
         action = crud["action"]
-        norm = normalize_crud_message(raw)
 
         try:
             if intent == "list_reminders":
