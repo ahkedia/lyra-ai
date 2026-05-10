@@ -63,6 +63,78 @@ delve, crucial, robust, comprehensive, nuanced, multifaceted, pivotal, landscape
 Would a sharp operator who's been in the trenches actually say this?
 `;
 
+// ─── Twitter/X URL fetching via Twitter API v2 ───────────────────────────────
+
+function isTwitterUrl(url) {
+  return /^https?:\/\/(www\.)?(twitter\.com|x\.com)\/\w+\/status\/\d+/.test(url);
+}
+
+function extractTweetId(url) {
+  const m = url.match(/\/status\/(\d+)/);
+  return m ? m[1] : null;
+}
+
+async function refreshTwitterToken() {
+  const clientId = process.env.TWITTER_CLIENT_ID;
+  const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+  const refreshToken = process.env.TWITTER_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error("Missing TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET, or TWITTER_REFRESH_TOKEN");
+  }
+
+  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const res = await fetch("https://api.twitter.com/2/oauth2/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${credentials}`,
+    },
+    body: body.toString(),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Twitter token refresh failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  return data.access_token;
+}
+
+async function fetchTweetContent(url) {
+  const tweetId = extractTweetId(url);
+  if (!tweetId) throw new Error(`Could not extract tweet ID from URL: ${url}`);
+
+  const accessToken = await refreshTwitterToken();
+
+  const apiUrl = `https://api.twitter.com/2/tweets/${tweetId}?tweet.fields=text,created_at&expansions=author_id&user.fields=name,username`;
+  const res = await fetch(apiUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Twitter API v2 fetch failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const tweet = data.data;
+  const user = data.includes?.users?.[0];
+
+  if (!tweet?.text) throw new Error("Twitter API returned no tweet text");
+
+  const author = user ? `@${user.username} (${user.name})` : "unknown author";
+  const title = `Tweet by ${author}`;
+  const content = `Tweet by ${author}:\n\n${tweet.text}`;
+  return { title, content };
+}
+
 // ─── URL content fetching via Tavily extract ──────────────────────────────────
 
 async function fetchUrlContent(url) {
@@ -130,9 +202,9 @@ ${sanitizeInput(input)}
 TASK:
 Write two pieces of reactive commentary:
 
-1. TWEET TAKE: A single punchy tweet that gives an opinion or insight on this. 240-270 characters. No hashtags. No rhetorical questions. No "hot take:" framing. Write the actual take.
+1. TWEET TAKE: A single punchy tweet that gives an opinion or insight on this. 240-270 characters (Twitter limit). No hashtags. No rhetorical questions. No "hot take:" framing. Write the actual take.
 
-2. LINKEDIN POST: A reactive LinkedIn post. 180-250 words. Mobile-first. Hook line first (specific claim, not vague). 2-3 short paragraphs with a concrete point each. End with one real question. Final line: "full write-up in the comments 👇" if it has a URL, else omit that line. No hashtags. No em dash.
+2. LINKEDIN POST: A reactive LinkedIn post. Around 350 words. Mobile-first. Hook line first (specific claim, not vague). 3-4 short paragraphs with concrete points. End with one real question. No hashtags. No em dash. No "full write-up" line.
 
 OUTPUT: Respond ONLY with valid JSON, no preamble:
 {
@@ -187,15 +259,18 @@ async function main() {
 
   // Fetch URL content if needed
   if (isUrl) {
-    console.log("Fetching URL content via Tavily...");
+    const fetchMethod = isTwitterUrl(raw) ? "Twitter API v2" : "Tavily";
+    console.log(`Fetching URL content via ${fetchMethod}...`);
     try {
-      const { title, content } = await fetchUrlContent(raw);
+      const { title, content } = isTwitterUrl(raw)
+        ? await fetchTweetContent(raw)
+        : await fetchUrlContent(raw);
       fetchedTitle = title;
       inputForPrompt = `URL: ${raw}\nTitle: ${title}\n\nContent:\n${content}`;
       console.log(`  Fetched: "${title}" (${content.length} chars)`);
     } catch (e) {
-      console.warn(`  URL fetch failed: ${e.message}. Falling back to URL as topic.`);
-      inputForPrompt = raw;
+      console.warn(`  URL fetch failed: ${e.message}. Using URL as context.`);
+      inputForPrompt = `URL: ${raw}\n\n(Content could not be fetched — generate commentary based on the URL and any context inferable from it.)`;
     }
   }
 
