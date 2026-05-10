@@ -24,6 +24,8 @@ def usage():
   cli.py wiki-lint                         # automated orphan/stale/take check
   cli.py wiki-dedup "<title or keywords>"  # list similar existing wiki rows
   cli.py news-inbox-rss [max_new]         # arXiv CS.LG → News Inbox (dedupe on Link)
+  cli.py wiki-inbox-rss [max_new]         # multi-feed RSS → Personal Wiki Inbox (dedupe on URL in Source)
+  cli.py wiki-careers-sync [--apply] [--interactive] [--manifest PATH] [--workspace DIR] [--archive-career-title "Exact Title"]
 """)
 
 def cmd_weight(args):
@@ -119,6 +121,23 @@ def cmd_parse(args):
     if not raw:
         print("parse requires a message")
         sys.exit(1)
+
+    # --- HOT commentary (FIRST — must beat Second Brain / Twitter save heuristics) ---
+    import re as _re
+    _hot_m = _re.match(r'^hot\s+(.+)', raw, _re.IGNORECASE)
+    if _hot_m:
+        _arg = _hot_m.group(1).strip()
+        _script = "/root/content-engine/scripts/hot-commentary-generator.js"
+        subprocess.Popen(
+            ["node", _script, _arg],
+            env=os.environ.copy(),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        label = _arg[:60] + ("..." if len(_arg) > 60 else "")
+        print(f"🔥 generating commentary on: {label}\n\npreview coming in ~30s via Telegram.")
+        return
+    # --- End HOT ---
 
     # --- Content draft / revise (shared wiki + channel rules — Sonnet) ---
     from content_draft import try_content_draft_tier0
@@ -392,6 +411,21 @@ def cmd_news_inbox_rss(args):
     print(ingest_arxiv_cs_lg(max_new=n))
 
 
+def cmd_wiki_inbox_rss(args):
+    from wiki_inbox_rss import ingest_wiki_inbox_rss
+
+    n = 30
+    if args and str(args[0]).isdigit():
+        n = int(args[0])
+    print(ingest_wiki_inbox_rss(max_new=n))
+
+
+def cmd_wiki_careers_sync(args):
+    from wiki_careers_sync import main as wiki_careers_main
+
+    raise SystemExit(wiki_careers_main(args))
+
+
 def cmd_job_application(args):
     """Directly invoke the job application workflow (parse + trigger or reply)."""
     from job_application import is_job_trigger, is_clarification_reply, has_recent_state, handle_trigger, handle_clarification_reply
@@ -424,6 +458,8 @@ COMMANDS = {
     'wiki-lint': cmd_wiki_lint,
     'wiki-dedup': cmd_wiki_dedup,
     'news-inbox-rss': cmd_news_inbox_rss,
+    'wiki-inbox-rss': cmd_wiki_inbox_rss,
+    'wiki-careers-sync': cmd_wiki_careers_sync,
 }
 
 if __name__ == '__main__':
