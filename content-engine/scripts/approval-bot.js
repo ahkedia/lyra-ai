@@ -17,11 +17,10 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
-import { notionQuery, notionPatch, notionCreatePage, extractTitle, extractSelect, extractRichText, extractUrl, notionGetPage } from "./lib/notion.js";
+import { notionQuery, notionPatch, extractTitle, extractSelect, extractRichText, extractUrl, notionGetPage } from "./lib/notion.js";
 import { getTelegramUpdates, validateChatId, getMessageText, sendTelegram } from "./lib/telegram.js";
 import { acquireLock, releaseLock } from "./lib/lockfile.js";
 import { generateVisualForDraft } from "./visual-generator.js";
-import { countShortlistedToday, remainingSlots, getTodayYmd } from "./lib/topic-pool-quota.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOCKFILE = "/tmp/content-approval-bot-script.lock";
@@ -29,11 +28,6 @@ const OFFSET_FILE = "/tmp/content-approval-bot-offset.txt";
 const LEARNINGS_FILE = join(__dirname, "../config/learnings.json");
 const CONTENT_DRAFTS_DB = "8135676dd15c4ef4925336cf484567ac";
 
-const sources = JSON.parse(readFileSync(join(__dirname, "../config/sources.json"), "utf8"));
-const TOPIC_POOL_DB = sources.topicPool.dbId;
-const queueCfg = sources.topicPool.queue || {};
-const DAILY_SHORTLIST_CAP = queueCfg.dailyShortlistCap ?? 2;
-const SHORTLISTED_ON = queueCfg.shortlistedOnProperty || "Shortlisted on";
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -54,8 +48,8 @@ async function getPendingTextDrafts() {
   const res = await notionQuery(CONTENT_DRAFTS_DB, {
     property: "text_approval_status",
     select: { equals: "pending" },
-  }, [{ property: "created_time", direction: "ascending" }], 10);
-  
+  }, [{ timestamp: "created_time", direction: "ascending" }], 10);
+
   return res.results;
 }
 
@@ -66,7 +60,7 @@ async function getPendingVisualDrafts() {
       { property: "visual_approval_status", select: { equals: "pending" } },
       { property: "visual_url", url: { is_not_empty: true } },
     ],
-  }, [{ property: "created_time", direction: "ascending" }], 10);
+  }, [{ timestamp: "created_time", direction: "ascending" }], 10);
   
   return res.results;
 }
@@ -177,103 +171,13 @@ async function handleFeedback(draft, feedback) {
   await sendTelegram(`📝 Feedback recorded for: "${title}"\n\nThis feedback will be incorporated into future drafts.\n\n*Current queue:* Draft moved to "feedback" status. Send a new topic to generate an improved version, or manually edit in Notion.`);
 }
 
-async function handleHotTopic(topicText) {
-  console.log(`HOT topic: "${topicText.slice(0, 50)}..."`);
-  const week = new Date().toISOString().split("T")[0];
-
-  let promotedToday = 0;
-  try {
-    promotedToday = await countShortlistedToday(TOPIC_POOL_DB, SHORTLISTED_ON, notionQuery);
-  } catch (e) {
-    console.error("Shortlist count failed:", e.message);
-    try {
-      await notionCreatePage(
-        { type: "database_id", database_id: TOPIC_POOL_DB },
-        {
-          Topic: { title: [{ text: { content: topicText.slice(0, 100) } }] },
-          Source: { select: { name: "Manual" } },
-          Domain: { select: { name: "General" } },
-          Score: { number: 5.0 },
-          Status: { select: { name: "Candidate" } },
-          Week: { date: { start: week } },
-        }
-      );
-    } catch (err) {
-      await sendTelegram(`❌ Failed to create hot topic: ${err.message}`);
-      return;
-    }
-    await sendTelegram(
-      `⚠️ Add Notion date property *${SHORTLISTED_ON}* to Content Topic Pool for daily cap tracking.\n\nHOT saved as *Candidate*. Shortlist in Notion when ready.`
-    );
-    return;
-  }
-
-  const slots = remainingSlots(DAILY_SHORTLIST_CAP, promotedToday);
-
-  if (slots <= 0) {
-    try {
-      await notionCreatePage(
-        { type: "database_id", database_id: TOPIC_POOL_DB },
-        {
-          Topic: { title: [{ text: { content: topicText.slice(0, 100) } }] },
-          Source: { select: { name: "Manual" } },
-          Domain: { select: { name: "General" } },
-          Score: { number: 5.0 },
-          Status: { select: { name: "Candidate" } },
-          Week: { date: { start: week } },
-        }
-      );
-    } catch (err) {
-      await sendTelegram(`❌ Failed to create hot topic: ${err.message}`);
-      return;
-    }
-    await sendTelegram(
-      `🔥 Daily Shortlist cap (${DAILY_SHORTLIST_CAP}) already reached for *${getTodayYmd()}* (includes auto + prior HOT).\n\nTopic saved as *Candidate*. Shortlist in Notion or try tomorrow.`
-    );
-    return;
-  }
-
-  await sendTelegram(
-    `🔥 Creating hot topic: "${topicText.slice(0, 80)}${topicText.length > 80 ? "…" : ""}"\n\nStarting draft generation in the background…`
-  );
-
-  try {
-    const day = getTodayYmd();
-    await notionCreatePage(
-      { type: "database_id", database_id: TOPIC_POOL_DB },
-      {
-        Topic: { title: [{ text: { content: topicText.slice(0, 100) } }] },
-        Source: { select: { name: "Manual" } },
-        Domain: { select: { name: "General" } },
-        Score: { number: 5.0 },
-        Status: { select: { name: "Shortlisted" } },
-        Week: { date: { start: week } },
-        [SHORTLISTED_ON]: { date: { start: day } },
-      }
-    );
-
-    const { spawn } = await import("child_process");
-    const child = spawn("node", [join(__dirname, "draft-generator.js")], {
-      env: process.env,
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
-
-    await sendTelegram(
-      `✅ Hot topic *Shortlisted* (${getTodayYmd()}). Draft generator started.\n\nYou should get the usual draft preview in Telegram once the run finishes.`
-    );
-  } catch (err) {
-    console.error(`Failed to create hot topic: ${err.message}`);
-    await sendTelegram(`❌ Failed to create hot topic: ${err.message}`);
-  }
-}
 
 async function processUpdates() {
   const offset = getLastOffset();
   console.log(`Polling Telegram updates (offset: ${offset})`);
   
-  const updates = await getTelegramUpdates(offset ? offset + 1 : undefined, 5);
+  // timeout=0: short-poll (non-blocking) to avoid conflicting with OpenClaw's long-poll on the same bot token
+  const updates = await getTelegramUpdates(offset ? offset + 1 : undefined, 0);
   
   if (updates.length === 0) {
     console.log("No new updates");
@@ -298,13 +202,6 @@ async function processUpdates() {
     const text = getMessageText(update);
     console.log(`Processing command: ${text}`);
 
-    if (text.startsWith("HOT ")) {
-      const topicText = text.slice(4).trim();
-      if (topicText) await handleHotTopic(topicText);
-      await sleep(500);
-      continue;
-    }
-
     if (text === "HELP") {
       const helpMsg = `📖 *Commands*
 
@@ -319,12 +216,12 @@ SKIP - Skip visual (text only)
 REDO - Regenerate visual
 REDO <hint> - Regenerate with specific hint
 
-*Hot topics:*
-HOT <topic> - Shortlist if daily cap allows, else save as Candidate (cap = auto + HOT)
-
 *Other:*
 STATUS - Show queue status
-HELP - Show this message`;
+HELP - Show this message
+
+*To create commentary:*
+Send HOT <url_or_topic> as a regular message to Lyra`;
       await sendTelegram(helpMsg);
       await sleep(500);
       continue;
