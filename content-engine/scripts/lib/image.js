@@ -44,6 +44,13 @@ export async function generateImageNanoBanana(prompt) {
             parts: [{ text: prompt }],
           },
         ],
+        // 16:9 landscape — universal aspect for X / LinkedIn post / LinkedIn
+        // newsletter cover / Substack header. Gemini's newer image config
+        // field; if the API silently ignores it, the prompt also carries
+        // an aspect-ratio instruction as a soft hint.
+        generationConfig: {
+          imageConfig: { aspectRatio: "16:9" },
+        },
       }),
     },
     GEMINI_TIMEOUT_MS
@@ -72,7 +79,7 @@ export async function generateImageNanoBanana(prompt) {
   throw new Error("Nano Banana returned no image data");
 }
 
-export async function generateImageDalle(prompt, size = "1024x1024") {
+export async function generateImageDalle(prompt, size = "1792x1024") {
   if (!OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY not configured");
   }
@@ -132,6 +139,10 @@ export async function generateImage(prompt) {
 }
 
 export function buildDoodlePrompt(concept, domain) {
-  const domainHint = doodleConfig.domainHints[domain] || doodleConfig.fallbackHint;
-  return `${doodleConfig.basePrompt}\nSubject: ${concept}\nDomain context: ${domainHint}`;
+  return `A clean, minimal hand-drawn doodle illustration in black ink on white paper.
+Aspect ratio: 16:9 landscape (1600x900, wider than tall). The composition must fill a wide horizontal frame; do not produce a square or portrait crop. This image will be used as a header for blog posts and social media (X, LinkedIn, Substack).
+Style: simple sketch, no color, no shading, editorial cartoon quality.
+Subject: ${concept}
+Domain context: ${domain}
+No text, no labels, no people's faces. Illustration only.`;
 }

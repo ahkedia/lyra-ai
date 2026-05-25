@@ -1,8 +1,39 @@
 /**
- * Anthropic API utilities (Claude Sonnet + Haiku)
+ * Anthropic API utilities (Claude Sonnet + Haiku) with MiniMax fallback.
+ * If Anthropic returns 400 billing (credit exhausted), silently retry on
+ * MiniMax-M2.7 so workflows keep running.
  */
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+const MINIMAX_KEY = process.env.MINIMAX_API_KEY;
+const MINIMAX_MODEL = "MiniMax-M2.7";
+
+async function minimaxRequest(systemPrompt, userPrompt, maxTokens) {
+  // MiniMax M2.x is a reasoning model: half of completion budget gets eaten by
+  // reasoning tokens. Double the cap so the actual answer has room.
+  const res = await fetch("https://api.minimaxi.chat/v1/text/chatcompletion_v2", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${MINIMAX_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MINIMAX_MODEL,
+      max_tokens: Math.max(maxTokens * 2, 1000),
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+  });
+  const json = await res.json();
+  if (!res.ok || json?.base_resp?.status_code) {
+    const code = json?.base_resp?.status_code;
+    const msg = json?.base_resp?.status_msg || JSON.stringify(json).slice(0, 200);
+    throw new Error(`MiniMax fallback failed: ${code} ${msg}`);
+  }
+  return json.choices?.[0]?.message?.content || "";
+}
 
 export async function anthropicRequest(model, systemPrompt, userPrompt, maxTokens = 1500) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -19,10 +50,15 @@ export async function anthropicRequest(model, systemPrompt, userPrompt, maxToken
       messages: [{ role: "user", content: userPrompt }],
     }),
   });
-  
+
   const json = await res.json();
   if (!res.ok) {
-    throw new Error(`Anthropic ${model}: ${json.error?.message}`);
+    const errMsg = json.error?.message || "";
+    if (res.status === 400 && /credit balance/i.test(errMsg)) {
+      console.warn(`[anthropic→minimax] Anthropic ${model} billing failed, falling back to ${MINIMAX_MODEL}`);
+      return minimaxRequest(systemPrompt, userPrompt, maxTokens);
+    }
+    throw new Error(`Anthropic ${model}: ${errMsg}`);
   }
   return json.content?.[0]?.text || "";
 }
@@ -33,6 +69,21 @@ export async function generateWithSonnet(systemPrompt, userPrompt, maxTokens = 2
 
 export async function humanizeWithHaiku(systemPrompt, userPrompt, maxTokens = 1500) {
   return anthropicRequest("claude-haiku-4-5-20251001", systemPrompt, userPrompt, maxTokens);
+}
+
+/**
+ * Parse JSON from a model response that may be wrapped in ```json fences,
+ * preceded by prose, or otherwise dirty. Returns null if no valid JSON found.
+ */
+export function parseJsonLoose(text) {
+  if (!text || typeof text !== "string") return null;
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const candidate = fenced ? fenced[1].trim() : (text.match(/\{[\s\S]*\}/)?.[0] || text.trim());
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    return null;
+  }
 }
 
 /**

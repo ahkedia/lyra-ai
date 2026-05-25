@@ -1,0 +1,26 @@
+{
+  "_comment": "NewsAPI configuration for signal-synthesizer pipeline. Queries run daily at 06:30 UTC.",
+  "newsapi": {
+    "baseUrl": "https://newsapi.org/v2/everything",
+    "language": "en",
+    "sortBy": "publishedAt",
+    "pageSize": 8,
+    "excludeDomains": "buzzfeed.com,dailymail.co.uk,tmz.com,pagesix.com"
+  },
+  "domains": {
+    "AI": {
+      "query": "artificial intelligence OR LLM OR AI agent OR foundation model OR Claude OR GPT OR Gemini",
+      "label": "AI"
+    },
+    "Fintech": {
+      "query": "fintech OR payments OR neobank OR embedded finance OR open banking OR lending OR credit card OR digital wallet",
+      "label": "Fintech"
+    },
+    "Stablecoins": {
+      "query": "stablecoin OR DeFi OR crypto regulation OR CBDC OR tokenization OR digital dollar OR USDC OR Tether",
+      "label": "Stablecoins"
+    }
+  },
+  "notionInboxDb": "8a900cb78c0c4be996347c5dfebec375",
+  "contentDraftsDb": "8135676dd15c4ef4925336cf484567ac"
+}

@@ -38,9 +38,21 @@ describe("sanitize", () => {
 });
 
 describe("lockfile", () => {
-  it("exports acquireLock and releaseLock", async () => {
-    const { acquireLock, releaseLock } = await import("../scripts/lib/lockfile.js");
-    expect(typeof acquireLock).toBe("function");
-    expect(typeof releaseLock).toBe("function");
+  it("exports acquireLock, releaseLock, parseLockPid, isPidAlive", async () => {
+    const m = await import("../scripts/lib/lockfile.js");
+    expect(typeof m.acquireLock).toBe("function");
+    expect(typeof m.releaseLock).toBe("function");
+    expect(typeof m.parseLockPid).toBe("function");
+    expect(typeof m.isPidAlive).toBe("function");
+  });
+});
+
+describe("topic-pool-quota", () => {
+  it("remainingSlots respects cap", async () => {
+    const { remainingSlots } = await import("../scripts/lib/topic-pool-quota.js");
+    expect(remainingSlots(2, 0)).toBe(2);
+    expect(remainingSlots(2, 1)).toBe(1);
+    expect(remainingSlots(2, 2)).toBe(0);
+    expect(remainingSlots(2, 3)).toBe(0);
   });
 });

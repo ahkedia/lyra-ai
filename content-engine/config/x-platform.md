@@ -4,10 +4,10 @@
 
 - No hashtags
 - Links in a reply to your own post, never in the main tweet
-- Line break between every thought — never dense paragraphs
+- Line break between every thought; never dense paragraphs
 - No CTA closing ("what do you think?", "drop a comment")
 - No emoji except rarely at end as punctuation (optional, not default)
-- Proper capitalization where natural — not forced lowercase
+- All-lowercase copy by default (same rule as command-center: no title case, no shouty caps; minimal caps only for acronyms or brand spellings like CheQ)
 
 ## Format Observations
 
@@ -20,7 +20,7 @@ When the observation can stand alone without evidence. Most common for sharp cla
 When a scene from the field proves a point better than an argument does. Start with the scene.
 
 ### Structured list
-Only when the list IS the argument and each item has its own editorial voice — not a bullet dump.
+Only when the list IS the argument and each item has its own editorial voice, not a bullet dump.
 
 ### Long-form (1000-1500 chars)
 When a claim needs field evidence. CheQ/Flipkart Pay/Trade Republic examples live here.

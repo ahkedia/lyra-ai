@@ -83,6 +83,21 @@ export async function notionPatch(pageId, properties) {
   return notionRequest("PATCH", `/pages/${pageId}`, { properties });
 }
 
+/**
+ * Split a long string into a Notion rich_text array. Each text segment
+ * caps at 1900 chars (Notion limit is 2000; 1900 leaves headroom).
+ * Returns the array shape Notion expects for a rich_text property value.
+ */
+export function richTextChunks(text, chunkSize = 1900) {
+  const s = text == null ? "" : String(text);
+  if (s.length === 0) return [{ text: { content: "" } }];
+  const chunks = [];
+  for (let i = 0; i < s.length; i += chunkSize) {
+    chunks.push({ text: { content: s.slice(i, i + chunkSize) } });
+  }
+  return chunks;
+}
+
 export async function notionCreatePage(parent, properties, children) {
   const body = { parent, properties };
   if (children) body.children = children;

@@ -1,6 +1,6 @@
 {
   "_comment": "Domain-specific doodle style hints for visual-generator.js",
-  "basePrompt": "A clean, minimal hand-drawn editorial cartoon illustration in black ink with selective color accents. Style: simple sketch, editorial cartoon quality, high contrast. Colour palette: blue tones for one group/section, warm/green tones for another group/section. Human figures are simple, cartoon-style, expressive. Subject should reflect the actual content of the piece — relatable, specific to the topic, not abstract. No photorealism. No complex gradients. Illustration only. No text labels.",
+  "basePrompt": "A clean, minimal hand-drawn doodle illustration in black ink on white paper. Style: simple sketch, no color, no shading, editorial cartoon quality. No text, no labels, no people's faces. Illustration only.",
   "domainHints": {
     "AI/ML": "neural network diagram, robot icon, brain with circuits, decision tree",
     "Growth & Internationalisation": "growth chart, funnel, flywheel, globe with arrows",
