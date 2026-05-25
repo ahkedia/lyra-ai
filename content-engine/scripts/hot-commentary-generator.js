@@ -36,24 +36,30 @@ const VOICE_CANON_MAX_CHARS = 5000;
 const sources = JSON.parse(readFileSync(join(__dirname, "../config/sources.json"), "utf8"));
 const PERSONAL_WIKI_DB = sources.sources.personalWiki.dbId;
 
+// ─── Voice canon (canonical, from voice-canon.md) ────────────────────────────
+
+const voiceCanonFile = readFileSync(join(__dirname, "../config/voice-canon.md"), "utf8");
+
 // ─── Negative style contract (matches draft-generator) ───────────────────────
 
 const NEGATIVE_STYLE = `
 # Negative Style: What Not To Sound Like
 
 ## Punctuation (hard ban)
-- Never use the em dash character (Unicode U+2014). Use commas, periods, colons, or parentheses instead.
-- Do not use an en dash (Unicode U+2013) as a stand-in for an em dash.
+- ABSOLUTE BAN: Never use the em dash character (—, Unicode U+2014). Rewrite the sentence using a comma, colon, period, or parentheses. This applies to every output format.
+- ABSOLUTE BAN: Never use an en dash (–, Unicode U+2013) as a stand-in for an em dash.
+- If you are about to type " — " or "—", stop and restructure the sentence.
 
 ## Casing (hard default)
 - All-lowercase body. No title case headings, no ALL CAPS emphasis.
 - First person as lowercase i. Allow caps only for acronyms (API, PR) and brand spellings (CheQ).
 
-## AI Symmetry Patterns (highest priority ban)
+## AI Symmetry Patterns (highest priority ban — AI detector load-bearing)
 - Tidy 3x3 bullets. Three points, each two words long, all parallel.
 - Too-perfect transitions: "Furthermore", "Moreover", "Additionally", "It's worth noting that"
 - The windup opener: "In today's fast-paced world...", "In an era where..."
-- The rhetorical pair: "Not just X, but Y."
+- The "Not X, but Y" cadence (ANY variant): "not X, but Y", "not X, it's Y", "not X, actually Y", "X isn't Y, it's Z", "it's not about X, it's about Y", "X — not Y" or "Y, not X". This is the single most overused pattern in AI-generated content. Rewrite as two separate sentences, concession-then-pivot, or the sharper claim delivered directly. See voice-canon.md Rule 7.
+- Anaphoric three-beat negation: "Not a recap. Not a question. Not a flourish." Three-beat lists of nouns are fine ("faster, cheaper, better"). The slop is specifically negation in repeated form.
 - The symmetrical close: "The future belongs to those who..."
 
 ## Words to Kill on Sight
@@ -191,7 +197,10 @@ function buildCommentaryPrompt(input, voiceCanon) {
 
   return `You are writing for Akash Kedia, a technical founder (Flipkart payments, N26 neobanking, CheQ credit, Trade Republic brokerage). Write reactive commentary in his voice.
 
-VOICE CANON:
+VOICE CANON (canonical, from voice-canon.md — follow strictly):
+${voiceCanonFile}
+
+VOICE CANON (supplementary, from Notion Personal Wiki — may be empty):
 ${voiceCanon}
 
 ${NEGATIVE_STYLE}
@@ -291,7 +300,7 @@ async function main() {
   const raw_response = await generateWithSonnet(
     "You are a social media writer. Respond ONLY with valid JSON, no preamble or explanation.",
     prompt,
-    1200
+    1800
   );
 
   const parsed = parseJsonLoose(raw_response);
@@ -315,8 +324,8 @@ async function main() {
     ? tweet_take.slice(0, 277) + "..."
     : tweet_take;
 
-  const linkedinPreview = linkedin_post.length > 200
-    ? linkedin_post.slice(0, 197) + "..."
+  const linkedinPreview = linkedin_post.length > 300
+    ? linkedin_post.slice(0, 297) + "..."
     : linkedin_post;
 
   const sourceNote = sourceUrl ? `\n\n📎 ${sourceUrl}` : "";

@@ -47,6 +47,8 @@ Bookmarks content_create ──► same Topic Pool (classify-and-route) ──�
 | `draft-generator.js` | Wiki-grounded blog + tweet + LinkedIn via Sonnet/Haiku; Topic Pool **Author brief** injected into blog prompt; full Voice Canon from wiki blocks; if Haiku score is below 8, Sonnet voice rewrite before social copy | Hourly 09:00-22:00 |
 | `visual-generator.js` | Gemini image → Imgur URL if needed → Notion `visual_url` + page block | Triggered by text approval |
 | `approval-bot.js` | Poll Telegram for APPROVE/SKIP/FEEDBACK/REDO/HOT/HELP/STATUS | Every 5 min |
+| `pull-quote-scheduler.js linkedin` | Send next unused pull-quote from a recent approved draft to Telegram for one-tap LinkedIn copy-paste | Wed 09:00 Berlin |
+| `pull-quote-scheduler.js x` | Same, for X | Fri 14:00 Berlin |
 
 ## Telegram Commands
 
@@ -129,9 +131,12 @@ All scripts use lockfiles to prevent concurrent runs:
 
 - `config/sources.json` — source DB IDs, filters, scoring weights
 - `config/doodle-prompts.json` — domain → doodle style prompt mapping
-- `config/opening-principles.md` — voice-grounded opening principles
+- `config/voice-canon.md` — the 11 voice rules governing all surfaces (blog, LinkedIn, X, signals, /hot, reachouts)
+- `config/MACRO_STRUCTURE.md` — blog-only skeleton (scene → claim → evidence → instruction)
+- `config/linkedin-platform.md` — three LinkedIn formats (argument / aphorism / scene), 280-word cap
+- `config/reachout-principles.md` — cold reachout rules, 150-word cap
 - `config/x-platform.md` — X format observations and platform rules
-- `config/repurpose.md` — repurposing chain: X → LinkedIn → newsletter
+- `config/repurpose.md` — repurposing chain (blog-first default; named phrase as through-line)
 - `config/content-types.md` — format observations (prose thread, short take, etc.)
 - `config/command-center.md` — orchestration entry point
 
@@ -155,6 +160,12 @@ All scripts use lockfiles to prevent concurrent runs:
 
 # Every 5 min — Approval polling
 */5 * * * * cron-task-runner.sh content-approval-bot 180 2 ... approval-bot.js
+
+# Wed 09:00 Berlin summer (07:00 UTC) — LinkedIn pull-quote. Same convention as other content crons (set for CEST; runs an hour earlier in CET winter).
+0 7 * * 3 /root/lyra-ai/scripts/cron-task-runner.sh content-pull-quote-li 120 1 /bin/bash -c '/root/lyra-ai/scripts/run-with-openclaw-env.sh node /root/content-engine/scripts/pull-quote-scheduler.js linkedin' >> /var/log/content-engine.log 2>&1
+
+# Fri 14:00 Berlin summer (12:00 UTC) — X pull-quote.
+0 12 * * 5 /root/lyra-ai/scripts/cron-task-runner.sh content-pull-quote-x 120 1 /bin/bash -c '/root/lyra-ai/scripts/run-with-openclaw-env.sh node /root/content-engine/scripts/pull-quote-scheduler.js x' >> /var/log/content-engine.log 2>&1
 ```
 
 Local equivalent: `npm run topic-pipeline-daily` (from repo root, with `.env` loaded).
