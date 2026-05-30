@@ -196,7 +196,7 @@ export class OpenClawClient {
       id: this._pendingConnectId,
       method: 'connect',
       params: {
-        minProtocol: 3, maxProtocol: 3,
+        minProtocol: 3, maxProtocol: 4,
         client: { id: 'gateway-client', version: '1.0.0', platform, mode: 'backend' },
         caps: [], auth, role,
         scopes: DEVICE_IDENTITY?.scopes || [],
