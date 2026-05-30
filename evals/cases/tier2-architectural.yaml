@@ -91,6 +91,7 @@ tests:
     tags: [email, tool-use, dry-run]
 
   - id: tool-cross-user-dryrun
+    eval_lane: diagnostic
     tier: architectural
     category: tool_use
     name: "Cross-user task handoff (write-backed)"

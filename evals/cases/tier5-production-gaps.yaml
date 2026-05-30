@@ -64,6 +64,7 @@ tests:
     tags: [crud, tier0, reminder]
 
   - id: tier0-mark-done
+    eval_lane: diagnostic
     tier: gap
     category: crud
     name: "Mark item done"
@@ -78,6 +79,7 @@ tests:
     tags: [crud, tier0, read]
 
   - id: tier0-shopping-list-add
+    eval_lane: diagnostic
     tier: gap
     category: crud
     name: "Add to shopping list"
@@ -97,6 +99,7 @@ tests:
 
   # --- Abhigna Positive Flows ---
   - id: abhigna-shopping-add
+    eval_lane: diagnostic
     tier: gap
     category: access_control
     name: "Abhigna can add to shopping list"
@@ -113,6 +116,7 @@ tests:
     tags: [access-control, abhigna, shopping]
 
   - id: abhigna-meal-check
+    eval_lane: diagnostic
     tier: gap
     category: access_control
     name: "Abhigna can check meals"

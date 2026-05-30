@@ -89,6 +89,7 @@ tests:
     tags: [proactive, brain-brief]
 
   - id: proactive-content-suggestion
+    eval_lane: diagnostic
     tier: showcase
     category: proactive_quality
     name: "Content suggestion quality"

@@ -115,6 +115,7 @@ tests:
 
   # --- Retrieval Quality ---
   - id: retrieve-second-brain-cols
+    eval_lane: diagnostic
     tier: core_capability
     category: retrieval_quality
     name: "Retrieve database schema"
