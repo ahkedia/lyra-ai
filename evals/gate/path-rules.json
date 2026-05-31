@@ -1,0 +1,47 @@
+{
+  "_comment": "Eval-coverage gate path rules. First matching rule wins (top to bottom). Categories: eval_case (the eval definitions themselves — satisfies coverage), behavior (changes what Lyra does/says — REQUIRES an eval touch), infra (harness/build/ops — no eval needed), docs (no eval needed), unknown (default; logged for rule refinement, does not require eval in shadow mode). Tune globs here without touching code.",
+  "rules": [
+    { "category": "eval_case", "globs": ["evals/cases/**"] },
+    { "category": "infra",     "globs": ["evals/**"] },
+
+    { "category": "behavior",  "globs": [
+      "content-engine/**",
+      "crud/**",
+      "plugins/**",
+      "prompts/**",
+      "voice-system/**",
+      "src/**",
+      "SOUL.md",
+      "**/SOUL.md",
+      "config/routing-rules.yaml",
+      "config/topic-to-domain.json",
+      "config/openclaw.json",
+      "config/HEARTBEAT.md"
+    ]},
+
+    { "category": "docs",      "globs": [
+      "docs/**",
+      "blog/**",
+      "deck/**",
+      "references/**",
+      "research/**",
+      "*.md"
+    ]},
+
+    { "category": "infra",     "globs": [
+      "test/**",
+      "tests/**",
+      ".github/**",
+      "package.json",
+      "package-lock.json",
+      "dist/**",
+      "scripts/**",
+      "migrations/**",
+      "notion/**",
+      "workspace/**",
+      "logs/**",
+      "templates/**",
+      "config/**"
+    ]}
+  ]
+}
