@@ -228,6 +228,12 @@ Run: $(date -u '+%Y-%m-%d %H:%M UTC')" > /dev/null 2>&1
   fi
 fi
 
+# Step 5b: Eval-coverage gate shadow scan (offline, free — Phase 2 warn-only)
+# Classifies new commits and logs whether behavior changed without an eval touch.
+echo ""
+echo "Step 5b: Eval-coverage gate shadow scan..."
+bash /root/lyra-ai/evals/gate/shadow-scan.sh || echo "[warn] shadow-scan failed (non-fatal)"
+
 # Step 6: Infrastructure checks (always run — free)
 echo ""
 echo "Step 6: Infrastructure checks..."
