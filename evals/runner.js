@@ -33,6 +33,13 @@ const POST_TEST_MS = Math.max(0, parseInt(process.env.EVAL_POST_TEST_MS || '2000
 const INTER_TEST_DELAY_MS = Math.max(0, parseInt(process.env.EVAL_INTER_TEST_DELAY_MS || '10000', 10));
 const BATCH_SIZE = Math.max(1, parseInt(process.env.EVAL_BATCH_SIZE || '12', 10));
 const BATCH_PAUSE_MS = Math.max(0, parseInt(process.env.EVAL_BATCH_PAUSE_MS || '45000', 10));
+// Rate-limit backoff (MiniMax agent-side throttle). MiniMax limits are per-minute,
+// so exponential waits starting at 30s clear them fast. The old behaviour was a fixed
+// 10-min wait + single retry, which wasted ~9 min per hit and still failed if the one
+// retry also throttled. Waits: 30s, 60s, 120s, 240s (capped), up to MAX_RETRIES.
+const RATE_LIMIT_BASE_WAIT_MS = Math.max(1000, parseInt(process.env.EVAL_RATE_LIMIT_BASE_WAIT_MS || '30000', 10));
+const RATE_LIMIT_MAX_WAIT_MS = Math.max(RATE_LIMIT_BASE_WAIT_MS, parseInt(process.env.EVAL_RATE_LIMIT_MAX_WAIT_MS || '240000', 10));
+const RATE_LIMIT_MAX_RETRIES = Math.max(0, parseInt(process.env.EVAL_RATE_LIMIT_MAX_RETRIES || '4', 10));
 const HEALTH_WAIT_MS = Math.max(5000, parseInt(process.env.EVAL_HEALTH_WAIT_MS || '120000', 10));
 const GATEWAY_HEALTH_URL = process.env.GATEWAY_HEALTH_URL || 'http://127.0.0.1:18789/health';
 
@@ -528,6 +535,27 @@ function isRateLimitError(result) {
   return RATE_LIMIT_PATTERNS.some((p) => haystack.includes(p));
 }
 
+/**
+ * Send to Lyra with exponential backoff on MiniMax rate-limit throttle.
+ * Used by both the single-turn and multi-turn paths so neither flakes the
+ * gated lane on a transient per-minute limit.
+ */
+async function sendWithBackoff(message, timeoutMs, sessionKey, dryRun, label = '') {
+  let result = await sendToLyra(message, timeoutMs, sessionKey, dryRun);
+  let attempt = 0;
+  while (isRateLimitError(result) && attempt < RATE_LIMIT_MAX_RETRIES) {
+    const waitMs = Math.min(RATE_LIMIT_MAX_WAIT_MS, RATE_LIMIT_BASE_WAIT_MS * 2 ** attempt);
+    console.log(
+      `    [rate-limit] MiniMax throttled${label ? ` on ${label}` : ''}. Backoff ${Math.round(waitMs / 1000)}s ` +
+        `(retry ${attempt + 1}/${RATE_LIMIT_MAX_RETRIES})...`,
+    );
+    await new Promise((r) => setTimeout(r, waitMs));
+    result = await sendToLyra(message, timeoutMs, sessionKey, dryRun);
+    attempt++;
+  }
+  return result;
+}
+
 function parseCliArgs(argv) {
   let onlyIds = null;
   let tierOrIdFilter = null;
@@ -616,7 +644,7 @@ async function runTest(testCase) {
     for (const turn of turns) {
       if (turn.role === 'user') {
         transcript.push({ role: 'user', message: turn.message || '' });
-        const turnResult = await sendToLyra(turn.message, timeout_ms, `eval-${RUN_ID}-${id}`, useDryRun);
+        const turnResult = await sendWithBackoff(turn.message, timeout_ms, `eval-${RUN_ID}-${id}`, useDryRun, id);
         response = turnResult.text;
         latencyMs = turnResult.durationMs;
         ttftMs = turnResult.ttftMs;
@@ -635,15 +663,7 @@ async function runTest(testCase) {
     }
     // Dry-run mode enabled for side_effects: 'none' to prevent accidental Notion writes
 
-    let result = await sendToLyra(finalPrompt, timeout_ms, `eval-${RUN_ID}-${id}`, useDryRun);
-
-    // Rate limit backoff: wait 10 min and retry once if MiniMax rate limits hit
-    if (isRateLimitError(result)) {
-      console.log(`    [rate-limit] MiniMax rate limit detected. Waiting 10 minutes before retry...`);
-      await new Promise((r) => setTimeout(r, 10 * 60 * 1000));
-      console.log(`    [rate-limit] Retrying [${id}]...`);
-      result = await sendToLyra(finalPrompt, timeout_ms, `eval-${RUN_ID}-${id}`, useDryRun);
-    }
+    const result = await sendWithBackoff(finalPrompt, timeout_ms, `eval-${RUN_ID}-${id}`, useDryRun, id);
 
     response = result.text;
     latencyMs = result.durationMs;
