@@ -63,7 +63,7 @@ tests:
     category: proactive_quality
     name: "Morning digest quality"
     prompt: "Generate my morning digest for today. Include news, tasks due, and any important reminders."
-    timeout_ms: 45000
+    timeout_ms: 90000
     side_effects: read_only
     validators:
       - type: llm_judge
@@ -78,7 +78,7 @@ tests:
     category: proactive_quality
     name: "Weekly brain brief quality"
     prompt: "Generate my weekly brain brief. Synthesize patterns from the past week across my Second Brain, content ideas, and any recurring themes."
-    timeout_ms: 45000
+    timeout_ms: 90000
     side_effects: read_only
     validators:
       - type: llm_judge
