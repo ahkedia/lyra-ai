@@ -31,6 +31,7 @@ tests:
     tags: [latency, notion]
 
   - id: latency-multi-tool
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: architectural
     category: latency
     name: "Multi-tool task latency"
@@ -64,6 +65,7 @@ tests:
     tags: [notion, tool-use, write]
 
   - id: tool-cron-list
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: architectural
     category: tool_use
     name: "List cron jobs correctly"

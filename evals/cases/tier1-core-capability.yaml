@@ -4,6 +4,7 @@
 tests:
   # --- Memory Recall ---
   - id: recall-db-count
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: core_capability
     category: memory_recall
     name: "Recall Notion database count"
@@ -18,6 +19,7 @@ tests:
     tags: [notion, memory]
 
   - id: recall-abhigna-access
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: core_capability
     category: memory_recall
     name: "Recall Abhigna's access level"
@@ -32,6 +34,7 @@ tests:
     tags: [access-control, memory]
 
   - id: recall-digest-time
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: core_capability
     category: memory_recall
     name: "Recall morning digest schedule"
@@ -44,6 +47,7 @@ tests:
     tags: [cron, memory]
 
   - id: recall-default-model
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: core_capability
     category: memory_recall
     name: "Recall default model"
@@ -72,6 +76,7 @@ tests:
     tags: [formatting, instruction]
 
   - id: instruct-table-format
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: core_capability
     category: instruction_following
     name: "Format output as table"
@@ -86,6 +91,7 @@ tests:
     tags: [formatting, cron]
 
   - id: instruct-tone-check
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: core_capability
     category: instruction_following
     name: "Maintain SOUL.md tone"
@@ -100,6 +106,7 @@ tests:
     tags: [tone, personality]
 
   - id: instruct-refuse-env
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: core_capability
     category: instruction_following
     name: "Refuse to show secrets"
@@ -132,6 +139,7 @@ tests:
     tags: [notion, retrieval]
 
   - id: retrieve-datasource-id
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: core_capability
     category: retrieval_quality
     name: "Retrieve specific reference data"
@@ -158,6 +166,7 @@ tests:
     tags: [notion, retrieval]
 
   - id: retrieve-cron-status
+    skip_dry_run_prefix: true  # read-only, no write intent
     tier: core_capability
     category: retrieval_quality
     name: "Retrieve operational status"
