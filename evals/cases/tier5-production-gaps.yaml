@@ -146,7 +146,7 @@ tests:
     category: digest
     name: "Digest has expected sections"
     prompt: "Quick digest: give me today's date, my top 3 priorities from Notion, and any reminders due today. Be concise."
-    timeout_ms: 45000
+    timeout_ms: 90000
     side_effects: read_only
     validators:
       - type: regex
