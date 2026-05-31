@@ -63,10 +63,12 @@ tests:
     prompt: "Summarize what you do in exactly 3 bullet points. No more, no less."
     timeout_ms: 45000
     side_effects: none
+    # No write intent — the dry-run prefix would dominate the prompt and make Lyra
+    # answer the meta-instructions instead of summarizing. Opt out so it tests formatting.
+    skip_dry_run_prefix: true
     validators:
-      - type: regex
-        pattern: "^\\s*[-•*]"
-        flags: "m"
+      - type: llm_judge
+        rubric: "Does the response contain EXACTLY 3 bullet points — no more, no less? Bullets may use -, *, •, or a numbered 1./2./3. format, and a short lead-in line before them is fine. A response with 2 or 4+ bullets, or prose with no bullet list, is a FAIL. This tests exact instruction-following, so the count must be exactly 3."
     tags: [formatting, instruction]
 
   - id: instruct-table-format

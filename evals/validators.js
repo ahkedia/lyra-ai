@@ -92,6 +92,13 @@ export const validators = {
   },
 };
 
+// Validator types that are INFORMATIONAL ONLY — recorded in results but never
+// cause a capability FAIL. Latency is genuinely variable (Notion synthesis 15-45s,
+// throttle backoff) and is tracked as a suite-level trend + alerted on >20% drop;
+// gating individual tests on a hard per-test latency threshold only manufactures
+// flaky capability failures. (Phase 1.2 de-flaking, 2026-05-31.)
+const NON_GATING_VALIDATOR_TYPES = new Set(['latency_p95']);
+
 /**
  * Run all validators for a test case against a response.
  * @param {string} response - The LLM response text
@@ -123,12 +130,14 @@ export function runValidators(response, validatorConfigs, meta = {}) {
       : meta;
 
     const result = validatorFn(response, config, judgeMeta);
+    const gating = !NON_GATING_VALIDATOR_TYPES.has(config.type);
     results.push({
       type: config.type,
+      gating,
       ...result,
     });
 
-    if (!result.passed) {
+    if (!result.passed && gating) {
       allPassed = false;
     }
   }
