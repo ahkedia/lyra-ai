@@ -240,6 +240,11 @@ async function main() {
   const gate = latest.gates?.all_ok ? '🟢' : '🔴';
   const subject = `${gate} Lyra Eval Digest ${latest.date} — ${pctf(latest.pass_rate)} pass, ${failures.length} fail`;
 
+  if (process.env.EVAL_DIGEST_HTML_OUT) {
+    const { writeFileSync } = await import('fs');
+    writeFileSync(process.env.EVAL_DIGEST_HTML_OUT, html);
+    console.log('[email-digest] wrote preview HTML to', process.env.EVAL_DIGEST_HTML_OUT);
+  }
   if (process.env.EVAL_DIGEST_DRY_RUN === '1') {
     console.log('[email-digest] DRY RUN — would send to', to, '\nsubject:', subject);
     console.log('html bytes:', html.length, '| diagnosis:', diag.overall || '(none)');
