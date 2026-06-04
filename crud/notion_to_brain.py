@@ -184,22 +184,150 @@ def sync_personal_wiki(dry_run: bool = False) -> dict:
             "pruned": pruned, "by_dir": by_dir}
 
 
-SOURCES = {"personal-wiki": sync_personal_wiki}
+# --- Generic Notion DB → brain namespace sync -----------------------------------
+# Each entry: data_source id, brain namespace dir, the property to use as the body
+# (rich_text/url fields appended after page blocks), and an optional include() filter.
+_GENERIC_SOURCES = {
+    "twitter": {
+        "ds": "32d78008-9100-81b6-ac17-000bf4db6f2e",
+        "dir": "tweets",
+        "type": "tweet",
+        "extra_props": ["Author", "Original Tweet URL", "Original Tweet Summary"],
+    },
+    "content-drafts": {
+        "ds": "553cecf2-69dd-44b9-a46e-43e761407fb4",
+        "dir": "writing",
+        "type": "writing",
+        "extra_props": ["Status", "blog_content", "linkedin_copy"],
+    },
+    "content-topics": {
+        "ds": "33f78008-9100-817b-8cee-000b816a89d4",
+        "dir": "content-topics",
+        "type": "content-idea",
+        "extra_props": ["Domain", "Source", "Author brief", "Notes", "Status"],
+    },
+    "second-brain": {
+        "ds": "f1ce4e0f-9e0d-43da-87f8-94dae2732962",
+        "dir": "second-brain",
+        "type": "note",
+        "extra_props": [],
+    },
+}
+
+
+def _prop_any_text(props: dict, name: str) -> str:
+    """Best-effort text extraction for rich_text / url / select / title props."""
+    v = props.get(name, {})
+    t = v.get("type")
+    if t == "rich_text":
+        return "".join(x.get("plain_text", "") for x in v.get("rich_text", [])).strip()
+    if t == "url":
+        return v.get("url") or ""
+    if t == "select" and v.get("select"):
+        return v["select"]["name"]
+    if t == "title":
+        return "".join(x.get("plain_text", "") for x in v.get("title", [])).strip()
+    return ""
+
+
+def sync_generic(source_key: str, dry_run: bool = False) -> dict:
+    cfg = _GENERIC_SOURCES[source_key]
+    nsdir = cfg["dir"]
+    base = os.path.join(BRAIN_REPO, nsdir)
+    pages = _query_all(cfg["ds"])
+
+    written, skipped = 0, 0
+    seen_paths: set[str] = set()
+
+    for p in pages:
+        if p.get("archived") or p.get("in_trash"):
+            continue
+        props = p.get("properties", {})
+        title = _prop_title(props)
+        page_id = p["id"].replace("-", "")
+        if not title:
+            title = f"{source_key}-{page_id[:8]}"
+        slug = _slugify(title, fallback=page_id[:8])
+        rel = os.path.join(nsdir, f"{slug}.md")
+        if rel in seen_paths:
+            slug = f"{slug}-{page_id[:6]}"
+            rel = os.path.join(nsdir, f"{slug}.md")
+        seen_paths.add(rel)
+        fpath = os.path.join(BRAIN_REPO, rel)
+
+        body = _block_text(p["id"], max_blocks=400)
+        # append configured extra props (drafts/tweets store content in props, not blocks)
+        extras = []
+        for pn in cfg.get("extra_props", []):
+            val = _prop_any_text(props, pn)
+            if val:
+                extras.append(f"**{pn}:** {val}")
+        full_body = (body + ("\n\n" + "\n\n".join(extras) if extras else "")).strip()
+        if not full_body:
+            skipped += 1
+            continue
+
+        edited = (p.get("last_edited_time") or "")[:10]
+        fm = [
+            "---",
+            f'title: "{_yaml_escape(title)}"',
+            f'type: "{cfg["type"]}"',
+            'origin: "notion"  # Notion is master; derived mirror — do not hand-edit',
+            f'notion_page_id: "{p["id"]}"',
+        ]
+        if edited:
+            fm.append(f"notion_last_edited: {edited}")
+        fm.append("---")
+        content = "\n".join(fm) + f"\n\n# {title}\n\n{full_body}\n"
+
+        if not dry_run:
+            os.makedirs(os.path.dirname(fpath), exist_ok=True)
+            with open(fpath, "w") as fh:
+                fh.write(content)
+        written += 1
+
+    pruned = 0
+    if not dry_run and os.path.isdir(base):
+        for fn in os.listdir(base):
+            if fn.endswith(".md") and os.path.join(nsdir, fn) not in seen_paths:
+                os.remove(os.path.join(base, fn))
+                pruned += 1
+
+    return {"pages": len(pages), "written": written, "skipped": skipped,
+            "pruned": pruned, "by_dir": {nsdir: written}}
+
+
+SOURCES = {
+    "personal-wiki": sync_personal_wiki,
+    "twitter": lambda dry_run=False: sync_generic("twitter", dry_run),
+    "content-drafts": lambda dry_run=False: sync_generic("content-drafts", dry_run),
+    "content-topics": lambda dry_run=False: sync_generic("content-topics", dry_run),
+    "second-brain": lambda dry_run=False: sync_generic("second-brain", dry_run),
+}
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("source", choices=sorted(SOURCES.keys()))
+    ap.add_argument("source", choices=sorted(SOURCES.keys()) + ["all"])
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     if not os.environ.get("NOTION_API_KEY"):
         print("NOTION_API_KEY not set", file=sys.stderr)
         sys.exit(1)
-    res = SOURCES[args.source](dry_run=args.dry_run)
+
+    targets = sorted(SOURCES.keys()) if args.source == "all" else [args.source]
     tag = "DRY-RUN " if args.dry_run else ""
-    print(f"{tag}{args.source}: {res['written']} written, {res['skipped']} skipped, "
-          f"{res['pruned']} pruned, of {res['pages']} Notion pages")
-    print("  by dir: " + ", ".join(f"{k}={v}" for k, v in sorted(res["by_dir"].items())))
+    failures = 0
+    for src in targets:
+        try:
+            res = SOURCES[src](dry_run=args.dry_run)
+            print(f"{tag}{src}: {res['written']} written, {res['skipped']} skipped, "
+                  f"{res['pruned']} pruned, of {res['pages']} Notion pages")
+        except Exception as e:  # one DB failing must not abort the rest (cron-safe)
+            failures += 1
+            print(f"{tag}{src}: ERROR {e}", file=sys.stderr)
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
