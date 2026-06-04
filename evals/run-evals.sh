@@ -234,6 +234,11 @@ echo ""
 echo "Step 5b: Eval-coverage gate shadow scan..."
 bash /root/lyra-ai/evals/gate/shadow-scan.sh || echo "[warn] shadow-scan failed (non-fatal)"
 
+# Step 5c: Regenerate the eval dashboard (change -> eval-delta timeline) — Phase 3
+echo ""
+echo "Step 5c: Regenerating eval dashboard..."
+node /root/lyra-ai/evals/dashboard/build-eval-dashboard.js || echo "[warn] dashboard build failed (non-fatal)"
+
 # Step 6: Infrastructure checks (always run — free)
 echo ""
 echo "Step 6: Infrastructure checks..."
