@@ -169,6 +169,11 @@ if [ "$IS_FULL_EVAL_DAY" = true ]; then
       fi
     fi
   fi
+
+  # Step 4b: Email the daily eval digest (summary + failure diagnosis + dashboard) — non-fatal
+  echo ""
+  echo "Step 4b: Emailing eval digest..."
+  node /root/lyra-ai/evals/dashboard/email-digest.js || echo "[warn] email digest failed (non-fatal)"
 else
   if [ "$EVAL_ENABLE_LANE_SPLIT" = "1" ] && [ "$EVAL_RUN_DIAGNOSTIC_ON_EVEN_DAYS" = "1" ]; then
     echo "Step 1: Running diagnostic lane only (even day)"
