@@ -20,6 +20,11 @@ fi
 echo $$ > "$LOCK"
 trap 'rm -f "$LOCK"' EXIT
 
+# Take the shared brain WRITE lock (same one brain-capture.sh uses) so a sync never
+# collides with a Lyra capture on the PGLite single-writer DB. Wait up to 10 min.
+exec 8>/tmp/brain-write.lock
+flock -w 600 8 || { echo "[$(date -u +%T)] could not get write lock; abort sync"; exit 0; }
+
 echo "=== brain-sync $(date -u) ==="
 
 # 1) Notion → brain repo markdown (Notion is master). Skips News Inbox + content-topics by design.
