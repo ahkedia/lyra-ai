@@ -145,18 +145,19 @@ if [ "$IS_FULL_EVAL_DAY" = true ]; then
   echo "Step 3: Syncing to Notion..."
   node notion-sync.js || echo "[warn] Notion sync failed (non-fatal)"
 
-  # Step 4: Push dashboard data
+  # Step 4: Generate + publish dashboard (change->eval-delta timeline) to GitHub
   echo ""
-  echo "Step 4: Pushing dashboard data..."
+  echo "Step 4: Generating + publishing eval dashboard..."
+  node /root/lyra-ai/evals/dashboard/build-eval-dashboard.js || echo "[warn] dashboard build failed (non-fatal)"
   DASHBOARD_DATA_DIR="/root/lyra-ai/docs/dashboard/data"
   if [ -d "$DASHBOARD_DATA_DIR" ]; then
     cp -f "$SCRIPT_DIR/output/"*.json "$DASHBOARD_DATA_DIR/" 2>/dev/null || true
 
     cd /root/lyra-ai
-    if git diff --quiet docs/dashboard/data/; then
+    if git diff --quiet docs/dashboard/; then
       echo "  No changes to push."
     else
-      git add docs/dashboard/data/
+      git add docs/dashboard/
       if git commit -m "Update eval dashboard data $(date +%Y-%m-%d)" >/dev/null 2>&1; then
         if git push origin main >/dev/null 2>&1; then
           echo "  Dashboard data committed and pushed to GitHub."
@@ -233,11 +234,6 @@ fi
 echo ""
 echo "Step 5b: Eval-coverage gate shadow scan..."
 bash /root/lyra-ai/evals/gate/shadow-scan.sh || echo "[warn] shadow-scan failed (non-fatal)"
-
-# Step 5c: Regenerate the eval dashboard (change -> eval-delta timeline) — Phase 3
-echo ""
-echo "Step 5c: Regenerating eval dashboard..."
-node /root/lyra-ai/evals/dashboard/build-eval-dashboard.js || echo "[warn] dashboard build failed (non-fatal)"
 
 # Step 6: Infrastructure checks (always run — free)
 echo ""
