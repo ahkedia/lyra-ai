@@ -155,6 +155,10 @@ def cmd_parse(args):
         return
     # --- End Personal Wiki ---
 
+    # NOTE: Brain (gbrain) integration is NOT a tier0 bypass — we want
+    # retrieve-then-synthesize (inject brain context, let the LLM answer).
+    # See plugins/lyra-model-router context-injection hook, not here.
+
     # --- Job application workflow (Phase A: trigger, Phase B: clarification reply) ---
     from job_application import (
         is_job_trigger,
@@ -440,6 +444,27 @@ def cmd_job_application(args):
         print(f'Not a job application trigger: {raw}'); sys.exit(1)
 
 
+def cmd_brain(args):
+    """gbrain retrieval for the model-router's retrieve-then-synthesize hook.
+
+    Prints raw brain context on a brain-intent message; prints nothing + exits 1
+    when there's no match or the brain is unavailable/locked, so the router treats
+    it as 'skip' and routes normally. Never raises into the router.
+    """
+    raw = " ".join(args).strip()
+    if not raw:
+        sys.exit(1)
+    try:
+        from brain_query import try_tier0_brain_text
+
+        out = try_tier0_brain_text(raw)
+    except Exception:
+        sys.exit(1)
+    if out is None:
+        sys.exit(1)  # no match / brain unavailable → router skips, normal routing
+    print(out)
+
+
 COMMANDS = {
     'weight': cmd_weight,
     'sleep': cmd_sleep,
@@ -451,6 +476,7 @@ COMMANDS = {
     'food': cmd_food,
     'snapshot': cmd_snapshot,
     'parse': cmd_parse,
+    'brain': cmd_brain,
     'daily-summary': cmd_daily_summary,
     'job-application': cmd_job_application,
     'content-draft': cmd_content_draft,
