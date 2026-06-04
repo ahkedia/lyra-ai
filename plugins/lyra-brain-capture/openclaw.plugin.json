@@ -1,0 +1,11 @@
+{
+  "id": "lyra-brain-capture",
+  "activation": { "onStartup": true },
+  "name": "Lyra Brain Capture",
+  "description": "Lyra's write path into gbrain: /remember + 'save to brain' explicit capture, and end-of-thread auto-summary on agent_end. All writes serialized via brain-capture.sh flock (PGLite single-writer safe).",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
