@@ -119,6 +119,18 @@ const WIKI_TIER0_PATTERNS = [
   /any (?:existing )?wiki (?:page )?about/i,
 ];
 
+// Brain (gbrain) retrieve-then-synthesize patterns. NOT a tier0 bypass:
+// on match we inject gbrain retrieval into the prompt and let the LLM answer.
+// Kept in sync with crud/brain_query.py (_EXPLICIT + _SELF intent).
+const BRAIN_PATTERNS = [
+  /^\s*\/brain\b/i,
+  /\bask (?:my |the )?brain\b/i,
+  /\bwhat does (?:my |the )?brain (?:say|know)\b/i,
+  /\bcheck (?:my |the )?brain\b/i,
+  // self-knowledge questions: question-shape + my/I/Akash + a knowledge cue
+  /\b(?:what|which|when|where|how|tell me|summar(?:ize|ise)|remind me)\b[\s\S]{0,80}\b(?:my|i|me|akash|akash's)\b[\s\S]{0,80}\b(?:career|experience|background|worked?|role|job|domain|expertise|built|launched?|achievement|n26|flipkart|trade republic|cheq|investing|payments|lending|growth|product|voice|writing style|thesis|opinion|view|take)\b/i,
+];
+
 const TIER0_PATTERNS = [
   // Telegram slash commands (setMyCommands menu) — zero-token routes.
   // /reminders → list reminders; /last → last-message recall.
@@ -199,6 +211,35 @@ function tryTier0(prompt, sessionKey = "") {
   }
 }
 // --- End Tier 0 ---
+
+// --- Brain (gbrain) retrieve-then-synthesize ---
+// On a brain-intent message, fetch gbrain retrieval context (zero LLM cost) and
+// return it so the hook can prepend it to the prompt. The normally-routed model
+// then writes a grounded, cited answer. Fail-safe: returns null on any error/lock/
+// empty so Lyra answers normally. CPU retrieval can be slow → generous timeout,
+// but it runs BEFORE model resolution so it does not share the 8s tier0 budget.
+function fetchBrainContext(prompt) {
+  const trimmed = (prompt || "").trim();
+  if (!trimmed) return null;
+  if (!BRAIN_PATTERNS.some((p) => p.test(trimmed))) return null;
+  if (!existsSync(CRUD_CLI)) return null;
+  try {
+    // crud/cli.py brain "<msg>" → prints retrieval text, or empty if no match/unavailable
+    const result = execFileSync("python3", [CRUD_CLI, "brain", trimmed], {
+      timeout: parseInt(process.env.LYRA_BRAIN_TIMEOUT_MS || "22000", 10),
+      env: { ...process.env },
+    });
+    const text = result.toString().trim();
+    if (!text) return null;
+    return text;
+  } catch (e) {
+    if (e.status !== 1) {
+      process.stderr.write(`[R] Brain fetch error: ${e.message}\n`);
+    }
+    return null;
+  }
+}
+// --- End Brain ---
 
 // Track Anthropic availability — START DISABLED (rate limited until April 1)
 let anthropicAvailable = false;
@@ -734,6 +775,20 @@ const plugin = {
   description: "Tier 0 Python bypass + MiniMax-first 4-way routing with rolling guardrails",
   register(api) {
     api.on("before_model_resolve", (event, ctx) => {
+      // Brain retrieve-then-synthesize: inject gbrain context, then route normally.
+      // Runs before tier0/scoring so the chosen LLM answers grounded in the brain.
+      try {
+        const brainCtx = fetchBrainContext(event?.prompt || "");
+        if (brainCtx) {
+          event.prompt =
+            `[Brain context — answer using this first, cite pages, note gaps honestly. ` +
+            `If it doesn't cover the question, say so and answer normally.]\n` +
+            `${brainCtx}\n\n[User message]\n${event.prompt}`;
+          process.stderr.write("[R] Brain context injected → routing to LLM for synthesis\n");
+        }
+      } catch (e) {
+        process.stderr.write(`[R] Brain inject skipped: ${e.message}\n`);
+      }
       const result = routeQuery(event, ctx);
       if (result?.__tier0) {
         // Inject direct response — bypass model call entirely
