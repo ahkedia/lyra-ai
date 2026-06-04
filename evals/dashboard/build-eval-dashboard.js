@@ -13,7 +13,7 @@
  * No external deps, no server process — served as static files by Caddy at /evals.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -239,11 +239,27 @@ function renderHtml(m) {
 
 function main() {
   const model = buildModel();
-  mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(join(OUT_DIR, 'index.html'), renderHtml(model));
-  writeFileSync(join(OUT_DIR, 'data.json'), JSON.stringify(model, null, 2));
+  const html = renderHtml(model);
+  const data = JSON.stringify(model, null, 2);
+
+  // Primary target: Hetzner web root.
+  const targets = [OUT_DIR];
+  // Mirror to the GitHub-published docs/dashboard/ so it rides the existing publish flow.
+  const docsMirror = join(REPO_ROOT, 'docs', 'dashboard');
+  if (existsSync(docsMirror)) targets.push(docsMirror);
+
+  for (const dir of targets) {
+    try {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'index.html'), html); // self-contained (data embedded)
+      // data.json (full model, ~600KB) only to the web root — avoid git churn in the mirror.
+      if (dir === OUT_DIR) writeFileSync(join(dir, 'data.json'), data);
+    } catch (e) {
+      console.error(`[dashboard] write failed for ${dir}: ${e.message}`);
+    }
+  }
   const l = model.latest || {};
-  console.log(`[dashboard] ${model.runs.length} runs · last ${l.date || '—'} ${pct(l.pass_rate)} · days-since-good-run=${model.daysSince} → ${OUT_DIR}/index.html`);
+  console.log(`[dashboard] ${model.runs.length} runs · last ${l.date || '—'} ${pct(l.pass_rate)} · days-since-good-run=${model.daysSince} → ${targets.join(', ')}`);
 }
 
 main();
