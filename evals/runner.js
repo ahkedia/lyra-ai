@@ -873,9 +873,20 @@ async function main() {
   const summaryLane = laneKeys.length === 1 ? laneKeys[0] : 'mixed';
 
   // Write summary (legacy fields preserved for dashboards; split metrics added)
+  // Record the commit under test so the dashboard can join runs to the changes
+  // that landed between them (the change -> eval-delta timeline).
+  let commitSha = null;
+  let commitSubject = null;
+  try {
+    commitSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim();
+    commitSubject = execFileSync('git', ['log', '-1', '--pretty=%s'], { cwd: __dirname, encoding: 'utf8' }).trim();
+  } catch { /* not a git checkout — leave null */ }
+
   const summary = {
     date: today,
     timestamp: new Date().toISOString(),
+    commit_sha: commitSha,
+    commit_subject: commitSubject,
     total: results.length,
     passed,
     failed,
