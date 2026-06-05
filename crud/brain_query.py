@@ -57,7 +57,31 @@ _ACHIEVE = re.compile(
 )
 
 
-def _run_gbrain_query(topic: str) -> str | None:
+# --- Provenance policy -----------------------------------------------------------
+# Page types that are AKASH'S OWN FACTUAL RECORD (safe to state as "what Akash did"):
+_FACTUAL_TYPES = {"Career", "Domain", "Meta", "Self-Reflection", "Voice Canon", "writing"}
+# Page types that are THIRD-PARTY / external (Lenny notes, others' tweets, RSS articles).
+# These are for philosophy, frameworks, "how I'd approach X" — NEVER as Akash's facts/achievements.
+_THIRDPARTY_TYPES = {"Lenny Synthesis", "tweet", "note"}
+
+# The canonical achievements page — pinned for achievement questions.
+_BRAG_SLUG = "wiki/meta/achievements-brag-bank"
+
+# Instruction prepended to brain context so the LLM respects provenance.
+_PROVENANCE_NOTE = (
+    "[BRAIN PROVENANCE RULES — follow strictly]\n"
+    "• Pages under wiki/career, wiki/domain, wiki/meta, wiki/self-reflection, and writing/ "
+    "are AKASH'S OWN record. Only these may be stated as facts about what Akash did, built, "
+    "achieved, or his metrics.\n"
+    "• Pages under wiki/lenny (Lenny's Newsletter), tweets/, and RSS-sourced notes are THIRD-PARTY. "
+    "Use them ONLY for philosophy, frameworks, mental models, or 'how Akash might approach X'. "
+    "NEVER present them as Akash's achievements, employers, or factual history.\n"
+    "• If you cannot find a fact in Akash's own pages, say so plainly. Do NOT invent or borrow "
+    "facts from third-party pages. Better to say 'I don't have that on record' than to guess.\n"
+)
+
+
+def _run_gbrain_query(topic: str, source_args: list | None = None) -> str | None:
     """Run `gbrain query` (hybrid retrieval, no LLM synthesis cost). Returns text or None."""
     env = os.environ.copy()
     env.setdefault("OLLAMA_HOST", _OLLAMA_HOST)
@@ -65,7 +89,7 @@ def _run_gbrain_query(topic: str) -> str | None:
     env["PATH"] = os.path.dirname(_GBRAIN) + os.pathsep + env.get("PATH", "")
     try:
         proc = subprocess.run(
-            [_GBRAIN, "query", topic],
+            [_GBRAIN, "query", topic] + (source_args or []),
             env=env,
             capture_output=True,
             text=True,
@@ -87,6 +111,24 @@ def _run_gbrain_query(topic: str) -> str | None:
     return out
 
 
+def _fetch_page(slug: str) -> str | None:
+    """Fetch a specific page's content by slug (for pinning the brag bank)."""
+    env = os.environ.copy()
+    env.setdefault("OLLAMA_HOST", _OLLAMA_HOST)
+    env["PATH"] = os.path.dirname(_GBRAIN) + os.pathsep + env.get("PATH", "")
+    try:
+        proc = subprocess.run(
+            [_GBRAIN, "get", slug],
+            env=env, capture_output=True, text=True, timeout=_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    out = (proc.stdout or "").strip()
+    if proc.returncode != 0 or not out or "not found" in out.lower():
+        return None
+    return out
+
+
 def try_tier0_brain_text(raw: str) -> str | None:
     """If the message is a brain query, return retrieved context to print; else None.
 
@@ -103,7 +145,10 @@ def try_tier0_brain_text(raw: str) -> str | None:
             topic = m.group(1).strip().strip("?.!。 ")
             break
 
-    if topic is None and (_SELF.search(t) or _ACHIEVE.search(t)):
+    is_achievement = bool(_ACHIEVE.search(t)) or ("achievement" in t.lower() or "accomplishment" in t.lower())
+    is_self = bool(_SELF.search(t))
+
+    if topic is None and (is_self or is_achievement):
         topic = t.strip().strip("?.!。 ")
 
     if topic is None:
@@ -112,12 +157,28 @@ def try_tier0_brain_text(raw: str) -> str | None:
         return "Add a topic (2+ characters), e.g. _ask my brain about my N26 work_"
 
     result = _run_gbrain_query(topic)
-    if result is None:
+    if result is None and not is_achievement:
         return None  # brain unavailable/empty/locked → Lyra answers normally
 
-    # Return clean retrieval text. The model-router injects this into the prompt and
-    # the routed LLM synthesizes a cited answer (retrieve-then-synthesize).
-    return result
+    parts = [_PROVENANCE_NOTE]
+
+    # For achievement questions: PIN the canonical brag bank as primary context so
+    # Akash's real, quantified wins are always front-and-center (not out-ranked by Lenny).
+    if is_achievement:
+        brag = _fetch_page(_BRAG_SLUG)
+        if brag:
+            parts.append("[AKASH'S CANONICAL ACHIEVEMENTS — use these as the authoritative answer]\n" + brag)
+
+    if result:
+        parts.append("[Additional brain retrieval — apply the provenance rules above]\n" + result)
+
+    # if we have nothing at all, fall through to normal routing
+    if len(parts) == 1:
+        return None
+
+    # The model-router injects this into the prompt; the routed LLM synthesizes a
+    # cited answer (retrieve-then-synthesize) while respecting provenance.
+    return "\n\n".join(parts)
 
 
 if __name__ == "__main__":
