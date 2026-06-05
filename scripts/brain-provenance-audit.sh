@@ -67,11 +67,14 @@ FACTUAL_QS=(
   "summarize my career"
 )
 pkill -f "gbrain serve" 2>/dev/null; sleep 2
+# Test through the REAL Lyra path (brain_query.py applies the provenance filter),
+# not raw `gbrain query` (which has no filter). This reflects what Lyra actually sees.
+BQ="/root/lyra-ai/crud/brain_query.py"
 leaks=0; total=0
 for q in "${FACTUAL_QS[@]}"; do
   total=$((total+1))
-  top=$(gbrain query "$q" --limit 1 2>/dev/null | grep -oE '^\[[0-9.]+\] [^ ]+' | head -1 | awk '{print $2}')
-  [ -z "$top" ] && { echo "  ? '$q' → no result"; continue; }
+  top=$(python3 "$BQ" "$q" 2>/dev/null | grep -oE '^\[[0-9.]+\] [^ ]+' | head -1 | awk '{print $2}')
+  [ -z "$top" ] && { echo "  ~ '$q' → no factual result (provenance note only — safe)"; continue; }
   t=$(tier_of "$top")
   if [ "$t" = reference ] || [ "$t" = UNCLASSIFIED ]; then
     echo "  ❌ LEAK: '$q'"
