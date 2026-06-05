@@ -128,7 +128,10 @@ const BRAIN_PATTERNS = [
   /\bwhat does (?:my |the )?brain (?:say|know)\b/i,
   /\bcheck (?:my |the )?brain\b/i,
   // self-knowledge questions: question-shape + my/I/Akash + a knowledge cue
-  /\b(?:what|which|when|where|how|tell me|summar(?:ize|ise)|remind me)\b[\s\S]{0,80}\b(?:my|i|me|akash|akash's)\b[\s\S]{0,80}\b(?:career|experience|background|worked?|role|job|domain|expertise|built|launched?|achievement|n26|flipkart|trade republic|cheq|investing|payments|lending|growth|product|voice|writing style|thesis|opinion|view|take)\b/i,
+  /\b(?:what|which|when|where|how|tell me|summar(?:ize|ise)|remind me|list)\b[\s\S]{0,80}\b(?:my|i|me|akash|akash's)\b[\s\S]{0,80}\b(?:career|experience|background|worked?|role|job|domain|expertise|built|launched?|achievement|accomplishment|win|wins|proud|track record|highlight|impact|shipped|metric|result|career win|career highlight|n26|flipkart|trade republic|cheq|carbon|investing|payments|lending|growth|product|voice|writing style|thesis|opinion|view|take)\b/i,
+  // achievement/accomplishment questions in any order (covers "my biggest accomplishments", "list my wins", "my track record")
+  /\b(?:my|akash's)\b[\s\S]{0,60}\b(?:achievements?|accomplishments?|wins?|track record|career highlights?|biggest win|proudest|impact|things i('?ve| have) (?:built|shipped|done))\b/i,
+  /\b(?:achievements?|accomplishments?|wins?|track record|career highlights?)\b[\s\S]{0,60}\b(?:my|akash|i('?ve| have)?)\b/i,
 ];
 
 const TIER0_PATTERNS = [
