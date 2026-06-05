@@ -67,6 +67,48 @@ _THIRDPARTY_TYPES = {"Lenny Synthesis", "tweet", "note"}
 # The canonical achievements page — pinned for achievement questions.
 _BRAG_SLUG = "wiki/meta/achievements-brag-bank"
 
+# Slug-prefix → tier. Single source of truth for provenance filtering (mirrors
+# scripts/brain-provenance-audit.sh). REFERENCE = third-party, never factual-about-Akash.
+_TIER_PREFIXES = [
+    ("canonical", ("wiki/career/", "wiki/domain/", "wiki/meta/", "wiki/self-reflection/", "persona/")),
+    ("authored", ("writing/",)),
+    ("reference", ("wiki/lenny/", "tweets/", "second-brain/")),
+    ("boot", ("lyra/", "command-center/")),
+    ("ephemeral", ("inbox/", "lyra/conversations/")),
+]
+
+
+def _tier_of(slug: str) -> str:
+    s = (slug or "").lstrip("/")
+    for tier, prefixes in _TIER_PREFIXES:
+        if s.startswith(prefixes):
+            return tier
+    return "unclassified"
+
+
+def _filter_reference_lines(retrieval: str) -> str:
+    """Drop reference-tier (third-party) result blocks from gbrain query output.
+    Output format is blocks led by '[score] slug -- excerpt'. For FACTUAL questions
+    we strip any block whose slug is reference/unclassified so Lyra can't cite them
+    as Akash's facts. Deterministic — does not depend on gbrain's ranker."""
+    if not retrieval:
+        return retrieval
+    import re as _re
+    lines = retrieval.split("\n")
+    kept, drop_block = [], False
+    for ln in lines:
+        m = _re.match(r"^\[[0-9.]+\]\s+(\S+)", ln)
+        if m:
+            t = _tier_of(m.group(1))
+            drop_block = t in ("reference", "unclassified")
+            if not drop_block:
+                kept.append(ln)
+        else:
+            # continuation line of the current block
+            if not drop_block:
+                kept.append(ln)
+    return "\n".join(kept).strip()
+
 # Instruction prepended to brain context so the LLM respects provenance.
 _PROVENANCE_NOTE = (
     "[BRAIN PROVENANCE RULES — follow strictly]\n"
@@ -170,7 +212,18 @@ def try_tier0_brain_text(raw: str) -> str | None:
             parts.append("[AKASH'S CANONICAL ACHIEVEMENTS — use these as the authoritative answer]\n" + brag)
 
     if result:
-        parts.append("[Additional brain retrieval — apply the provenance rules above]\n" + result)
+        # For factual/achievement/self questions, hard-filter out reference-tier
+        # (Lenny/tweets/RSS) results so they can't be cited as Akash's facts. This is
+        # deterministic and independent of gbrain's ranker. Non-factual questions
+        # (handled elsewhere / explicit /brain) keep full retrieval for framing value.
+        if is_achievement or is_self:
+            filtered = _filter_reference_lines(result)
+            if filtered:
+                parts.append("[Akash's own record — authoritative for facts]\n" + filtered)
+            # if filtering removed everything, we still have the pinned brag bank (achievement)
+            # or just the provenance note (self) — Lyra will say it lacks the fact rather than guess.
+        else:
+            parts.append("[Additional brain retrieval — apply the provenance rules above]\n" + result)
 
     # if we have nothing at all, fall through to normal routing
     if len(parts) == 1:
