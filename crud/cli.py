@@ -23,9 +23,8 @@ def usage():
   cli.py wiki-lenny "<topic>"              # search Lenny Synthesis pages by title
   cli.py wiki-lint                         # automated orphan/stale/take check
   cli.py wiki-dedup "<title or keywords>"  # list similar existing wiki rows
-  cli.py news-inbox-rss [max_new]         # arXiv CS.LG → News Inbox (dedupe on Link)
-  cli.py wiki-inbox-rss [max_new]         # multi-feed RSS → Personal Wiki Inbox (dedupe on URL in Source)
-  cli.py wiki-careers-sync [--apply] [--interactive] [--manifest PATH] [--workspace DIR] [--archive-career-title "Exact Title"]
+  cli.py news-inbox-rss [max_total] [--dry-run]   # configurable RSS/Atom feeds (feeds.json) -> News Inbox (dedupe on Link)
+  cli.py wiki-promote [limit] [--dry-run] [--threshold N]  # score News Inbox & promote keepers -> Second Brain (-> brain nightly)
 """)
 
 def cmd_weight(args):
@@ -407,27 +406,18 @@ def cmd_wiki_dedup(args):
 
 
 def cmd_news_inbox_rss(args):
-    from news_inbox_rss import ingest_arxiv_cs_lg
+    from news_inbox_rss import ingest_feeds
 
-    n = 20
-    if args and str(args[0]).isdigit():
-        n = int(args[0])
-    print(ingest_arxiv_cs_lg(max_new=n))
-
-
-def cmd_wiki_inbox_rss(args):
-    from wiki_inbox_rss import ingest_wiki_inbox_rss
-
-    n = 30
-    if args and str(args[0]).isdigit():
-        n = int(args[0])
-    print(ingest_wiki_inbox_rss(max_new=n))
+    dry = "--dry-run" in args
+    nums = [a for a in args if str(a).isdigit()]
+    max_total = int(nums[0]) if nums else 40
+    print(ingest_feeds(max_total=max_total, dry_run=dry))
 
 
-def cmd_wiki_careers_sync(args):
-    from wiki_careers_sync import main as wiki_careers_main
+def cmd_wiki_promote(args):
+    from wiki_promote import main as wiki_promote_main
 
-    raise SystemExit(wiki_careers_main(args))
+    raise SystemExit(wiki_promote_main(args))
 
 
 def cmd_job_application(args):
@@ -484,8 +474,7 @@ COMMANDS = {
     'wiki-lint': cmd_wiki_lint,
     'wiki-dedup': cmd_wiki_dedup,
     'news-inbox-rss': cmd_news_inbox_rss,
-    'wiki-inbox-rss': cmd_wiki_inbox_rss,
-    'wiki-careers-sync': cmd_wiki_careers_sync,
+    'wiki-promote': cmd_wiki_promote,
 }
 
 if __name__ == '__main__':

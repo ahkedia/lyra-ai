@@ -1,0 +1,41 @@
+{
+  "_comment": "Configurable RSS/Atom feeds → News Inbox (Notion). Edit freely. 'format' is 'atom' or 'rss'. 'category' maps to the News Inbox Category select; 'topics' to the Topics multi_select (Notion auto-creates unknown options). 'max_new' caps new rows per run for this feed.",
+  "feeds": [
+    {
+      "name": "arXiv cs.LG",
+      "url": "http://export.arxiv.org/api/query?search_query=cat:cs.LG&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending",
+      "format": "atom",
+      "category": "AI/ML",
+      "topics": ["AI/ML", "LLMs"],
+      "max_new": 8,
+      "enabled": true
+    },
+    {
+      "name": "arXiv cs.AI",
+      "url": "http://export.arxiv.org/api/query?search_query=cat:cs.AI&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending",
+      "format": "atom",
+      "category": "AI/ML",
+      "topics": ["AI", "AI Agents"],
+      "max_new": 8,
+      "enabled": true
+    },
+    {
+      "name": "Lenny's Newsletter",
+      "url": "https://www.lennysnewsletter.com/feed",
+      "format": "rss",
+      "category": "Product",
+      "topics": ["Product", "SaaS"],
+      "max_new": 5,
+      "enabled": true
+    },
+    {
+      "name": "TechCrunch Fintech",
+      "url": "https://techcrunch.com/category/fintech/feed/",
+      "format": "rss",
+      "category": "Fintech",
+      "topics": ["Fintech", "Payments"],
+      "max_new": 5,
+      "enabled": true
+    }
+  ]
+}
