@@ -36,16 +36,24 @@ _EXPLICIT = [
     re.compile(r"(?is)\bcheck (?:my |the )?brain (?:for |about )?(.+)"),
 ]
 
-# Self-knowledge questions about Akash (career / domain / experience / voice).
+# Self-knowledge questions about Akash (career / domain / experience / voice / achievements).
 # Scoped tight enough not to hijack generic chat. Must reference "I/my/me/Akash"
 # AND a knowledge cue, in a question shape.
 _SELF = re.compile(
-    r"(?is)\b(?:what|which|when|where|how|tell me|summar(?:ize|ise)|remind me)\b.*"
+    r"(?is)\b(?:what|which|when|where|how|tell me|summar(?:ize|ise)|remind me|list)\b.*"
     r"\b(?:my|i|me|akash|akash's)\b.*"
     r"\b(?:career|experience|background|work(?:ed)?|role|job|domain|expertise|"
-    r"built|launch(?:ed)?|achievement|n26|flipkart|trade republic|cheq|"
+    r"built|launch(?:ed)?|achievement|accomplishment|wins?|proud|track record|"
+    r"highlight|impact|shipped|metric|result|"
+    r"n26|flipkart|trade republic|cheq|carbon|"
     r"investing|payments|lending|growth|product|voice|writing style|"
     r"thesis|opinion|view|take)\b"
+)
+# Achievement/accomplishment phrasing in any order (no question word needed)
+_ACHIEVE = re.compile(
+    r"(?is)\b(?:my|akash's)\b.{0,60}\b(?:achievements?|accomplishments?|wins?|track record|"
+    r"career highlights?|biggest win|proudest|things i(?:'ve| have) (?:built|shipped|done))\b"
+    r"|\b(?:achievements?|accomplishments?|track record|career highlights?)\b.{0,60}\b(?:my|akash|i)\b"
 )
 
 
@@ -95,7 +103,7 @@ def try_tier0_brain_text(raw: str) -> str | None:
             topic = m.group(1).strip().strip("?.!。 ")
             break
 
-    if topic is None and _SELF.search(t):
+    if topic is None and (_SELF.search(t) or _ACHIEVE.search(t)):
         topic = t.strip().strip("?.!。 ")
 
     if topic is None:
