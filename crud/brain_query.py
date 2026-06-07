@@ -25,7 +25,7 @@ _GBRAIN = (
     or "/root/.bun/bin/gbrain"
 )
 _OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-_TIMEOUT_S = int(os.environ.get("LYRA_GBRAIN_TIMEOUT", "20"))
+_TIMEOUT_S = int(os.environ.get("LYRA_GBRAIN_TIMEOUT", "3"))
 
 # --- Trigger patterns -------------------------------------------------------
 # Explicit "ask the brain" verbs (always route).
