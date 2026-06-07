@@ -1,48 +1,90 @@
 # Lyra AI — deferred work
 
-Short-lived scratch list. Prefer Notion for product tasks; use this for repo-local engineering follow-ups.
+Consolidated list for all Lyra work — repo engineering, cron fixes, evals, content engine. Updated after each session.
+
+---
 
 ## Active
 
-| ID | What | Why | Depends on |
-|----|------|-----|------------|
-| L-1 | Atomic lock acquire (`O_EXCL` or `mkdir`) for content-engine hot paths | Removes rare double-acquire race between cron and manual runs | — |
-| L-2 | Optional: `bats` in CI (GitHub Action) calling `tests/bats/` | Catches bash regressions without relying on local brew | Runner image with `bats` |
-| L-4 | **Upstream filed** [openclaw#69787](https://github.com/openclaw/openclaw/issues/69787): on `getUpdates` 409, `markDirty()` not called; retry reuses keep-alive → 409 loop. Track until fixed in npm release, then deploy + verify 409s → ~0. | Passive watch | — |
-| L-5 | 7-day heap observation window (ends 2026-04-28). No OOMs expected post L-3 fix. A3 alarm (L-6) will flag recurrence. Close if clean. | Passive watch | — |
-| L-8 | **Slow cron prompts (low priority)**. `morning-weight-nudge` 180s, `content-reminder` 199s, `health-check` 261s, `morning-digest` 404s. Trivial crons (<200 char prompts) take 3+ min — likely router upgrading to Haiku/Sonnet or speculative tool calls. Fix pattern: convert trivial crons to tier-0 Python (zero-token), split `morning-digest` into fetch + synthesize phases per self-audit recommendation. Not urgent — no user-visible failures, just wasted tokens/time. | Not priority | Diagnostic: pull one full `morning-weight-nudge` journalctl log before converting |
-| L-14 | **Delete old shell scripts after clean week.** Cron flipped 2026-04-22 to `python3 scripts/twitter_bookmarks.py`. After 7 clean runs (by 2026-04-29), delete `scripts/fetch-twitter-bookmarks.sh`, `scripts/bookmarks-to-notion.sh` from Mac repo + Hetzner. Keep `get-twitter-oauth-refresh-token.sh` (one-time OAuth bootstrap tool). | After 2026-04-29 | Verify `/var/log/lyra-twitter-cron.log` shows 7 consecutive successful runs |
-| L-15 | **Content engine simplification** — full rewrite plan drafted at `~/.claude/plans/content-engine-rewrite.md`. Target: 1 cron, 1 DB, 3 Telegram actions (inline keyboard), 1 approval step, 0 rate caps. Do NOT start before 2026-04-27 — need 3-5 days of real cron data after the 2026-04-22 ingest fix to confirm current system is over-engineered vs. just starved. | Hold until 2026-04-27 | Observe 3-5 days of `/var/log/lyra-twitter-cron.log` + content-engine draft output post-fix |
+| ID | What | Why | Status | Depends on |
+|----|------|-----|--------|------------|
+| L-8a | ~~Fix `morning-weight-nudge` stalling~~ | MiniMax M2.7 reasoning mode stalled daily at 9am Berlin | ✅ DONE 2026-06-07 | — |
+| L-8b | ~~Fix `wiki-candidate-review-merged` stalling~~ | No model set → MiniMax default stalled daily at 9pm Berlin | ✅ DONE 2026-06-07 | — |
+| L-14 | Delete old shell scripts | `cron-task-runner` flipped to python on 2026-04-22; 7-clean-run condition met weeks ago. Delete: `scripts/fetch-twitter-bookmarks.sh`, `scripts/bookmarks-to-notion.sh` from Mac repo + Hetzner. Keep `get-twitter-oauth-refresh-token.sh`. | Open | Verify `/var/log/lyra-twitter-cron.log` for 7 consecutive ok |
+| L-5 | Close heap observation window | Window ended 2026-04-28. No OOM observed. A3 alarm (L-6) guards recurrence. Just close. | Open (stale) | — |
+| L-15 | Content engine quality gate + approval fix | Pipeline produces 0 drafts: quality gate threshold 7 is rejecting everything (all topics score 1-5). Fix options: (a) lower threshold 7→5, (b) fix dual-bot Telegram conflict so APPROVE routes correctly. Full rewrite deferred — see L-15 analysis below. | On hold — decide threshold | — |
+| L-1 | Atomic lock for content-engine hot paths | Removes rare double-acquire race between cron and manual runs | Low priority | — |
+| L-2 | bats in CI (GitHub Action) | Catches bash regressions without local brew | Low priority | Runner image with `bats` |
+| L-4 | Upstream OpenClaw #69787: 409 retry loop | Track until fixed in npm release, deploy, verify 409s → ~0 | Passive watch | — |
+| E-1 | Health logging evals (P0) | 14 Tier-0 patterns, highest daily frequency, zero eval coverage | Open | — |
+| E-2 | Fix mislabeled `tier0-mark-done` eval | Current test is a read, not a write. The actual mark_done path is uncovered. Quick fix. | Open | — |
+| E-3 | Email read eval (P1) | `tool-email-draft` tests drafting only; read path is a different code path | Open | — |
+| E-4 | Job application pipeline eval (P0) | Active job search; highest-stakes uneval'd path; regression costs real applications | Open | — |
+| E-5 | Content draft quality eval (P1) | Voice canon adherence untested despite voice system investment | Open | — |
+| E-6 | Wiki ops eval (P1) | 14 Tier-0 patterns across lenny-search, wiki-lint, wiki-dedup — all uneval'd | Open | — |
+| E-7 | HOT commentary eval (P1) | Bypasses LLM entirely; no eval for whether it returns content or fails silently | Open | — |
+| E-8 | Calendar graceful degradation eval (P1) | Calendar unavailable from Hetzner; no eval for graceful failure message | Open | — |
+| E-9 | Web search quality eval (P1) | Tavily used for job research; no quality eval | Open | — |
+| E-10 | Self-edit safety eval (P1) | `self_edit` can modify SOUL.md; no confirmation gate or destructive-edit refusal eval | Open | — |
+| E-11 | Sonnet escalation verification | No eval checks `model` field in routing log to confirm Sonnet was invoked | Deferrable | — |
+| E-12 | Cron add/remove eval | `tool-cron-list` tests listing only; create/remove is untested | Deferrable | — |
+| E-13 | Write→read consistency (Shopping, Second Brain) | Only reminders tested for write+read consistency | Deferrable | — |
+| E-14 | Competitor digest quality eval | Zero eval despite being in `always_sonnet` | Deferrable | — |
+| E-15 | Akash-specific ambiguity patterns | "Update that", "Check the status" — not covered | Deferrable | — |
+| PHASE-4 | Flip eval gate to blocking + Telegram authoring approval | Shadow data accumulating since 2026-05-31; ~2 weeks was the exit criteria — met. Ready to flip. | Open — gate ready | Phase 2 shadow data clean |
+
+---
+
+## L-15 Detail
+
+**Current state (2026-06-07):** Content pipeline is operational but producing zero output. Quality gate rejects all auto-sourced topics (scoring 1–5, threshold ≥7). 116 topics in pool, nothing Shortlisted. Draft generator idles. Approval bot has nothing to poll.
+
+**Known P0 bugs still unresolved (from 2026-04-15 audit):**
+- Dual Telegram bot conflict (content-engine bot + Lyra share same token → `getUpdates` 409 → APPROVE silently lost)
+- FEEDBACK records for future but doesn't rewrite current draft
+- APPROVE can fail if Lyra wins the poller race
+
+**Targeted fix options (prefer over full rewrite):**
+- (a) Lower quality gate threshold: `config/sources.json` → `topicPool.queue.qualityMinScore` 7→5. Immediate output.
+- (b) Fix dual-bot conflict: route `APPROVE`/`SKIP`/`REDO` through Lyra directly instead of a separate poller.
+- (c) Full L-15 rewrite: 1 cron, inline keyboard, no separate approval bot. Higher effort, same outcome.
+
+**Decision needed from Akash:** which approach + whether auto-posting to X/LinkedIn is still the end goal (affects architecture choice).
+
+---
 
 ## Done (archive when stale)
 
-- 2026-04-21: **Personal Wiki Tier 0 + News Inbox RSS.** `crud/wiki_notion.py` — Lenny Synthesis search (`wiki-lenny`, natural phrases via `try_tier0_wiki_text`), `wiki-lint`, `wiki-dedup`. Router: `WIKI_TIER0_PATTERNS` in `plugins/lyra-model-router/index.js`. `config/routing-rules.yaml` documents operations. `crud/news_inbox_rss.py` + `cli.py news-inbox-rss` — arXiv CS.LG → News Inbox, dedupe on `Link`. `MEMORY.md` + `projects/personal-kb-raw/WIKI-NOTION.md` updated.
+- 2026-06-07: **L-8a — `morning-weight-nudge` stall fixed.** Root cause: `minimax-direct/MiniMax-M2.7` is a reasoning model; triggers `<think>` mode for a trivial 1-sentence nudge, then stalls at 140s with no timeout set. Fix: model → `anthropic/claude-haiku-4-5`, added `timeoutSeconds: 30`. Deployed to `/root/.openclaw/cron/jobs.json`, service restarted, confirmed healthy. Config committed to `config/cron-jobs.json` in repo.
+- 2026-06-07: **L-8b — `wiki-candidate-review-merged` stall fixed.** Root cause: no model specified, fell to MiniMax default, same reasoning stall pattern at 9pm Berlin. Fix: added `model: anthropic/claude-haiku-4-5`, reduced `timeoutSeconds: 600→300`. Haiku is sufficient for 2 Notion queries + short digest. Same deploy.
+- 2026-05-31: **Phase 2 — Classifier + shadow gate deployed** (commit 061c725). `evals/gate/classify-diff.js` + `check-eval-coverage.js`. Shadow-only (exit 0). 2 weeks of data accumulating before flip to enforce.
+- 2026-06-04: **Phase 3 — Eval dashboard built + verified** (commit 41a4907). Dark-theme page at `evals/dashboard/`. Mirror to `docs/dashboard/` on GitHub via run-evals.sh Step 4.
+- 2026-05-31: **Phase 1 — Eval harness resurrected.** `ws-client.js` `maxProtocol: 3→4`. Preflight now does real ws handshake + Telegram alert. Baseline 65%→71% after validity triage. Rate-limit pacing, latency de-gated, dry-run prefix opt-out on 11 read-only tests.
+- 2026-04-21: **Personal Wiki Tier 0 + News Inbox RSS.** See previous entry.
+- 2026-04-22: **Twitter bookmark pipeline unified.** See previous entry.
+- 2026-04-21: **WhatsApp stripped at runtime.** See previous entry.
+- 2026-04-21: **L-10 — tier-0 eval reminder regression test.** See previous entry.
+- 2026-04-21: **L-11 — eval-pollution audit clean.** See previous entry.
+- 2026-04-21: **L-12 — branch protection drift (ops playbook).** See previous entry.
+- 2026-04-21: **L-13 — WhatsApp removed.** See previous entry.
+- 2026-04-21: **L-9 — router split-brain removed.** See previous entry.
+- 2026-04-21: **Streams 3/4 — Group A shipped.** See previous entry.
+- 2026-04-21: **Eval pollution root-cause fixed** (commit 20a66a1). See previous entry.
+- 2026-04-21: **Cron timeouts bumped** on wiki-health-check + second-brain-wiki-review-daily (240s→480s). See previous entry.
+- 2026-04-21: **Self-audit `\n` rendering bug fixed** (commit 0353d77). See previous entry.
+- 2026-04-21: **Lane B1 — Telegram slash-command menu.** See previous entry.
 
-- 2026-04-22: **Twitter bookmark pipeline — unified + simplified.** (1) `max_results` 100→10 in `fetch-twitter-bookmarks.sh` (API cost $0.50→~$0.05/day, Pro-tier per-tweet billing). (2) Fixed `TWITTER_INSIGHTS_DB_ID` drift across `references/notion.md`, `notion/notion.md`, `docs/TWITTER-X-API-SETUP-STEPS.md` — `33a7800891008166aa55ddec1d2e5dc2` (ghost) → `32d7800891008191b853d73aea132065` (live, verified). (3) New unified `scripts/twitter_bookmarks.py` replaces the old 4-script chain (`fetch` + `bookmarks-to-notion` + ghost `classify-and-route` + ghost `apply-claude-setup`) with single-file fetch→dedup→classify→write. Classifier is tier-1 regex (8 workflows: `lyra_capability`, `work_claude_setup`, `personal_claude_setup`, `content_create`, `tool_eval`, `work_productivity`, `market_competitor`, `research_read_later`) → tier-2 Haiku fallback for ambiguous. HTTP Basic Auth + refresh-token rotation persisted to .env. Smoke-tested dry-run on Hetzner: 10 bookmarks fetched, 2 new, both classified (1 tier-1 regex, 1 tier-2 Haiku). (4) `/root/content-engine/` pulled into repo at `content-engine/` — ends 3-way split-brain between Mac repo + `twitter-bookmarks-pipeline` + server-only `/root/content-engine/`. (5) Confirmed `classify-and-route.sh` + `apply-claude-setup.sh` were **ghost files** — cron referenced them but they existed nowhere; daily chain silently broke at the first `&&` after `bookmarks-to-notion.sh` for weeks (Twitter Insights DB has 0 rows). **NOT done:** cron migration (still points to old shell chain); delete old shell scripts; content-engine quality review. User will flip cron when ready: `0 7 * * * python3 /root/lyra-ai/scripts/twitter_bookmarks.py >> /var/log/lyra-twitter-cron.log 2>&1`.
-
-
-- 2026-04-21: **Hetzner — WhatsApp stripped at runtime.** `/root/.openclaw/.env`: removed `WHATSAPP_*` / `EVOLUTION_*` (timestamped `.bak-strip-wa-*` beside `.env`). Docker: `docker volume rm lyra-agent_evolution-data` (Evolution already absent). `/root/.openclaw/openclaw.json`: `jq` removed `channels.whatsapp` and whatsapp from `plugins.allow` / `plugins.entries` (timestamped `.bak-no-wa-*`); `systemctl restart openclaw` — `curl http://127.0.0.1:18789/health` → `{"ok":true,"status":"live"}`. Live config copied to `lyra-ai/config/openclaw.json` on server and synced into this repo (`config/openclaw.json` matches production Telegram-only).
-- 2026-04-21: **L-10 — tier-0 eval reminder regression test.** `test/tier0-eval-reminder.test.js` asserts `parse.detect_intent` classifies `Remind me to [eval] pick up groceries tomorrow` as `add_reminder` and the JS `^remind me (?:to \|about )?` prefix matches (router + Python stay aligned). Prior leak was addressed by eval dry-run prefix + cleanup; this test prevents silent drift.
-- 2026-04-21: **L-11 — eval-pollution audit procedure.** Cleanup loads `NOTION_API_KEY` from `/root/.openclaw/.env` (see `scripts/cleanup-eval-data.js`). **One-time / periodic audit:** run `node scripts/cleanup-eval-data.js` (preview), then `node scripts/cleanup-eval-data.js --apply` on Hetzner with key set; targets + patterns are `CLEANUP_TARGETS` / `CLEANUP_PATTERNS` in that file (extend patterns if new test titles leak). Eval runner also sweeps `eval-*` session crons after runs. Scale of historical pollution is unknowable pre-fix; post-fix hygiene is script + cron sweep.
-- 2026-04-22: **L-11 closed — audit run came back clean.** `node scripts/cleanup-eval-data.js` on Hetzner across Reminders-Akash/Shared/Abhigna, Second Brain, Upcoming Trips → `pages=0, crons=0`. All current eval writes use `[eval]` prefix, so the single `[eval]` pattern covers every test case; legacy patterns (Tokyo/Dubai/Hakone/dentist/plants/meal planning sync/groceries) retained as defensive catch-all. Post-fix hygiene (20a66a1 + runner self-sweep) has drained historical pollution to zero.
-- 2026-04-21: **L-12 — branch protection drift (ops playbook).** GitHub branch protection blocks non–machine-user pushes from the server; cron commits accumulate locally. **Options:** (a) Add the server deploy key or a bot account as an allowed bypass actor / exempt actor for `main`, or (b) Push automated/cron-only state to a dedicated branch (e.g. `server-state`) and merge via PR, or (c) Keep rebasing before deploy. No repo automation — policy lives in GitHub settings.
-- 2026-04-21: **L-13 — WhatsApp removed from Lyra.** WhatsApp/Evolution are not used (Telegram-only). `openclaw.json` has no `whatsapp` channel or plugin; `docker-compose.yml` no longer runs Evolution; `.env.example` drops `WHATSAPP_*` / `EVOLUTION_*`. Legacy `config/whatsapp-channel.plugin.ts` kept for reference only.
-- 2026-04-21: **L-9 — router split-brain removed (CLI = prod policy).** `scripts/model-router.js` is a thin shim that imports `routeForCli` / `ROUTING_DECISIONS_LOG` from `plugins/lyra-model-router/index.js` (no second YAML/LLM router). `evals/routing-eval.js` ground truth + tier gating updated: MiniMax-only labels no longer fail sonnet/haiku sub-thresholds at 0%. **Canonical routing (v16)** — all in `plugins/lyra-model-router/index.js` (`resolveRoutingCore` → `routeQuery` / `routeForCli`): (1) **Cron/scheduled** — router returns no override (gateway config). (2) **Tier-0** — regex + `crud/cli.py parse`; Python CRUD path, not a chat LLM tier. (3) **Haiku fast path** — `HAIKU_PATTERNS` (e.g. `promote to wiki:`) when Anthropic is allowed by policy. (4) **Scored path** — `extractFeatures` + `computeScores` + `decideTier` vs env thresholds (`LYRA_ROUTING_*`); acknowledgements → MiniMax; **Haiku** if `scores.haiku` clears threshold; **Sonnet** if sonnet score + margin + intent rules (or very high sonnet score), with **SONNET_ALLOWLIST** boost in emergency mode; **Abhigna** session + strong haiku → Haiku; **budget / rolling Anthropic share** can force **clamp** or **emergency** (stricter thresholds, mostly MiniMax). (5) If Anthropic is unavailable (rate-limit gate), non-MiniMax tiers **downgrade to MiniMax**. **Haiku and Sonnet are still used** when the policy selects them; most traffic is MiniMax at current numeric thresholds, not because Anthropic is disabled.
-- 2026-04-21: **Streams 3/4 — Group A shipped** (`5135df2`). 9 doc/skill files with zero behavioural risk: `.env.example` gcal redirect placeholder, `docs/3-notion-cockpit.md`, `docs/8-performance.md`, `docs/TWITTER-X-API-SETUP-STEPS.md`, `notion/database-schemas.md` (Topic Library schema), `skills/twitter-bookmarks/oauth-setup.md`, `skills/chief-of-staff/SKILL.md`, `skills/google-calendar/SKILL.md`, `skills/twitter-synthesis/SKILL.md`.
-- 2026-04-21: **Eval pollution root-cause fix** (commit `20a66a1`). Three compounding bugs resolved: (a) `dryRun` flag was cosmetic — no server handler consumed it; now prepends explicit "EVAL MODE — do not create..." prefix to every eval prompt so the LLM itself refuses writes. (b) `cleanup-eval-data.js` silently failed for weeks because it never loaded `NOTION_API_KEY` from `/root/.openclaw/.env`; now auto-loads. (c) cleanup ignored openclaw crons; now sweeps eval-spawned crons by `sessionKey` prefix (`eval-*` is the definitive provenance marker — no pattern matching). Same cron sweep added to `runGlobalCleanupSweep` in `evals/runner.js` so every eval run self-cleans. Pre-fix stale state archived: 4 Notion pages + 2 crons (`Travel insurance booking reminder`, `Groceries reminder`). See L-10, L-11 for follow-ups.
-- 2026-04-21: **Cron timeouts bumped** on `wiki-health-check` + `second-brain-wiki-review-daily` from 240s → 480s via `--timeout-seconds`. Both were failing with "cron: job execution timed out". Manual re-runs confirmed ok (wiki-health-check: 94s, second-brain: 34s).
-- 2026-04-21: **Self-audit Telegram message rendered literal `\n`** — bash single-quoted Python heredoc had `"\\n".join(lines)`; double backslash survived both escape layers. Fixed to `"\n".join(lines)` (commit `0353d77`). Also imported `scripts/lyra-self-audit.sh` into repo (previously server-only — same drift pattern as L-7).
-- 2026-04-21: **Lane B1** — Telegram slash-command menu (`/reminders`, `/brief`, `/weekly`, `/health`, `/new`, `/last`) registered via `setMyCommands`. `/reminders` wired to tier-0 Python CRUD for zero-token responses (commit `250bf65`).
-- 2026-04-21: **Stream 1** — MiniMax M2.5 → M2.7 rename across 20 pure-rename files (commit `eb6d666`).
-- 2026-04-21: **Stream 5** — subscription-crackdown blog draft + TODOS housekeeping (commit `b486f85`).
-- 2026-04-21: **L-7** — synced `scripts/lyra-health-check.sh` with live server copy (commit `e11073f`). A3 OOM block now tracked in repo; no longer at risk of being lost on redeploy.
-- 2026-04-21: **L-6** — OOM alarm shipped: appended to `/root/lyra-health-check.sh` on server. Scans last 20 min of `journalctl -u openclaw` for `FATAL ERROR.*heap`, alerts once per event to Telegram (de-duped via `/tmp/lyra-oom-state`). Backup at `/root/lyra-health-check.sh.bak-2026-04-21`.
-- 2026-04-21: **L-3** — root cause of Telegram 409 storm was NOT a double-fork. A second systemd unit `openclaw-gateway.service` (2026-03-15) was left enabled alongside `openclaw.service` (2026-03-28); both polled the same bot token. Disabled + unit file renamed `.disabled-2026-04-21`. 409 conflicts dropped 384/24h → ~4/min (remainder is upstream L-4). The interim `remove_orphan_openclaw_gateways` fix was symptom-treatment and has been reverted.
-- 2026-04-21: `lyra-gateway-smoke.sh` + bats syntax tests (fixed `pgrep -f` false positive via `pgrep -x openclaw-gatewa` against comm, 15-char kernel truncation).
-- 2026-04-21: **L-4 initial** — upstream issue filed: https://github.com/openclaw/openclaw/issues/69787.
-- 2026-04-15: Stale lockfile recovery in `content-engine/scripts/lib/lockfile.js`.
+---
 
 ## How to run tests
 
-- **lyra-ai:** `npm test` (Node tests + `bash -n` on wrapper and smoke script). Optional: `npm run test:bats` if [bats-core](https://github.com/bats-core/bats-core) is installed.
+- **lyra-ai:** `npm test`. Optional: `npm run test:bats` if bats-core is installed.
 - **content-engine:** `npm test` (Vitest, includes `tests/lockfile.test.js`).
+
+---
+
+## Maintenance notes
+
+- `config/cron-jobs.json` in this repo mirrors `/root/.openclaw/cron/jobs.json` on Hetzner. Sync after any cron change.
+- `/root/.openclaw/openclaw.json` is immutable (`chattr +i`). Unlock before editing: `ssh hetzner "chattr -i /root/.openclaw/openclaw.json"`, re-lock after.
+- Eval gate is in shadow mode until PHASE-4 is started. Check `evals/gate/logs/shadow-decisions.jsonl` on Hetzner for false-positive rate.
