@@ -169,6 +169,12 @@ const TIER0_PATTERNS = [
   // Content draft / revise — shared wiki + channel rules (cli.py parse → content_draft.py)
   /(?:^|\n)(?:lyra\s+)?content\s+draft\s+(?:x|outreach|generic)\b/i,
   /(?:^|\n)(?:lyra\s+)?content\s+revise\s+(?:x|outreach|generic)\b/i,
+  // Content pipeline approval — routed to approval-bot.js --cmd mode (no Telegram polling)
+  /^APPROVE$/i,
+  /^SKIP$/i,
+  /^REDO(?:\s+.+)?$/i,
+  /^FEEDBACK\s+.+$/i,
+  /^STATUS$/i,
 ];
 
 function resolveCrudCli() {

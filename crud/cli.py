@@ -138,6 +138,44 @@ def cmd_parse(args):
         return
     # --- End HOT ---
 
+    # --- Content pipeline approval (APPROVE, SKIP, REDO, FEEDBACK, STATUS) ---
+    # Lyra receives these commands via Telegram; approval-bot.js runs in --cmd mode
+    # so there's no second getUpdates poller competing with OpenClaw.
+    _approval_script = "/root/content-engine/scripts/approval-bot.js"
+    _approve_m = _re.match(r'^APPROVE$', raw, _re.IGNORECASE)
+    if _approve_m:
+        subprocess.Popen(["node", _approval_script, "--cmd", "APPROVE"],
+                         env=os.environ.copy(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("✅ Approving — result incoming via Telegram.")
+        return
+    _skip_m = _re.match(r'^SKIP$', raw, _re.IGNORECASE)
+    if _skip_m:
+        subprocess.Popen(["node", _approval_script, "--cmd", "SKIP"],
+                         env=os.environ.copy(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("⏭️ Skipping — result incoming via Telegram.")
+        return
+    _redo_m = _re.match(r'^REDO(?:\s+(.+))?$', raw, _re.IGNORECASE)
+    if _redo_m:
+        _cmd = ("REDO " + (_redo_m.group(1) or "")).strip()
+        subprocess.Popen(["node", _approval_script, "--cmd", _cmd],
+                         env=os.environ.copy(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("🔄 Regenerating visual — result incoming via Telegram.")
+        return
+    _feedback_m = _re.match(r'^FEEDBACK\s+(.+)$', raw, _re.IGNORECASE)
+    if _feedback_m:
+        _cmd = "FEEDBACK " + _feedback_m.group(1)
+        subprocess.Popen(["node", _approval_script, "--cmd", _cmd],
+                         env=os.environ.copy(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("📝 Feedback recorded — will apply to next draft.")
+        return
+    _status_m = _re.match(r'^STATUS$', raw, _re.IGNORECASE)
+    if _status_m:
+        subprocess.Popen(["node", _approval_script, "--cmd", "STATUS"],
+                         env=os.environ.copy(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("📊 Checking status — result incoming via Telegram.")
+        return
+    # --- End content pipeline approval ---
+
     # --- Content draft / revise (shared wiki + channel rules — Sonnet) ---
     from content_draft import try_content_draft_tier0
 
