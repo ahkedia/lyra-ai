@@ -283,7 +283,13 @@ export class OpenClawClient {
                 clearTimeout(timer);
                 const msgs = histPayload?.messages || [];
                 const asstMsg = msgs.filter(m => m.role === 'assistant').pop();
-                const text = asstMsg?.content?.find(c => c.type === 'text')?.text || '';
+                // Concatenate all text blocks (streaming stores one token per block)
+                // then strip <think>...</think> reasoning blocks that MiniMax M2.7 emits.
+                const rawText = (asstMsg?.content || [])
+                  .filter(c => c.type === 'text')
+                  .map(c => c.text || '')
+                  .join('');
+                const text = rawText.replace(/<think>[\s\S]*?<\/think>/g, '').trimStart();
                 const latencyMs = Date.now() - startTime;
                 resolve({
                   text,

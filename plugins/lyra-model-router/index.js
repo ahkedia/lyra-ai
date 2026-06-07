@@ -229,7 +229,7 @@ function fetchBrainContext(prompt) {
   try {
     // crud/cli.py brain "<msg>" → prints retrieval text, or empty if no match/unavailable
     const result = execFileSync("python3", [CRUD_CLI, "brain", trimmed], {
-      timeout: parseInt(process.env.LYRA_BRAIN_TIMEOUT_MS || "22000", 10),
+      timeout: parseInt(process.env.LYRA_BRAIN_TIMEOUT_MS || "3000", 10),
       env: { ...process.env },
     });
     const text = result.toString().trim();
