@@ -40,14 +40,14 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ---------- config ----------
 
 ENV_FILE = Path("/root/.openclaw/.env")
 NOTION_VERSION = "2022-06-28"
-DEFAULT_MAX_RESULTS = 10
+DEFAULT_MAX_RESULTS = 25
 BOOKMARKS_TMP = Path(f"/tmp/lyra-bookmarks-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json")
 SCRIPT_DIR = Path(__file__).resolve().parent
 EXEMPLARS_FILE = Path(os.environ.get("EXEMPLARS_FILE", SCRIPT_DIR / "classifier-exemplars.json"))
@@ -620,7 +620,6 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max", type=int, default=DEFAULT_MAX_RESULTS)
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--since-hours", type=int, default=24)
     ap.add_argument("--no-route", action="store_true",
                     help="skip fan-out to destination DBs")
     args = ap.parse_args()
@@ -641,12 +640,6 @@ def main() -> int:
         return 0
 
     authors = {u["id"]: u for u in payload.get("includes", {}).get("users", [])}
-
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=args.since_hours)).isoformat()
-    tweets = [t for t in tweets if t.get("created_at", "") >= cutoff]
-    log(f"after {args.since_hours}h filter: {len(tweets)} bookmark(s)")
-    if not tweets:
-        return 0
 
     if len(payload.get("data", [])) == args.max:
         log(f"WARN: X API returned max_results={args.max}, may have older bookmarks truncated")
