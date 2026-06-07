@@ -112,9 +112,17 @@ Every database has two IDs. Use the right one depending on what you're doing:
 - **Env:** `TWITTER_INSIGHTS_DB_ID` (no dashes)
 - **Setup:** `node scripts/setup-twitter-insights-db.cjs` — see `docs/NOTION-TWITTER-INSIGHTS-SETUP.md`
 
-### Content Topic Pool (canonical content intake; merged former Content Ideas DB)
-- **database_id:** `33f780089100812aacaec0a61d8caf3a` (with dashes: `33f78008-9100-812a-acae-c0a61d8caf3a`)
-- **Purpose:** Single queue for topic candidates (Candidate → Shortlisted) feeding `projects/content-engine` and Content Drafts. Bookmark `content_create` rows land here via `twitter-bookmarks-pipeline/scripts/classify-and-route.sh` (`CONTENT_TOPIC_POOL_DB_ID`). Old **Content Ideas** DB `27fc8e00643a4b9390f7ce8b9a345c62` — archive/delete in Notion after migrating any rows.
+### Content Topic Pool (canonical content intake)
+- **database_id:** `33f78008-9100-817b-8cee-000b816a89d4` (with dashes: `33f78008-9100-817b-8cee-000b816a89d4`)
+- **data_source_id:** `33f78008-9100-817b-8cee-000b816a89d4`
+- **Purpose:** Single queue for topic candidates (Candidate → Shortlisted) feeding `projects/content-engine` and Content Drafts. Bookmark `content_create` rows land here via `twitter-bookmarks-pipeline/scripts/classify-and-route.sh` (`CONTENT_TOPIC_POOL_DB_ID`).
+- **CREATE entries via data_source_id** (database_id fails for page creation). Query works with both.
+
+### Content Ideas (legacy)
+- **database_id:** `f008d0bb-ac81-401d-889d-4e8f508ab134`
+- **data_source_id:** `f008d0bb-ac81-401d-889d-4e8f508ab134`
+- **Properties:** Idea (title), Status (select: Idea/Draft/…), Rough Notes (rich_text), Channel (multi_select), Tags (multi_select), Link (url), Canon Page (url), From Bookmark (checkbox)
+- **Purpose:** Pre-2026 topic capture, pre-drafts. Consider migrating to Content Topic Pool.
 - **Properties (expected):** Topic (title), Source (select), Domain (select), Score (number), Status (select), Week (date), Source Reference (url), Shortlisted on (date), Quality score (number), Author brief (rich_text), …
 - **Who can access:** Akash only
 
