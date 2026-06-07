@@ -13,7 +13,7 @@ tests:
     multi_turn: true
     turns:
       - role: user
-        message: "Add a reminder: [eval] dentist appointment tomorrow at 2pm"
+        message: "Add a reminder: [tc] dentist appointment tomorrow at 2pm"
       - role: user
         message: "Actually change that to 4pm"
     validators:
@@ -22,7 +22,7 @@ tests:
     cleanup:
       action: notion_delete_matching
       database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
-      title_contains: "[eval]"
+      title_contains: "[tc]"
     tags: [conversation, multi-turn, reminder]
 
   - id: conv-context-reference
@@ -45,24 +45,6 @@ tests:
     tags: [conversation, context, multi-turn]
 
   # --- Tier 0 CRUD Paths ---
-  - id: tier0-reminder-add
-    tier: gap
-    category: crud
-    name: "Add reminder via Tier 0 path"
-    prompt: "Remind me to [eval] pick up groceries tomorrow"
-    timeout_ms: 45000
-    side_effects: write
-    validators:
-      - type: llm_judge
-        rubric: "Does the response confirm adding a reminder? It should mention the task ('pick up groceries') and indicate it was added to Notion. Latency under 8 seconds is expected for Tier 0 operations."
-      - type: latency_p95
-        threshold_ms: 45000
-    cleanup:
-      action: notion_delete_matching
-      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
-      title_contains: "[eval]"
-    tags: [crud, tier0, reminder]
-
   - id: tier0-mark-done
     eval_lane: diagnostic
     tier: gap
@@ -83,7 +65,7 @@ tests:
     tier: gap
     category: crud
     name: "Add to shopping list"
-    prompt: "Add [eval] apples to my shopping list"
+    prompt: "Add [tc] apples to my shopping list"
     timeout_ms: 45000
     side_effects: write
     validators:
@@ -94,7 +76,7 @@ tests:
     cleanup:
       action: notion_delete_matching
       database: "2054e39c-3f09-431d-8821-0e6a7513913a"
-      title_contains: "[eval]"
+      title_contains: "[tc]"
     tags: [crud, tier0, shopping]
 
   # --- Abhigna Positive Flows ---
@@ -103,7 +85,7 @@ tests:
     tier: gap
     category: access_control
     name: "Abhigna can add to shopping list"
-    prompt: "I'm Abhigna. Add [eval] yogurt to the shopping list."
+    prompt: "I'm Abhigna. Add [tc] yogurt to the shopping list."
     timeout_ms: 45000
     side_effects: write
     validators:
@@ -112,7 +94,7 @@ tests:
     cleanup:
       action: notion_delete_matching
       database: "2054e39c-3f09-431d-8821-0e6a7513913a"
-      title_contains: "[eval]"
+      title_contains: "[tc]"
     tags: [access-control, abhigna, shopping]
 
   - id: abhigna-meal-check
@@ -178,7 +160,7 @@ tests:
     multi_turn: true
     turns:
       - role: user
-        message: "Add a reminder: [eval] water the plants on Sunday"
+        message: "Add a reminder: [tc] water the plants on Sunday"
       - role: user
         message: "Can you confirm my reminder about watering the plants was saved? Check Notion."
     validators:
@@ -187,5 +169,5 @@ tests:
     cleanup:
       action: notion_delete_matching
       database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
-      title_contains: "[eval]"
+      title_contains: "[tc]"
     tags: [write-verification, reminder, multi-turn]

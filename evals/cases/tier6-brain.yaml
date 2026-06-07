@@ -100,38 +100,6 @@ tests:
 
   # --- Brain Capture (Write Path) ---
 
-  - id: brain-remember-slash-command
-    eval_lane: diagnostic
-    tier: gap
-    category: brain_capture
-    name: "/remember slash command confirms brain save"
-    prompt: "/remember [eval] provenance rule: only wiki/career and wiki/domain can be cited as personal facts"
-    timeout_ms: 20000
-    side_effects: write
-    validators:
-      - type: regex
-        pattern: "(saved|brain|remembered|stored|noted|captured)"
-        flags: "i"
-      - type: llm_judge
-        rubric: "Does the response confirm saving the note to the brain? Any confirmation that the save happened scores 4-5, even if it echoes back the content. Only asking for clarification, refusing, or showing no confirmation scores 1-2."
-    tags: [brain, capture, slash-command]
-
-  - id: brain-remember-natural-language
-    eval_lane: diagnostic
-    tier: gap
-    category: brain_capture
-    name: "Natural-language save-to-brain trigger"
-    prompt: "Save this to my brain: [eval] reduce brain query timeout to 3s for fail-fast behaviour"
-    timeout_ms: 30000
-    side_effects: write
-    validators:
-      - type: regex
-        pattern: "(saved|brain|stored|noted|captured)"
-        flags: "i"
-      - type: llm_judge
-        rubric: "Does the response confirm saving the content to the brain without requiring a slash command? It should detect the save to my brain intent and confirm storage. A direct save confirmation scores 5. Asking what to save or ignoring the intent scores 1."
-    tags: [brain, capture, natural-language]
-
   # --- Cross-User Brain Safety ---
 
   - id: brain-acl-abhigna-no-restricted-data

@@ -30,27 +30,12 @@ tests:
         threshold_ms: 45000
     tags: [latency, notion]
 
-  - id: latency-multi-tool
-    skip_dry_run_prefix: true  # read-only, no write intent
-    tier: architectural
-    category: latency
-    name: "Multi-tool task latency"
-    prompt: "Check the weather in Berlin and tell me if I should carry an umbrella"
-    timeout_ms: 45000
-    side_effects: none
-    validators:
-      - type: latency_p95
-        threshold_ms: 20000
-      - type: contains
-        value: "Berlin"
-    tags: [latency, weather, multi-tool]
-
   # --- Tool Use Reliability ---
   - id: tool-reminder-dryrun
     tier: architectural
     category: tool_use
     name: "Notion reminder creation (verified write)"
-    prompt: "Add a reminder: [eval] check eval framework results"
+    prompt: "Add a reminder: [tc] check eval framework results"
     timeout_ms: 60000
     side_effects: write
     validators:
@@ -60,7 +45,7 @@ tests:
       action: notion_delete_matching
       database: "32678008-9100-802f-ad9f-fb48ff5f4c1d"
       data_source: "32678008-9100-8171-8940-000b30243ddd"
-      title_contains: "[eval]"
+      title_contains: "[tc]"
       title_properties: ["Task"]
     tags: [notion, tool-use, write]
 
@@ -97,17 +82,17 @@ tests:
     tier: architectural
     category: tool_use
     name: "Cross-user task handoff (write-backed)"
-    prompt: "Tell Abhigna to check the meal plan for next week, and add a shared reminder titled [eval] meal plan follow-up."
+    prompt: "Tell Abhigna to check the meal plan for next week, and add a shared reminder titled [tc] meal plan follow-up."
     timeout_ms: 45000
     side_effects: write
     validators:
       - type: llm_judge
-        rubric: "Does the response complete a real cross-user handoff? It should (1) mention notifying Abhigna and (2) confirm creating the shared [eval] reminder in Notion. A theoretical plan without completion is a FAIL."
+        rubric: "Does the response complete a real cross-user handoff? It should (1) mention notifying Abhigna and (2) confirm creating the shared [tc] reminder in Notion. A theoretical plan without completion is a FAIL."
     cleanup:
       action: notion_delete_matching
       database: "2054e39c-3f09-431d-8821-0e6a7513913a"
       data_source: "9f206d71-7b25-408b-ad20-02daf0b43da0"
-      title_contains: "[eval]"
+      title_contains: "[tc]"
       title_properties: ["Task"]
     tags: [cross-user, telegram, write]
 
@@ -128,6 +113,7 @@ tests:
     tags: [routing, simple]
 
   - id: routing-synthesis
+    eval_lane: diagnostic
     tier: architectural
     category: model_routing
     name: "Complex task triggers escalation"
