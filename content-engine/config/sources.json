@@ -61,7 +61,7 @@
     "queue": {
       "dailyShortlistCap": 2,
       "ingestCap": 5,
-      "qualityMinScore": 7,
+      "qualityMinScore": 5,
       "maxGateEvaluationsPerRun": 15,
       "autoPromoteSources": ["Twitter", "SecondBrain"],
       "shortlistedOnProperty": "Shortlisted on",

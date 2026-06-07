@@ -303,17 +303,64 @@ async function checkExpiredDrafts() {
   return res.results.length;
 }
 
+// Direct command mode: called by Lyra via `node approval-bot.js --cmd APPROVE`.
+// Skips Telegram getUpdates entirely — eliminates the dual-poller 409 conflict.
+async function runDirectCommand(cmd) {
+  console.log(`Direct command: ${cmd}`);
+
+  const expired = await checkExpiredDrafts();
+  if (expired > 0) console.log(`Expired ${expired} drafts`);
+
+  const pendingText = await getPendingTextDrafts();
+  const pendingVisual = await getPendingVisualDrafts();
+  console.log(`Pending: ${pendingText.length} text, ${pendingVisual.length} visual`);
+
+  const upper = cmd.toUpperCase();
+
+  if (upper === "APPROVE") {
+    if (pendingText.length > 0) await handleTextApprove(pendingText[0]);
+    else if (pendingVisual.length > 0) await handleVisualApprove(pendingVisual[0]);
+    else await sendTelegram("No pending drafts to approve.");
+  } else if (upper === "SKIP") {
+    if (pendingText.length > 0) await handleTextSkip(pendingText[0]);
+    else if (pendingVisual.length > 0) await handleVisualSkip(pendingVisual[0]);
+    else await sendTelegram("No pending drafts to skip.");
+  } else if (upper.startsWith("REDO")) {
+    const hint = cmd.slice(4).trim();
+    if (pendingVisual.length > 0) await handleVisualRedo(pendingVisual[0], hint);
+    else await sendTelegram("No pending visual drafts to redo.");
+  } else if (upper.startsWith("FEEDBACK")) {
+    const feedback = cmd.slice(8).trim();
+    if (pendingText.length > 0 && feedback) await handleFeedback(pendingText[0], feedback);
+    else await sendTelegram(feedback ? "No pending text drafts for feedback." : "Usage: FEEDBACK <text>");
+  } else if (upper === "STATUS") {
+    const statusMsg = `📊 *Status*\n\nPending text: ${pendingText.length}\nPending visual: ${pendingVisual.length}`;
+    await sendTelegram(statusMsg);
+  } else {
+    console.log(`Unknown direct command: ${cmd}`);
+  }
+}
+
 async function main() {
   console.log("=== Approval Bot starting ===");
   console.log(`Time: ${new Date().toISOString()}`);
-  
+
+  // --cmd mode: Lyra routes APPROVE/SKIP/REDO/FEEDBACK directly here, no Telegram polling.
+  const cmdIndex = process.argv.indexOf("--cmd");
+  if (cmdIndex > -1) {
+    const cmd = process.argv.slice(cmdIndex + 1).join(" ").trim();
+    await runDirectCommand(cmd);
+    console.log("=== Approval Bot complete (direct) ===");
+    return;
+  }
+
   const expired = await checkExpiredDrafts();
   if (expired > 0) {
     console.log(`Expired ${expired} drafts`);
   }
-  
+
   await processUpdates();
-  
+
   console.log("=== Approval Bot complete ===");
 }
 
