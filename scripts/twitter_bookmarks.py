@@ -47,7 +47,7 @@ from pathlib import Path
 
 ENV_FILE = Path("/root/.openclaw/.env")
 NOTION_VERSION = "2022-06-28"
-DEFAULT_MAX_RESULTS = 25
+DEFAULT_MAX_RESULTS = 10
 BOOKMARKS_TMP = Path(f"/tmp/lyra-bookmarks-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json")
 SCRIPT_DIR = Path(__file__).resolve().parent
 EXEMPLARS_FILE = Path(os.environ.get("EXEMPLARS_FILE", SCRIPT_DIR / "classifier-exemplars.json"))
