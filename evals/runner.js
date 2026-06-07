@@ -28,6 +28,21 @@ const RUN_START_ISO = new Date().toISOString();
 // when they fall inside the run window. Used by leakage assertion + nuke cleanup.
 const LYRA_INTEGRATION_USER_ID = '31778008-9100-81f5-86d2-00274e9a233a';
 
+// Read preflight results written by preflight-check.js.
+// Gracefully degrades: if file is missing (preflight skipped), assume all available.
+const PREFLIGHT_RESULTS_PATH = process.env.PREFLIGHT_RESULTS_PATH || '/tmp/lyra-eval-preflight.json';
+function loadPreflightResults() {
+  try {
+    if (existsSync(PREFLIGHT_RESULTS_PATH)) {
+      return JSON.parse(readFileSync(PREFLIGHT_RESULTS_PATH, 'utf8'));
+    }
+  } catch {
+    /* ignore — treat as all-available */
+  }
+  return { notion: true };
+}
+const PREFLIGHT = loadPreflightResults();
+
 /** Pacing — tune via env (Phase 1: reduce gateway OOM under long runs) */
 const POST_TEST_MS = Math.max(0, parseInt(process.env.EVAL_POST_TEST_MS || '2000', 10));
 const INTER_TEST_DELAY_MS = Math.max(0, parseInt(process.env.EVAL_INTER_TEST_DELAY_MS || '10000', 10));
@@ -786,6 +801,22 @@ async function main() {
     filteredCases = filteredCases.filter((tc) => onlyIds.some((id) => tc.id === id || tc.id?.includes(id)));
   } else if (tierOrIdFilter) {
     filteredCases = filteredCases.filter((tc) => tc.tier?.includes(tierOrIdFilter) || tc.id?.includes(tierOrIdFilter));
+  }
+
+  // Skip tests whose infrastructure requirements aren't met per preflight.
+  // Logged as SKIP_INFRA so they don't pollute pass/fail counts.
+  const skippedInfra = [];
+  filteredCases = filteredCases.filter((tc) => {
+    if (tc.requires_notion && !PREFLIGHT.notion) {
+      skippedInfra.push(tc.id);
+      return false;
+    }
+    return true;
+  });
+  if (skippedInfra.length > 0) {
+    console.log(`Skipping ${skippedInfra.length} Notion-dependent test(s) — Notion unavailable per preflight:`);
+    skippedInfra.forEach((id) => console.log(`  SKIP_INFRA: ${id}`));
+    console.log('');
   }
 
   const laneSuffix = laneFilter ? ` (lane=${laneFilter})` : '';

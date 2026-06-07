@@ -7,7 +7,7 @@ tests:
     tier: showcase
     category: multi_step
     name: "Create reminder with date parsing"
-    prompt: "Add a reminder: [eval] call the dentist tomorrow at 3pm"
+    prompt: "Add a reminder: [tc] call the dentist tomorrow at 3pm"
     timeout_ms: 45000
     side_effects: write
     validators:
@@ -17,7 +17,7 @@ tests:
       action: notion_delete_matching
       database: "32678008-9100-802f-ad9f-fb48ff5f4c1d"
       data_source: "32678008-9100-8171-8940-000b30243ddd"
-      title_contains: "[eval]"
+      title_contains: "[tc]"
       title_properties: ["Task"]
     tags: [multi-step, reminder]
 
@@ -25,17 +25,17 @@ tests:
     tier: showcase
     category: multi_step
     name: "Cross-user task delegation"
-    prompt: "Tell Abhigna we need to plan meals for next week, and create a shared reminder titled [eval] meal planning sync."
+    prompt: "Tell Abhigna we need to plan meals for next week, and create a shared reminder titled [tc] meal planning sync."
     timeout_ms: 45000
     side_effects: write
     validators:
       - type: llm_judge
-        rubric: "Does the response complete both parts: (1) notify Abhigna and (2) confirm writing the shared [eval] reminder in Notion? Missing either step is a FAIL."
+        rubric: "Does the response complete both parts: (1) notify Abhigna and (2) confirm writing the shared [tc] reminder in Notion? Missing either step is a FAIL."
     cleanup:
       action: notion_delete_matching
       database: "2054e39c-3f09-431d-8821-0e6a7513913a"
       data_source: "9f206d71-7b25-408b-ad20-02daf0b43da0"
-      title_contains: "[eval]"
+      title_contains: "[tc]"
       title_properties: ["Task"]
     tags: [multi-step, cross-user, write]
 
@@ -43,7 +43,7 @@ tests:
     tier: showcase
     category: multi_step
     name: "Classify and save insight"
-    prompt: "I just realized that the biggest risk in our product is not competition, it is internal alignment. Teams are optimizing for different metrics and nobody is noticing. Please save this insight with title: [eval] alignment insight."
+    prompt: "I just realized that the biggest risk in our product is not competition, it is internal alignment. Teams are optimizing for different metrics and nobody is noticing. Please save this insight with title: [tc] alignment insight."
     timeout_ms: 45000
     side_effects: write
     validators:
@@ -54,7 +54,7 @@ tests:
       database: "e4027aaf-d2ff-49e1-babf-7487725e2ef4"
       data_source: "f1ce4e0f-9e0d-43da-87f8-94dae2732962"
       title_properties: ["Name"]
-      title_contains: "[eval]"
+      title_contains: "[tc]"
     tags: [multi-step, second-brain]
 
   # --- Proactive Quality ---
@@ -65,6 +65,7 @@ tests:
     prompt: "Generate my morning digest for today. Include news, tasks due, and any important reminders."
     timeout_ms: 90000
     side_effects: read_only
+    requires_notion: true
     validators:
       - type: llm_judge
         rubric: "Is this a well-structured morning digest? It should have clear sections (news, tasks, reminders), be actionable (not just informational), be concise (under 400 words), and feel like a briefing from a capable executive assistant. Generic or overly long responses score low."
@@ -80,6 +81,7 @@ tests:
     prompt: "Generate my weekly brain brief. Synthesize patterns from the past week across my Second Brain, content ideas, and any recurring themes."
     timeout_ms: 90000
     side_effects: read_only
+    requires_notion: true
     validators:
       - type: llm_judge
         rubric: "Does this brain brief demonstrate synthesis? It should identify patterns, connect dots between different entries, and surface non-obvious insights. Simply listing items is a low score. Genuine pattern recognition and strategic suggestions score high."
@@ -125,6 +127,7 @@ tests:
     prompt: "I need to plan a complex trip. We are going from Berlin to Tokyo via Dubai, staying 3 nights in Dubai at a hotel near the Marina, then flying to Tokyo for 5 nights where we want to visit Shibuya, Asakusa, Akihabara, and take a day trip to Hakone. Budget is around 5000 euros total for two people including flights but not including food. We need to book the flights by next Friday and the hotels by the end of the month. Also check if our passports need renewal since they expire in September. And remind me to get travel insurance at least 2 weeks before departure. Can you help organize all of this into a structured plan with timeline and checklist?"
     timeout_ms: 45000
     side_effects: none
+    skip_dry_run_prefix: true   # planning response only — dry-run prefix causes Lyra to respond in eval mode rather than produce a structured plan
     validators:
       - type: llm_judge
         rubric: "Does the response handle this complex, multi-part request well? It should break down the trip into structured components (flights, hotels, activities, documents, insurance), create a timeline or checklist, and not miss major elements. Addressing only one part or giving a generic response scores low."
