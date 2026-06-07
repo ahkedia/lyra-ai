@@ -29,26 +29,17 @@
   .foot{color:var(--mut);font-size:11px;margin-top:28px;border-top:1px solid var(--bd);padding-top:12px}
 </style></head><body>
   <h1>Lyra Eval Dashboard</h1>
-  <div class="sub">evals-before-changes · generated 2026-06-05T04:28:37.268Z · 36 full runs</div>
+  <div class="sub">evals-before-changes · generated 2026-06-07T04:28:45.112Z · 37 full runs</div>
   
   <div class="band">
-    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-06-05</div></div>
-    <div class="metric"><div class="mlabel">Pass rate</div><div class="mval big">71%</div><div class="msub">30/42 · cap 83%</div></div>
+    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-06-07</div></div>
+    <div class="metric"><div class="mlabel">Pass rate</div><div class="mval big">57%</div><div class="msub">24/42 · cap 65%</div></div>
     <div class="metric"><div class="mlabel">Days since good run</div><div class="mval big ok">0</div><div class="msub">harness healthy</div></div>
-    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">22.9s</div></div>
-    <div class="metric"><div class="mlabel">Ship gate</div><div class="mval ok">GREEN</div><div class="msub">all_ok</div></div>
+    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">23.5s</div></div>
+    <div class="metric"><div class="mlabel">Ship gate</div><div class="mval down">RED</div><div class="msub">blocking on real bugs</div></div>
   </div>
   <h2>Pass-rate trend (last 8 runs)</h2>
   <table class="trend"><thead><tr><th>Date</th><th>Pass</th><th>Core</th><th>Judgment</th><th>Showcase</th><th>Gap</th><th>Latency</th></tr></thead><tbody>
-    <tr>
-      <td>2026-05-13</td>
-      <td class="num">57%</td>
-      <td class="num">75%</td>
-      <td class="num">69%</td>
-      <td class="num">17%</td>
-      <td class="num">55%</td>
-      <td class="num">29.0s</td>
-    </tr>
     <tr>
       <td>2026-05-15</td>
       <td class="num">55%</td>
@@ -111,10 +102,29 @@
       <td class="num">20%</td>
       <td class="num">71%</td>
       <td class="num">22.9s</td>
+    </tr>
+    <tr>
+      <td>2026-06-07</td>
+      <td class="num">57%</td>
+      <td class="num">55%</td>
+      <td class="num">75%</td>
+      <td class="num">0%</td>
+      <td class="num">71%</td>
+      <td class="num">23.5s</td>
     </tr></tbody></table>
   <h2>Change → eval-delta timeline</h2>
   <div class="sub">Each run shows its pass-rate delta and the commits that landed since the prior run. <span class="badge warn">⚠ behavior · no eval</span> = a change to Lyra's behavior that shipped without an eval (what the gate will block).</div>
   
+    <div class="run">
+      <div class="runhead">
+        <div class="rundate">2026-06-07</div>
+        <div class="runpass">57% <span class="rsub">24/42</span></div>
+        <div class="rundelta"><span class="d down">▼ -14 pts</span></div>
+      </div>
+      <div class="tierrow"><span class="tierd down">core capability 73%→55%</span><span class="tierd down">architectural 67%→33%</span><span class="tierd down">judgment 88%→75%</span><span class="tierd down">showcase 20%→0%</span></div>
+      <div class="fbrow">failures: assertion:6 · judge:7 · timeout:5</div>
+      <ul class="commits"><li class="commit flag"><code>56cf10a9</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (1)</span> <span class="csubj">fix(brain): filter reference-tier results for factual questions</span></li><li class="commit "><code>a431d55d</code> <span class="badge muted">infra/docs</span> <span class="csubj">feat(brain): provenance audit + factual-leak eval</span></li><li class="commit flag"><code>368d39c8</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (1)</span> <span class="csubj">fix(brain): provenance rules + pin achievements page</span></li><li class="commit flag"><code>ab1fa70c</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (2)</span> <span class="csubj">fix(brain): route achievement/accomplishment/wins questions to brain</span></li><li class="commit flag"><code>77b5f5a1</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (4)</span> <span class="csubj">feat(crud): RSS→Notion→brain auto-learning loop</span></li><li class="commit "><code>9e12f48c</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update eval dashboard data 2026-06-05</span></li></ul>
+    </div>
     <div class="run">
       <div class="runhead">
         <div class="rundate">2026-06-05</div>
