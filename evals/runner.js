@@ -95,6 +95,7 @@ function loadTestCases() {
     'tier3-judgment.yaml',
     'tier4-showcase.yaml',
     'tier5-production-gaps.yaml',
+    'tier6-brain.yaml',
   ];
 
   for (const file of files) {
