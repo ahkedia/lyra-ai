@@ -16,6 +16,9 @@
 
 **Twitter bookmarks → Notion** — After `fetch-twitter-bookmarks.sh`, process `/tmp/lyra-bookmarks-*.json` per `skills/twitter-synthesis/SKILL.md`. **User corrections in Notion** to classifications override your prior output.
 
+## Eval Provenance Rule
+Only `wiki/career` and `wiki/domain` Notion pages may be cited as personal facts in eval-generated content. Do not cite other wiki pages, memory files, or session context as sourced personal facts.
+
 ## Incident notes (append-only)
 _Add one line: date, symptom, fix / pointer to PR or skill change._
 
