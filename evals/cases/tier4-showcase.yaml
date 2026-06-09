@@ -17,7 +17,7 @@ tests:
       action: notion_delete_matching
       database: "32678008-9100-802f-ad9f-fb48ff5f4c1d"
       data_source: "32678008-9100-8171-8940-000b30243ddd"
-      title_contains: "[tc]"
+      title_contains: "call the dentist"
       title_properties: ["Task"]
     tags: [multi-step, reminder]
 
@@ -35,7 +35,7 @@ tests:
       action: notion_delete_matching
       database: "2054e39c-3f09-431d-8821-0e6a7513913a"
       data_source: "9f206d71-7b25-408b-ad20-02daf0b43da0"
-      title_contains: "[tc]"
+      title_contains: "meal planning sync"
       title_properties: ["Task"]
     tags: [multi-step, cross-user, write]
 
@@ -54,7 +54,7 @@ tests:
       database: "e4027aaf-d2ff-49e1-babf-7487725e2ef4"
       data_source: "f1ce4e0f-9e0d-43da-87f8-94dae2732962"
       title_properties: ["Name"]
-      title_contains: "[tc]"
+      title_contains: "alignment insight"
     tags: [multi-step, second-brain]
 
   # --- Proactive Quality ---
