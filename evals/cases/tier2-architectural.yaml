@@ -45,7 +45,7 @@ tests:
       action: notion_delete_matching
       database: "32678008-9100-802f-ad9f-fb48ff5f4c1d"
       data_source: "32678008-9100-8171-8940-000b30243ddd"
-      title_contains: "[tc]"
+      title_contains: "check eval framework"
       title_properties: ["Task"]
     tags: [notion, tool-use, write]
 
@@ -58,11 +58,8 @@ tests:
     timeout_ms: 45000
     side_effects: none
     validators:
-      - type: contains
-        value: "digest"
-      - type: regex
-        pattern: "(morning|content|brain|competitor|weekly)"
-        flags: "i"
+      - type: llm_judge
+        rubric: "Does the response list scheduled jobs with their names and times? It should return at least one job entry. The response does not need to contain any specific job name — cron configurations change over time. If no openclaw crons are active it may say so and describe system jobs — acceptable (score 3). No attempt at all scores 1."
     tags: [cron, tool-use]
 
   - id: tool-email-draft
@@ -92,7 +89,7 @@ tests:
       action: notion_delete_matching
       database: "2054e39c-3f09-431d-8821-0e6a7513913a"
       data_source: "9f206d71-7b25-408b-ad20-02daf0b43da0"
-      title_contains: "[tc]"
+      title_contains: "meal plan follow-up"
       title_properties: ["Task"]
     tags: [cross-user, telegram, write]
 
