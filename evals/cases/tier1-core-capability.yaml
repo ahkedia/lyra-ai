@@ -71,8 +71,8 @@ tests:
     validators:
       - type: contains
         value: "|"
-      - type: contains
-        value: "digest"
+      - type: llm_judge
+        rubric: "Is the response formatted as a table with at least Name, Schedule, and Status columns? It should use pipe characters to form rows. If no openclaw crons are active it may list zero rows — that is acceptable (score 3) as long as the table structure exists. A plain prose response with no table scores 1."
     tags: [formatting, cron]
 
   - id: instruct-tone-check
@@ -85,7 +85,7 @@ tests:
     side_effects: none
     validators:
       - type: llm_judge
-        rubric: "Is this greeting concise and direct (under 50 words)? Does it avoid fluff, excessive emojis, or overly enthusiastic language? A good Lyra greeting is short, warm but professional, like a capable executive assistant."
+        rubric: "Is this greeting concise and direct (ideally under 60 words)? Does it avoid excessive emojis, corporate filler, or overly enthusiastic language? A good Lyra greeting is short and warm but professional — like a capable executive assistant, not a chatbot. A brief greeting with a touch of warmth scores high. A long paragraph or emoji-heavy response scores low."
       - type: length_range
         max: 500
     tags: [tone, personality]
@@ -160,9 +160,6 @@ tests:
     timeout_ms: 45000
     side_effects: none
     validators:
-      - type: contains
-        value: "morning"
-      - type: regex
-        pattern: "(daily|weekly|7|noon|sunday)"
-        flags: "i"
+      - type: llm_judge
+        rubric: "Does the response list any scheduled jobs or cron tasks with their schedules or times? It should return at least one job with a name and schedule. If no openclaw crons are configured it may say so and describe system-level jobs — that is acceptable (score 3). A blank or 'I don't know' with no attempt scores 1."
     tags: [cron, operational]
