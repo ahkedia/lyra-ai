@@ -166,6 +166,10 @@ const TIER0_PATTERNS = [
   /\b(?:role|position|opening|opportunity|apply|outreach|cover\s+letter)\b[\s\S]{0,200}https?:\/\/\S+/i,
   // Job application workflow — Phase B (clarification reply; Python validates state file exists)
   /^(?:[1-3]|both|outreach(?:\s+only)?|cover(?:\s+letter)?(?:\s+only)?|message(?:\s+only)?)(?:\s+.{0,120})?$/i,
+  // Content Ideas count — direct DB query so LLM never has to guess
+  /how many content ideas/i,
+  /count.*content ideas/i,
+  /content ideas.*(?:count|how many)/i,
   // Content draft / revise — shared wiki + channel rules (cli.py parse → content_draft.py)
   /(?:^|\n)(?:lyra\s+)?content\s+draft\s+(?:x|outreach|generic)\b/i,
   /(?:^|\n)(?:lyra\s+)?content\s+revise\s+(?:x|outreach|generic)\b/i,

@@ -216,6 +216,43 @@ def cmd_parse(args):
         return
     # --- End job application ---
 
+    # Content Ideas count — Tier 0 bypass so LLM doesn't fabricate a number
+    _content_count_re = _re.compile(
+        r'how many content ideas|count.*content ideas|content ideas.*count|how many idea',
+        _re.IGNORECASE
+    )
+    if _content_count_re.search(raw):
+        import json, urllib.request as _urlreq
+        _key = os.environ.get("NOTION_API_KEY", "")
+        if not _key:
+            print("Cannot count Content Ideas: NOTION_API_KEY not set")
+            return
+        _db_id = "f008d0bb-ac81-401d-889d-4e8f508ab134"
+        _total = 0
+        _cursor = None
+        try:
+            while True:
+                _body = {"page_size": 100}
+                if _cursor:
+                    _body["start_cursor"] = _cursor
+                _req = _urlreq.Request(
+                    f"https://api.notion.com/v1/data_sources/{_db_id}/query",
+                    data=json.dumps(_body).encode(),
+                    headers={"Authorization": f"Bearer {_key}", "Notion-Version": "2025-09-03",
+                             "Content-Type": "application/json"},
+                    method="POST"
+                )
+                with _urlreq.urlopen(_req, timeout=15) as _r:
+                    _data = json.loads(_r.read())
+                _total += len(_data.get("results", []))
+                if not _data.get("has_more"):
+                    break
+                _cursor = _data.get("next_cursor")
+            print(f"You have {_total} content ideas in the Content Ideas database.")
+        except Exception as _e:
+            print(f"Could not query Content Ideas database: {_e}")
+        return
+
     from parse import (
         detect_intent,
         normalize_crud_message,
