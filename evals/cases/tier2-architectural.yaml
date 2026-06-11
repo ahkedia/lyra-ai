@@ -134,5 +134,5 @@ tests:
     skip_dry_run_prefix: true   # meta-introspection Q, no write intent
     validators:
       - type: llm_judge
-        rubric: "Does the response explain a resilient fallback chain grounded in verifiable facts from MEMORY.md (MiniMax → Haiku → Sonnet with budget/conservative safeguards)? It must NOT fabricate unverifiable specifics like exact version numbers, router version strings, file paths, or cron names. Grounded, concept-level answers score high; invented specifics score low."
+        rubric: "Does the response describe Lyra's routing fallback at a concept level? The CORRECT answer is: primary model is MiniMax, if it fails Lyra falls back to Haiku automatically, if both fail Lyra tells the user. Sonnet is on-demand escalation only, not automatic. PASS criteria: mentions primary→secondary→tell-user fallback concept, does NOT mention specific version numbers (M2.7, 4.5, 4.6), does NOT mention router version strings (v14, v16), does NOT describe specific retry timing or cron details. A clean 2-sentence description of the fallback concept is a 5. A response mentioning version numbers or retry intervals scores 1-2 even if otherwise correct."
     tags: [routing, fallback, introspection]
