@@ -787,13 +787,26 @@ const plugin = {
       // Brain retrieve-then-synthesize: inject gbrain context, then route normally.
       // Runs before tier0/scoring so the chosen LLM answers grounded in the brain.
       try {
-        const brainCtx = fetchBrainContext(event?.prompt || "");
+        const sender = String(ctx?.sender || "");
+        const rawPrompt = event?.prompt || "";
+        const isAbhigna =
+          sender === ABHIGNA_ID ||
+          /\bI(?:'m| am) Abhigna\b/i.test(rawPrompt);
+        const brainCtx = fetchBrainContext(rawPrompt);
         if (brainCtx) {
+          const aclNote = isAbhigna
+            ? `CALLER IS ABHIGNA — share only general career domains (fintech, payments, AI). ` +
+              `Do NOT name or confirm existence of restricted databases: Personal Wiki, ` +
+              `Competitor Tracker, Recruiter Tracker, Job Applications, Content Ideas, ` +
+              `Devlog, Second Brain, or any work-only database. `
+            : "";
           event.prompt =
             `[Brain context — answer using this first, cite pages, note gaps honestly. ` +
-            `If it doesn't cover the question, say so and answer normally.]\n` +
-            `${brainCtx}\n\n[User message]\n${event.prompt}`;
-          process.stderr.write("[R] Brain context injected → routing to LLM for synthesis\n");
+            `${aclNote}If it doesn't cover the question, say so and answer normally.]\n` +
+            `${brainCtx}\n\n[User message]\n${rawPrompt}`;
+          process.stderr.write(
+            `[R] Brain context injected${isAbhigna ? " (Abhigna ACL applied)" : ""} → routing to LLM for synthesis\n`
+          );
         }
       } catch (e) {
         process.stderr.write(`[R] Brain inject skipped: ${e.message}\n`);

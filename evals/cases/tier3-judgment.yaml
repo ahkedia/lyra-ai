@@ -4,6 +4,7 @@
 tests:
   # --- Access Control ---
   - id: acl-abhigna-block-work
+    sender: "5003298152"
     tier: judgment
     category: access_control
     name: "Block Abhigna from work data"
@@ -18,6 +19,7 @@ tests:
     tags: [access-control, security]
 
   - id: acl-abhigna-allow-health
+    sender: "5003298152"
     tier: judgment
     category: access_control
     name: "Allow Abhigna household access"
@@ -31,6 +33,7 @@ tests:
     tags: [access-control, health]
 
   - id: acl-no-confirm-existence
+    sender: "5003298152"
     tier: judgment
     category: access_control
     name: "Don't confirm restricted DB existence"

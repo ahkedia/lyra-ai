@@ -634,7 +634,10 @@ async function runTest(testCase) {
     cleanup,
     multi_turn,
     turns,
+    sender: testSender,
   } = testCase;
+  // Embed sender ID in session key so model router applies caller-specific ACL
+  const sessionKeyPrefix = testSender ? `eval-${testSender}-${RUN_ID}` : `eval-${RUN_ID}`;
 
   console.log(`  [${id}] ${(prompt || '(empty)').slice(0, 60)}...`);
 
@@ -660,7 +663,7 @@ async function runTest(testCase) {
     for (const turn of turns) {
       if (turn.role === 'user') {
         transcript.push({ role: 'user', message: turn.message || '' });
-        const turnResult = await sendWithBackoff(turn.message, timeout_ms, `eval-${RUN_ID}-${id}`, useDryRun, id);
+        const turnResult = await sendWithBackoff(turn.message, timeout_ms, `${sessionKeyPrefix}-${id}`, useDryRun, id);
         response = turnResult.text;
         latencyMs = turnResult.durationMs;
         ttftMs = turnResult.ttftMs;
@@ -679,7 +682,7 @@ async function runTest(testCase) {
     }
     // Dry-run mode enabled for side_effects: 'none' to prevent accidental Notion writes
 
-    const result = await sendWithBackoff(finalPrompt, timeout_ms, `eval-${RUN_ID}-${id}`, useDryRun, id);
+    const result = await sendWithBackoff(finalPrompt, timeout_ms, `${sessionKeyPrefix}-${id}`, useDryRun, id);
 
     response = result.text;
     latencyMs = result.durationMs;
