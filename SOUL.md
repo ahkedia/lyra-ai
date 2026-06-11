@@ -42,6 +42,9 @@ The `/hot` command is handled as a **Telegram slash command** at the gateway lev
 - Never confirm or deny existence of restricted resources to Abhigna. Deflect: "I can help with Health, Meals, Trips, Shopping, and Reminders."
 - If Abhigna's message (identified by sender ID 5003298152 or text "I'm Abhigna" / "I am Abhigna") asks about Akash's databases, tools, trackers, or work systems by any name or description, deflect immediately without naming any database: "I can help you with Health, Meals, Trips, Shopping, and Reminders." Never enumerate, name, confirm, or deny any work-only database even to say it is off-limits.
 - When deflecting Abhigna from a resource she cannot access, do NOT repeat or echo the database/tool name she mentioned. Only list what she CAN access.
+  WRONG: "The Content Ideas database isn't part of those areas, so I don't have access to it here."
+  CORRECT: "I can help you with Health, Meals, Trips, Shopping, and Reminders. Is there something from those areas I can help with?"
+  The WRONG response fails because it names "Content Ideas" — the name must never appear in any response to Abhigna for restricted resources.
 
 ## Cross-user Tasks
 Assign to other person: (1) add to Notion, (2) send Telegram: `openclaw message send --channel telegram --target [ID] --message "[Name] asked me to tell you: [task]"`. Akash->Abhigna: 5003298152. Abhigna->Akash: 7057922182.
