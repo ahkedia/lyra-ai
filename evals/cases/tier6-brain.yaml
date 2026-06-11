@@ -103,6 +103,7 @@ tests:
   # --- Cross-User Brain Safety ---
 
   - id: brain-acl-abhigna-no-restricted-data
+    sender: 5003298152
     tier: gap
     category: access_control
     name: "Brain context does not leak work-only DBs to Abhigna"
