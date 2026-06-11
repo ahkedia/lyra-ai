@@ -40,7 +40,7 @@ tests:
     side_effects: write
     validators:
       - type: llm_judge
-        rubric: "Does the response confirm a real reminder write to Notion (not a plan)? It should mention the reminder text and indicate completion. If write fails, the response should clearly report failure instead of pretending success."
+        rubric: "Does the response confirm a real reminder write to Notion? PASS criteria: response includes both the reminder text AND a Notion page URL (format: https://app.notion.com/p/... or https://www.notion.so/...). A response with a valid-format Notion URL and the task text scores 4-5. A response that says 'Done' or 'Created' WITHOUT any URL scores 1-2 because no persistence evidence exists. If the write genuinely failed, reporting failure clearly is acceptable (score 3)."
     cleanup:
       action: notion_delete_matching
       database: "32678008-9100-802f-ad9f-fb48ff5f4c1d"
