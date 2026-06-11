@@ -29,26 +29,17 @@
   .foot{color:var(--mut);font-size:11px;margin-top:28px;border-top:1px solid var(--bd);padding-top:12px}
 </style></head><body>
   <h1>Lyra Eval Dashboard</h1>
-  <div class="sub">evals-before-changes · generated 2026-06-09T04:33:38.373Z · 38 full runs</div>
+  <div class="sub">evals-before-changes · generated 2026-06-11T04:34:11.248Z · 39 full runs</div>
   
   <div class="band">
-    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-06-09</div></div>
-    <div class="metric"><div class="mlabel">Pass rate</div><div class="mval big">58%</div><div class="msub">25/43 · cap 68%</div></div>
+    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-06-11</div></div>
+    <div class="metric"><div class="mlabel">Pass rate</div><div class="mval big">67%</div><div class="msub">29/43 · cap 76%</div></div>
     <div class="metric"><div class="mlabel">Days since good run</div><div class="mval big ok">0</div><div class="msub">harness healthy</div></div>
-    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">28.7s</div></div>
+    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">27.9s</div></div>
     <div class="metric"><div class="mlabel">Ship gate</div><div class="mval down">RED</div><div class="msub">blocking on real bugs</div></div>
   </div>
   <h2>Pass-rate trend (last 8 runs)</h2>
   <table class="trend"><thead><tr><th>Date</th><th>Pass</th><th>Core</th><th>Judgment</th><th>Showcase</th><th>Gap</th><th>Latency</th></tr></thead><tbody>
-    <tr>
-      <td>2026-05-17</td>
-      <td class="num">63%</td>
-      <td class="num">75%</td>
-      <td class="num">81%</td>
-      <td class="num">33%</td>
-      <td class="num">45%</td>
-      <td class="num">23.0s</td>
-    </tr>
     <tr>
       <td>2026-05-30</td>
       <td class="num">65%</td>
@@ -111,10 +102,29 @@
       <td class="num">20%</td>
       <td class="num">73%</td>
       <td class="num">28.7s</td>
+    </tr>
+    <tr>
+      <td>2026-06-11</td>
+      <td class="num">67%</td>
+      <td class="num">78%</td>
+      <td class="num">80%</td>
+      <td class="num">20%</td>
+      <td class="num">64%</td>
+      <td class="num">27.9s</td>
     </tr></tbody></table>
   <h2>Change → eval-delta timeline</h2>
   <div class="sub">Each run shows its pass-rate delta and the commits that landed since the prior run. <span class="badge warn">⚠ behavior · no eval</span> = a change to Lyra's behavior that shipped without an eval (what the gate will block).</div>
   
+    <div class="run">
+      <div class="runhead">
+        <div class="rundate">2026-06-11</div>
+        <div class="runpass">67% <span class="rsub">29/43</span></div>
+        <div class="rundelta"><span class="d up">▲ +9 pts</span></div>
+      </div>
+      <div class="tierrow"><span class="tierd up">core capability 44%→78%</span><span class="tierd up">architectural 33%→67%</span><span class="tierd up">judgment 73%→80%</span><span class="tierd down">gap 73%→64%</span></div>
+      <div class="fbrow">failures: timeout:5 · judge:8 · assertion:1</div>
+      <ul class="commits"><li class="commit "><code>0fdc3953</code> <span class="badge eval">eval edit</span> <span class="csubj">eval: fix 5 root causes from 2026-06-09 run (58% pass rate)</span></li><li class="commit "><code>bee97e90</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update eval dashboard data 2026-06-09</span></li></ul>
+    </div>
     <div class="run">
       <div class="runhead">
         <div class="rundate">2026-06-09</div>
@@ -123,7 +133,7 @@
       </div>
       <div class="tierrow"><span class="tierd down">core capability 67%→44%</span><span class="tierd up">architectural 30%→33%</span><span class="tierd up">judgment 0%→73%</span><span class="tierd up">showcase 0%→20%</span><span class="tierd up">gap 0%→73%</span></div>
       <div class="fbrow">failures: timeout:6 · assertion:3 · judge:9</div>
-      <ul class="commits"><li class="commit "><code>11f70e28</code> <span class="badge muted">infra/docs</span> <span class="csubj">Daily memory backup: 2026-06-08</span></li><li class="commit flag"><code>224ea95d</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (4)</span> <span class="csubj">Fix content pipeline: lower quality gate threshold + route approvals through Lyra</span></li><li class="commit "><code>b7fa6035</code> <span class="badge muted">infra/docs</span> <span class="csubj">Fix morning-weight-nudge and wiki-candidate-review-merged stalling</span></li><li class="commit "><code>a6f057a0</code> <span class="badge ok">✓ behavior + eval</span> <span class="csubj">eval: fix consistent failures, add coverage gap todos, Wednesday reminder</span></li><li class="commit "><code>3a228c66</code> <span class="badge muted">infra/docs</span> <span class="csubj">Revert max_results back to 10</span></li></ul>
+      <ul class="commits"><li class="commit "><code>11f70e28</code> <span class="badge muted">infra/docs</span> <span class="csubj">Daily memory backup: 2026-06-08</span></li><li class="commit "><code>b3cd4e32</code> <span class="badge muted">infra/docs</span> <span class="csubj">Mark L-15 done in TODOS.md — Options A+B shipped, 10 drafts queued</span></li><li class="commit flag"><code>224ea95d</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (4)</span> <span class="csubj">Fix content pipeline: lower quality gate threshold + route approvals through Lyra</span></li><li class="commit "><code>b7fa6035</code> <span class="badge muted">infra/docs</span> <span class="csubj">Fix morning-weight-nudge and wiki-candidate-review-merged stalling</span></li><li class="commit "><code>a6f057a0</code> <span class="badge ok">✓ behavior + eval</span> <span class="csubj">eval: fix consistent failures, add coverage gap todos, Wednesday reminder</span></li><li class="commit "><code>3a228c66</code> <span class="badge muted">infra/docs</span> <span class="csubj">Revert max_results back to 10</span></li></ul>
     </div>
     <div class="run">
       <div class="runhead">
