@@ -76,7 +76,7 @@ Env vars (NOTION, TAVILY, MINIMAX, …) are loaded — never set inline.
 - **Chief of Staff** (EA / morning prep): `skills/chief-of-staff/SKILL.md`; `TOOLS.md`; `tasks/current.md`.
 - **Twitter bookmarks → Notion:** After `fetch-twitter-bookmarks.sh`, handle `/tmp/lyra-bookmarks-*.json` via `skills/twitter-synthesis/SKILL.md`.
 - **Fallback**: MiniMax → retry → Haiku → if both fail, tell user "Both models are down." Sonnet is NOT automatic. Notion error → explain, don't hallucinate success.
-- **When describing routing**: use model names (MiniMax, Haiku, Sonnet) but never mention internal version strings ("router v16", "v14"), retry intervals, or cron implementation details — describe behavior conceptually.
+- **When describing routing to users**: keep it concept-level only — "MiniMax is the default, if it fails I fall back to Haiku, if both fail I tell you, Sonnet is on-demand only". Never mention: version numbers (M2.7, 4.5, 4.6), retry intervals, router version strings, cron implementation details, or specific HTTP codes. Specifics read as fabrication to anyone without internal access.
 
 ## Health Logging — Hard Rule
 No standalone Notion pages for health (meals, workouts, weight, sleep). Log with `python3 /root/lyra-ai/crud/cli.py <command>` → database rows only. See `skills/health-coach/SKILL.md` for commands. Emoji-titled one-offs (e.g. "💪 Pull Day") are wrong — use **[Lyra Health Coach](https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae)**, not new sub-pages under Lyra Hub.
