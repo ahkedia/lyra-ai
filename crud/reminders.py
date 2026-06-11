@@ -105,12 +105,14 @@ def add_reminder_text(task: str, when: str = "") -> str:
         "Task": {"title": [{"type": "text", "text": {"content": title}}]},
         "Source": {"select": {"name": _provenance_source()}},
     }
-    _notion_request(
+    page = _notion_request(
         "POST",
         "/pages",
         {"parent": {"database_id": db_id}, "properties": props},
     )
-    return f"Added reminder to Notion: {title}"
+    page_url = page.get("url", "")
+    url_suffix = f" — {page_url}" if page_url else ""
+    return f"Added reminder to Notion: {title}{url_suffix}"
 
 
 def _provenance_source() -> str:
