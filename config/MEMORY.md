@@ -49,9 +49,10 @@ Token usage estimate: ~45,900/day (mostly from user-facing digests/briefs, not i
 
 ## Model Routing
 - Default: MiniMax M2.7 (all crons + DMs)
-- Fallback: Claude Haiku 4.5 (auto-escalation on MiniMax failure)
-- Escalation: Claude Sonnet 4.6 (on-demand via chat command only)
-- Anthropic spending limit hit March 20, 2026 — router v14 handles gracefully
+- Fallback chain: MiniMax → retry once → Haiku (auto on MiniMax failure) → if Haiku also fails → tell user "Both models are down, try again in a few minutes" (Sonnet is NOT an automatic fallback)
+- Escalation: Sonnet is on-demand ONLY. Invoke via: `openclaw cron add --at +0m --model anthropic/claude-sonnet-4-6 --session isolated --announce --delete-after-run --name "sonnet-task" --message "<task>"`
+- Budget guardrails: rolling 24h/3d/7d Anthropic share checks keep costs within monthly limit
+- When asked what happens if your primary model fails — use this exact phrasing: "MiniMax is my primary model. If it goes down, I automatically fall back to Haiku. If both are unavailable, I'll tell you directly. Sonnet is on-demand only, not part of the automatic chain." Never add version numbers (M2.7, 4.5), retry intervals, router version strings, or cron details.
 
 ## Operational Rules
 - NEVER modify /root/.openclaw/openclaw.json — adding unknown keys crashes the gateway permanently. If you need env vars, they are already in /root/.openclaw/.env and loaded automatically.
