@@ -29,14 +29,14 @@
   .foot{color:var(--mut);font-size:11px;margin-top:28px;border-top:1px solid var(--bd);padding-top:12px}
 </style></head><body>
   <h1>Lyra Eval Dashboard</h1>
-  <div class="sub">evals-before-changes · generated 2026-06-11T05:44:58.568Z · 39 full runs</div>
+  <div class="sub">evals-before-changes · generated 2026-06-13T04:32:32.932Z · 39 full runs</div>
   
   <div class="band">
-    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-06-11</div></div>
-    <div class="metric"><div class="mlabel">Pass rate</div><div class="mval big">60%</div><div class="msub">37/62 · cap 79%</div></div>
+    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-06-13</div></div>
+    <div class="metric"><div class="mlabel">Pass rate</div><div class="mval big">72%</div><div class="msub">31/43 · cap 89%</div></div>
     <div class="metric"><div class="mlabel">Days since good run</div><div class="mval big ok">0</div><div class="msub">harness healthy</div></div>
-    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">31.4s</div></div>
-    <div class="metric"><div class="mlabel">Ship gate</div><div class="mval down">RED</div><div class="msub">blocking on real bugs</div></div>
+    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">27.5s</div></div>
+    <div class="metric"><div class="mlabel">Ship gate</div><div class="mval ok">GREEN</div><div class="msub">all_ok</div></div>
   </div>
   <h2>Pass-rate trend (last 8 runs)</h2>
   <table class="trend"><thead><tr><th>Date</th><th>Pass</th><th>Core</th><th>Judgment</th><th>Showcase</th><th>Gap</th><th>Latency</th></tr></thead><tbody>
@@ -104,26 +104,26 @@
       <td class="num">28.7s</td>
     </tr>
     <tr>
-      <td>2026-06-11</td>
+      <td>2026-06-13</td>
+      <td class="num">72%</td>
+      <td class="num">78%</td>
+      <td class="num">93%</td>
       <td class="num">60%</td>
-      <td class="num">73%</td>
-      <td class="num">80%</td>
-      <td class="num">13%</td>
-      <td class="num">53%</td>
-      <td class="num">31.4s</td>
+      <td class="num">45%</td>
+      <td class="num">27.5s</td>
     </tr></tbody></table>
   <h2>Change → eval-delta timeline</h2>
   <div class="sub">Each run shows its pass-rate delta and the commits that landed since the prior run. <span class="badge warn">⚠ behavior · no eval</span> = a change to Lyra's behavior that shipped without an eval (what the gate will block).</div>
   
     <div class="run">
       <div class="runhead">
-        <div class="rundate">2026-06-11</div>
-        <div class="runpass">60% <span class="rsub">37/62</span></div>
-        <div class="rundelta"><span class="d up">▲ +2 pts</span></div>
+        <div class="rundate">2026-06-13</div>
+        <div class="runpass">72% <span class="rsub">31/43</span></div>
+        <div class="rundelta"><span class="d up">▲ +14 pts</span></div>
       </div>
-      <div class="tierrow"><span class="tierd up">core capability 44%→73%</span><span class="tierd up">architectural 33%→67%</span><span class="tierd up">judgment 73%→80%</span><span class="tierd down">showcase 20%→13%</span><span class="tierd down">gap 73%→53%</span></div>
-      <div class="fbrow">failures: timeout:15 · judge:9 · assertion:1</div>
-      <ul class="commits"><li class="commit "><code>167988ff</code> <span class="badge ok">✓ behavior + eval</span> <span class="csubj">Fix ACL leaks: brain context filter + SOUL.md rule + eval sender propagation</span></li><li class="commit "><code>bb706f27</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update eval dashboard data 2026-06-11</span></li><li class="commit "><code>0fdc3953</code> <span class="badge eval">eval edit</span> <span class="csubj">eval: fix 5 root causes from 2026-06-09 run (58% pass rate)</span></li><li class="commit "><code>bee97e90</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update eval dashboard data 2026-06-09</span></li></ul>
+      <div class="tierrow"><span class="tierd up">core capability 44%→78%</span><span class="tierd up">architectural 33%→67%</span><span class="tierd up">judgment 73%→93%</span><span class="tierd up">showcase 20%→60%</span><span class="tierd down">gap 73%→45%</span></div>
+      <div class="fbrow">failures: timeout:8 · judge:3 · other:1</div>
+      <ul class="commits"><li class="commit flag"><code>8805c84c</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (1)</span> <span class="csubj">Daily memory backup: 2026-06-12</span></li><li class="commit flag"><code>bcd6be76</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (2)</span> <span class="csubj">Tier0: count Content Ideas via data_sources endpoint, bypasses LLM</span></li><li class="commit "><code>c2ab95c8</code> <span class="badge eval">eval edit</span> <span class="csubj">evals: tool-reminder-dryrun rubric — accept Notion URL as write evidence</span></li><li class="commit "><code>0c1c0ce3</code> <span class="badge eval">eval edit</span> <span class="csubj">evals: fix routing-fallback rubric — judge cannot see MEMORY.md, make pass criteria explicit</span></li><li class="commit flag"><code>0f11e0b4</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (1)</span> <span class="csubj">crud: output Notion page URL in add_reminder_text confirmation</span></li><li class="commit "><code>3229138a</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update eval dashboard data 2026-06-11</span></li><li class="commit "><code>167988ff</code> <span class="badge ok">✓ behavior + eval</span> <span class="csubj">Fix ACL leaks: brain context filter + SOUL.md rule + eval sender propagation</span></li><li class="commit "><code>bb706f27</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update eval dashboard data 2026-06-11</span></li><li class="commit "><code>0fdc3953</code> <span class="badge eval">eval edit</span> <span class="csubj">eval: fix 5 root causes from 2026-06-09 run (58% pass rate)</span></li><li class="commit "><code>bee97e90</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update eval dashboard data 2026-06-09</span></li></ul>
     </div>
     <div class="run">
       <div class="runhead">
