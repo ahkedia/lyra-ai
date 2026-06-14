@@ -21,8 +21,14 @@ Use the Notion API to create/read/update pages, data sources (databases), and bl
 
 **Use this command for ANY reminder write (eval, user, cron — all of them):**
 ```bash
-python3 /root/lyra-ai/crud/cli.py parse '<the user's reminder request verbatim>'
+python3 /root/lyra-ai/crud/cli.py parse '<the user\'s reminder request verbatim>'
 ```
+
+**⛔ Write confirmation is MANDATORY:**
+After running `crud/cli.py`, the CLI prints a success line including the Notion page URL and/or page ID.
+- ✅ CORRECT: Include the CLI output in your reply. Example: "Done — [Reminder](https://notion.so/...) created."
+- ❌ WRONG: Saying "Done." / "Reminder created." / "Added." without any CLI output — this means the write NEVER happened. Report failure instead.
+- If the CLI produces no output or errors, the write failed. Say so explicitly.
 
 Examples:
 - User: "Add a reminder: call the dentist tomorrow at 3pm"
