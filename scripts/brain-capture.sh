@@ -1,29 +1,23 @@
 #!/usr/bin/env bash
-# Serialized gbrain capture — the ONLY write path Lyra uses into the brain.
-# PGLite is single-writer: flock guarantees captures never collide with each other,
-# the nightly sync, or the dream cycle (they all take /tmp/brain-write.lock).
+# Serialized gbrain capture — write path via HTTP MCP (put_page).
+# Replaced subprocess/CLI path 2026-06-20 — gbrain-http.service holds PGLite
+# permanently; direct CLI calls deadlock. Now uses write-scoped OAuth token.
 #
-# Usage:
+# Usage (unchanged from previous version):
 #   brain-capture.sh inline "<text>" [type] [slug-prefix]
 #   echo "<text>" | brain-capture.sh stdin [type] [slug-prefix]
-# Fire-and-forget friendly: detaches the heavy work, returns fast. Never throws into Lyra.
 set -uo pipefail
 
-export PATH="$HOME/.bun/bin:$PATH"
-export OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
-LOCK="/tmp/brain-write.lock"
 LOG="/var/log/lyra/brain-capture.log"
 mkdir -p /var/log/lyra 2>/dev/null || true
 
-mode="${1:-}"; shift || true
+source /root/.openclaw/.env 2>/dev/null || true
 
-read_content() {
-  case "$mode" in
-    inline) printf '%s' "${1:-}";;
-    stdin)  cat;;
-    *) echo ""; return 1;;
-  esac
-}
+GBRAIN_URL="${GBRAIN_HTTP_URL:-http://localhost:3131}"
+WRITE_ID="${LYRA_GBRAIN_WRITE_CLIENT_ID:-}"
+WRITE_SECRET="${LYRA_GBRAIN_WRITE_CLIENT_SECRET:-}"
+
+mode="${1:-}"; shift || true
 
 if [ "$mode" = "inline" ]; then
   CONTENT="${1:-}"; TYPE="${2:-note}"; PREFIX="${3:-lyra}"
@@ -31,18 +25,21 @@ else
   CONTENT="$(cat)"; TYPE="${1:-note}"; PREFIX="${2:-lyra}"
 fi
 
-# guard: skip trivial/empty captures
 TRIMMED="$(printf '%s' "$CONTENT" | tr -d '[:space:]')"
 if [ "${#TRIMMED}" -lt 20 ]; then
   echo "[$(date -u +%T)] skip: content too short" >> "$LOG"
   exit 0
 fi
 
+if [ -z "$WRITE_ID" ] || [ -z "$WRITE_SECRET" ]; then
+  echo "[$(date -u +%T)] ERROR: write client creds not set" >> "$LOG"
+  exit 1
+fi
+
 SLUG="${PREFIX}/$(date -u +%Y-%m-%d)-$(printf '%s' "$CONTENT" | md5sum | cut -c1-8)"
 
-# Serialize on the write lock; wait up to 5 min for any sync/dream/other capture to finish.
-(
-  flock -w 300 9 || { echo "[$(date -u +%T)] lock timeout, skipped" >> "$LOG"; exit 0; }
-  printf '%s' "$CONTENT" | gbrain capture --stdin --type "$TYPE" --slug "$SLUG" >> "$LOG" 2>&1
-  echo "[$(date -u +%T)] captured $SLUG (type=$TYPE)" >> "$LOG"
-) 9>"$LOCK"
+python3 /root/lyra-ai/scripts/brain_capture_http.py \
+  "$GBRAIN_URL" "$WRITE_ID" "$WRITE_SECRET" "$SLUG" "$TYPE" "$CONTENT" >> "$LOG" 2>&1
+
+EXIT=$?
+echo "[$(date -u +%T)] captured $SLUG exit=$EXIT" >> "$LOG"
