@@ -26,3 +26,12 @@ evals/results/*-summary.json
 evals/results/*-routing.json
 logs/
 .gstack/
+
+# --- lyra-refactor-2026-06-20: ignore regenerated/cache/backup noise ---
+evals/output/*.json
+evals/results-diagnostic/
+**/__pycache__/
+*.pyc
+*.bak
+*.bak-*
+*.bak.*
