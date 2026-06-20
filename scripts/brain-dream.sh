@@ -16,7 +16,9 @@ BRAIN_REPO="${GBRAIN_BRAIN_REPO:-/root/gbrain-brain}"
 echo "=== brain-dream $(date -u) ==="
 
 # stop the MCP serve so it doesn't hold the lock during the heavy cycle
-pkill -f "gbrain serve" 2>/dev/null; sleep 2
+systemctl stop gbrain-http 2>/dev/null || true
+pkill -f "gbrain serve" 2>/dev/null || true
+sleep 2
 
 # Take the shared write lock; wait up to 15 min for sync/captures to clear.
 exec 8>/tmp/brain-write.lock
@@ -25,4 +27,5 @@ flock -w 900 8 || { echo "[$(date -u +%T)] could not get write lock; abort dream
 # Run the dream cycle (single process, single writer). --json keeps logs parseable.
 gbrain dream --repo "$BRAIN_REPO" 2>&1 | tail -40
 
+systemctl start gbrain-http 2>/dev/null || true
 echo "=== brain-dream done $(date -u) ==="
