@@ -43,7 +43,9 @@ else
 fi
 
 # 3) clean DB rebuild (wipe avoids stale rows from prior syncs), then embed
-pkill -f "gbrain (serve|sync|import|embed)" 2>/dev/null; sleep 2
+systemctl stop gbrain-http 2>/dev/null || true
+pkill -f "gbrain (serve|sync|import|embed)" 2>/dev/null || true
+sleep 2
 mkdir -p /root/gbrain-archive/db-rotations
 mv /root/.gbrain/brain.pglite "/root/gbrain-archive/db-rotations/brain.pglite.$(date +%Y%m%d-%H%M)" 2>/dev/null || true
 # keep only the 3 most recent DB rotations
@@ -51,4 +53,5 @@ ls -1dt /root/gbrain-archive/db-rotations/brain.pglite.* 2>/dev/null | tail -n +
 gbrain init --pglite --embedding-model ollama:nomic-embed-text --repo "$BRAIN_REPO" >/dev/null 2>&1
 gbrain sync --repo "$BRAIN_REPO" --no-pull --full 2>&1 | tail -3 | sed "s/^/[gbrain] /"
 
+systemctl start gbrain-http 2>/dev/null || true
 echo "=== brain-sync done $(date -u) ==="
