@@ -166,6 +166,8 @@ def sync_personal_wiki(dry_run: bool = False) -> dict:
         written += 1
 
     # prune: remove mirror files whose page no longer exists in Notion (only in dirs we manage)
+    # Only prune files this script created (notion_page_id in frontmatter).
+    # Hand-authored files lack it and are skipped — they survive the nightly sync.
     pruned = 0
     if not dry_run:
         for subdir in set(_TYPE_TO_DIR.values()) | {"misc"}:
@@ -177,8 +179,18 @@ def sync_personal_wiki(dry_run: bool = False) -> dict:
                     continue
                 relp = os.path.join("wiki", subdir, fn)
                 if relp not in seen_paths:
-                    os.remove(os.path.join(d, fn))
+                    fpath_abs = os.path.join(d, fn)
+                    try:
+                        with open(fpath_abs) as _fh:
+                            header = _fh.read(512)
+                    except OSError:
+                        header = ""
+                    if "notion_page_id:" not in header:
+                        continue  # hand-authored — preserve
+                    os.remove(fpath_abs)
                     pruned += 1
+                    slug = relp[:-3]  # strip .md
+                    print(f"PRUNED:{slug}", flush=True)
 
     return {"pages": len(pages), "written": written, "skipped": skipped,
             "pruned": pruned, "by_dir": by_dir}
@@ -290,8 +302,18 @@ def sync_generic(source_key: str, dry_run: bool = False) -> dict:
     if not dry_run and os.path.isdir(base):
         for fn in os.listdir(base):
             if fn.endswith(".md") and os.path.join(nsdir, fn) not in seen_paths:
-                os.remove(os.path.join(base, fn))
+                fpath_abs = os.path.join(base, fn)
+                try:
+                    with open(fpath_abs) as _fh:
+                        header = _fh.read(512)
+                except OSError:
+                    header = ""
+                if "notion_page_id:" not in header:
+                    continue  # hand-authored — preserve
+                os.remove(fpath_abs)
                 pruned += 1
+                slug = os.path.join(nsdir, fn[:-3])  # strip .md
+                print(f"PRUNED:{slug}", flush=True)
 
     return {"pages": len(pages), "written": written, "skipped": skipped,
             "pruned": pruned, "by_dir": {nsdir: written}}
