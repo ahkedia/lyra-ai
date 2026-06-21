@@ -1,284 +1,16 @@
 {
   "version": 1,
+  "_note": "SINGLE SOURCE OF TRUTH for OpenClaw crons. Regenerated from live 2026-06-20. Restore via scripts/restore-crons.py if openclaw cron list goes empty.",
   "jobs": [
     {
-      "id": "c24ee473-d70b-440a-8f06-ed0c1270dcf5",
-      "name": "content-reminder",
-      "description": "Daily content draft reminder at noon CET",
-      "enabled": true,
-      "createdAtMs": 1773593117881,
-      "schedule": {
-        "kind": "cron",
-        "expr": "0 12 * * *",
-        "tz": "Europe/Berlin"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Check Notion Content Ideas database for any drafts due today or this week. If there are pending drafts, remind Akash with a summary of what's due. If nothing is due, skip.",
-        "timeoutSeconds": 600,
-        "model": "minimax-direct/MiniMax-M2.7"
-      },
-      "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "state": {}
-    },
-    {
-      "id": "b6e66f0d-be0c-4631-929e-a27f240af035",
-      "name": "health-check",
-      "description": "Weekly health check - Monday 9am CET",
-      "enabled": true,
-      "createdAtMs": 1773593132772,
-      "schedule": {
-        "kind": "cron",
-        "expr": "0 9 * * 1",
-        "tz": "Europe/Berlin"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Weekly health check. Query the Health & Meds Notion database. Summarize: any supplements running low, upcoming appointments, medication reminders, or health notes from the past week. Deliver to Akash.",
-        "timeoutSeconds": 600,
-        "model": "minimax-direct/MiniMax-M2.7"
-      },
-      "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "state": {}
-    },
-    {
-      "id": "5b33bb7d-d4a9-47cb-be98-868935847766",
-      "name": "morning-digest",
-      "enabled": true,
-      "createdAtMs": 1773604314876,
-      "schedule": {
-        "kind": "cron",
-        "expr": "0 7 * * *",
-        "tz": "Europe/Berlin"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Morning digest for Akash. Do ALL steps in order:\n\n1. EMAIL: Run himalaya envelope list -s 10 -f INBOX. Summarize: total unread, any recruiter emails (flag with job title + company), anything urgent requiring reply today. Max 4 lines.\n\n2. NEWS: Run these direct commands (no shell wrappers):\n   /root/lyra-ai/scripts/openclaw-research-query.sh \"AI and tech news today\"\n   /root/lyra-ai/scripts/openclaw-research-query.sh \"fintech product launches this week\"\n   /root/lyra-ai/scripts/openclaw-research-query.sh \"European startup news this week\"\n   From the printed results: pick 3-5 most interesting stories. For each write: Bold headline, 2-sentence summary, why it matters. Save each to Notion News Inbox (database_id: 8a900cb78c0c4be996347c5dfebec375).\n\n3. HEALTH: Run this direct command and parse JSON output:\n   /root/lyra-ai/scripts/openclaw-daily-summary.sh\n   Extract date (yesterday), nutrition totals and today_workout. If meal_count is 0, say \"No meals logged yesterday\".\n\n4. TASKS DUE: Query Notion Reminders - Shared (data_source_id: 9f206d71-7b25-408b-ad20-02daf0b43da0) for Status=unchecked and Due=today or overdue.\n\n5. Send one clean Telegram message. Format: Email | News | Health | Tasks. Max 700 words.",
-        "timeoutSeconds": 600,
-        "model": "minimax-direct/MiniMax-M2.7"
-      },
-      "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "failureAlert": {
-        "after": 1,
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "state": {}
-    },
-    {
-      "id": "a7f1e946-9631-4ff6-b696-5e9a9d11dbbf",
-      "name": "daily-activity-log",
-      "enabled": true,
-      "createdAtMs": 1773604348014,
-      "schedule": {
-        "kind": "cron",
-        "expr": "0 21 * * *",
-        "tz": "Europe/Berlin"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Daily activity summary for Akash. Do ALL steps:\n\n1. REMINDERS: Query Reminders - Shared (data_source_id: 9f206d71-7b25-408b-ad20-02daf0b43da0) for items created or modified today.\n\n2. CRON STATUS: Run `openclaw cron list` and report which scheduled jobs ran today and their status (ok/error).\n\n3. USAGE STATS: Run `/root/lyra-usage-tracker.sh daily` and include the full output.\n\n4. DAILY COST: Calculate as follows:\n- Hetzner: €0.23/day (€7/month pro-rated)\n- MiniMax: $0.33/day (fixed, $10/month pro-rated)\n- Anthropic: Estimate from usage. If usage tracker shows Haiku/Sonnet calls, estimate: Haiku ~$0.001/call, Sonnet ~$0.10/call\n- Format as: 💰 Daily Cost: Hetzner €0.23 + MiniMax $0.33 + Anthropic ~$X.XX = Total ~$X.XX\n\n5. Format as brief Telegram message: Lyra Daily Log [date]: [reminders summary] | [cron status] | [usage stats] | [daily cost]. Max 250 words.",
-        "timeoutSeconds": 600,
-        "model": "minimax-direct/MiniMax-M2.7"
-      },
-      "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "failureAlert": {
-        "after": 1,
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "state": {}
-    },
-    {
-      "id": "2c857d22-7eb9-4439-b48b-86ddb2ee07d7",
-      "name": "job-review",
-      "enabled": true,
-      "createdAtMs": 1773604621383,
-      "schedule": {
-        "kind": "cron",
-        "expr": "0 9 * * 0",
-        "tz": "Europe/Berlin"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Weekly job review for Akash. Steps:\n1. NOTE: Recruiter Tracker database is NOT accessible - skip this step.\n2. Summarize any LinkedIn activity or updates from the week.\n3. Note any job search progress.\nFormat as clean Telegram message, max 300 words.",
-        "timeoutSeconds": 600
-      },
-      "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "state": {}
-    },
-    {
-      "id": "2dcddfaf-8880-4dae-9b4f-7277a12466d4",
-      "name": "competitor-digest",
-      "enabled": true,
-      "createdAtMs": 1773604625124,
-      "schedule": {
-        "kind": "cron",
-        "expr": "0 18 * * 0",
-        "tz": "Europe/Berlin"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Weekly competitor digest for Akash. Do ALL steps:\n\n1. RESEARCH: Use Tavily only. Run this exact command (it calls Tavily):\n   python3 /root/.openclaw/workspace/research/research.py \"Revolut Monzo Starling Bunq news this week\"\n   If Tavily returns NO_RESULTS, run: python3 /root/.openclaw/workspace/research/research.py \"Revolut Monzo Starling fintech news April 2026\"\n   Do NOT use any other search method.\n\n2. FORMAT: For each competitor with news: bold name, what happened (2 sentences), why it matters (1 sentence).\n\n3. SAVE TO NOTION: For each competitor with news, add to Competitor Tracker (database_id: 9a7e80a037544a2f929b295c37fa43f8): Update title, Competitor, Update Type, Summary, Date (today), Relevance (High/Medium/Low).\n\n4. Skip competitors with no news. Do not fabricate.\n\nFormat Telegram message max 400 words.",
-        "timeoutSeconds": 600,
-        "model": "minimax-direct/MiniMax-M2.7",
-        "toolsAllow": [
-          "telegram",
-          "notion",
-          "exec"
-        ]
-      },
-      "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "state": {}
-    },
-    {
-      "id": "dc9a5695-d412-45db-8c0a-57587e966b59",
-      "name": "brain-brief",
-      "enabled": true,
-      "createdAtMs": 1773604629238,
-      "schedule": {
-        "kind": "cron",
-        "expr": "0 20 * * 0",
-        "tz": "Europe/Berlin"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Weekly brain brief for Akash. Do ALL steps:\n1. SECOND BRAIN: Query Second Brain (data_source_id: f1ce4e0f-9e0d-43da-87f8-94dae2732962) for entries from this week.\n2. CROSS-REFERENCE: Scan Recruiter Tracker (data_source_id: 31778008-9100-8007-8b65-000b2abf7d15), Content Ideas (data_source_id: f008d0bb-ac81-401d-889d-4e8f508ab134), US Relocation Tasks (data_source_id: 95a33b1d-4a91-41e4-8082-9aafa3f4f8e1).\n3. SYNTHESISE: Decisions (max 3), ideas (max 3), patterns, one thing to carry forward.\n4. WEEKLY USAGE: Run `/root/lyra-usage-tracker.sh weekly` and include output.\nMax 400 words.",
-        "timeoutSeconds": 600,
-        "model": "minimax-direct/MiniMax-M2.7"
-      },
-      "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "state": {}
-    },
-    {
-      "id": "bec67281-4066-4a4d-9adf-653fec877adf",
-      "agentId": "main",
-      "sessionKey": "agent:main:telegram:direct:7057922182",
-      "name": "daily-evals",
-      "enabled": false,
-      "createdAtMs": 1773634946937,
-      "schedule": {
-        "expr": "0 4 * * *",
-        "kind": "cron",
-        "tz": "UTC"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Run all evals in /root/.openclaw/workspace/evals/ and log results. Generate daily summary. Update dashboard.md with today's stats. If Notion API is available, also push to Notion."
-      },
-      "delivery": {
-        "mode": "announce",
-        "to": "7057922182",
-        "channel": "telegram"
-      },
-      "state": {}
-    },
-    {
-      "id": "15c5304c-b1cc-4f3e-8160-832dc5008c8f",
-      "agentId": "main",
-      "sessionKey": "agent:main:telegram:direct:7057922182",
-      "name": "weekly-evals",
-      "enabled": false,
-      "createdAtMs": 1773634950643,
-      "schedule": {
-        "expr": "0 4 * * 0",
-        "kind": "cron",
-        "tz": "UTC"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Generate weekly evals summary from /root/.openclaw/workspace/evals/logs/. Calculate: total tests, avg pass rate, avg latency, top failures, improvements vs last week. Update dashboard.md with weekly stats. Also prepare a short summary suitable for publishing/blog post."
-      },
-      "delivery": {
-        "mode": "announce",
-        "to": "7057922182",
-        "channel": "telegram"
-      },
-      "state": {}
-    },
-    {
-      "id": "cc78b3d3-8727-4264-b34a-68f201dc92e5",
-      "agentId": "main",
-      "sessionKey": "agent:main:telegram:direct:7057922182",
-      "name": "evening-supplements",
-      "enabled": false,
-      "deleteAfterRun": true,
-      "createdAtMs": 1774688518162,
-      "schedule": {
-        "kind": "at",
-        "at": "2026-03-28T19:00:00.000Z"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Evening supplement reminder for Akash: Take Magnesium glycinate (200-300mg) + Ashwagandha (300-600mg) before bed. Also ask: How was the Pull workout? Did you get good pumps?"
-      },
-      "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "state": {}
-    },
-    {
-      "id": "4c486714-6cdb-4cc9-83f1-1fd1dfb3bbe4",
       "name": "morning-weight-nudge",
       "enabled": true,
-      "createdAtMs": 1774697664980,
       "schedule": {
         "kind": "cron",
         "expr": "0 9 * * *",
         "tz": "Europe/Berlin"
       },
       "sessionTarget": "isolated",
-      "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
         "message": "Good morning\\! Did you weigh yourself today? If yes, reply with: weight: X.X (e.g. weight: 91.5)",
@@ -289,90 +21,49 @@
         "mode": "announce",
         "channel": "telegram",
         "to": "7057922182"
-      },
-      "failureAlert": {
-        "after": 1,
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "state": {}
+      }
     },
     {
-      "id": "b833bb4c-7a94-44bb-9efc-ba06fe1807d6",
-      "agentId": "main",
-      "name": "wiki-candidate-review-merged",
+      "name": "weekly-review",
       "enabled": true,
-      "createdAtMs": 1775905670078,
       "schedule": {
         "kind": "cron",
-        "expr": "0 21 * * *",
+        "expr": "0 18 * * 0",
         "tz": "Europe/Berlin"
       },
       "sessionTarget": "isolated",
-      "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Daily wiki candidate digest — passive notification, no interactive prompts.\n\nSTEPS:\n1. Query Twitter Insights DB (data_source_id: 32d7800891008191b853d73aea132065) for rows where wiki_candidate=true AND Status=Draft added in the last 24h.\n2. Query Second Brain DB (data_source_id: e4027aafd2ff49e1babf7487725e2ef4) for rows added in the last 24h OR with wiki_candidate=true and Status not archived.\n3. SHORT-CIRCUIT: If both queries return zero matching rows, reply with exactly this single line and stop — do no further work, no drafting, no extra commentary:\n   No wiki candidates today.\n4. Otherwise, output a Telegram-friendly digest, max 5 items total across both sources, numbered 1..N, each formatted as:\n   [N] <Twitter|SecondBrain> — <one-line gist ≤120 chars>\n   URL: <link>\n   Domain hint: <if obvious>\n5. End with exactly this line:\n   To promote: message Lyra \"draft wiki page for <URL>\" (Personal Wiki DB: 33d7800891008183850de7677ac46b63). Or mark Status=Archived in the source DB to skip.\n6. Do NOT draft full wiki pages in this run. Do NOT ask interactive yes/skip/later questions — there is no inbound reply channel here. Keep total output under 1500 characters.",
-        "model": "anthropic/claude-haiku-4-5",
-        "timeoutSeconds": 300
+        "message": "Weekly review for Akash. Do ALL sections, then send ONE Telegram message (max 650 words). Skip any section with nothing to report; never fabricate.\n\n1. HEALTH: Query the Health & Meds Notion database. Summarize supplements running low, upcoming appointments, medication reminders, and health notes from the past week.\n\n2. COMPETITORS: Run `python3 /root/.openclaw/workspace/research/research.py \"Revolut Monzo Starling Bunq news this week\"` (Tavily). For each competitor with news: bold name, what happened (2 sentences), why it matters (1 sentence). Save each to Notion Competitor Tracker (database_id: 9a7e80a037544a2f929b295c37fa43f8). Skip competitors with no news.\n\n3. BRAIN BRIEF: Query Second Brain (data_source_id: f1ce4e0f-9e0d-43da-87f8-94dae2732962) for this week's entries. Synthesize: top decisions (max 3), ideas (max 3), one thing to carry forward.\n\n4. WIKI HEALTH: Query Personal Wiki DB (data_source_id: 33d78008-9100-8197-9f0f-000b205edfe8). Report domains with fewer than 3 Career/Framework pages and pages not reviewed in 30+ days. Suggest 3 specific wiki pages to add/update, grounded in Akash's work at CheQ, Flipkart Pay, or Trade Republic.\n\n5. JOB SEARCH: Note any LinkedIn activity or job-search progress from the week.\n\n6. WEEKLY USAGE: Run `/root/lyra-usage-tracker.sh weekly` and add a one-line summary.",
+        "model": "minimax-direct/MiniMax-M2.7",
+        "timeoutSeconds": 900
       },
       "delivery": {
         "mode": "announce",
         "channel": "telegram",
         "to": "7057922182"
-      },
-      "state": {}
+      }
     },
     {
-      "id": "7044abb8-01b4-4ef8-a4b5-e792ec4fcaeb",
-      "agentId": "main",
-      "name": "second-brain-wiki-review-daily-RETIRED",
-      "enabled": false,
-      "createdAtMs": 1775905691743,
-      "schedule": {
-        "kind": "cron",
-        "expr": "30 21 * * *",
-        "tz": "Europe/Berlin"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Query Second Brain DB (e4027aafd2ff49e1babf7487725e2ef4) for entries added today or marked wiki_candidate=true with Status not archived. List them with their content. For each, ask: promote to wiki (yes), keep in second brain (keep), or discard? For each yes: draft a wiki page using the 4-section template (## What I Know, ## My Take, ## Key Examples from My Career, ## Sources) grounded in my career experience at CheQ, Flipkart Pay, Trade Republic. Show me the draft and ask: reply SAVE to commit to personal-kb-raw git repo + create Notion wiki page (DB: 33d7800891008183850de7677ac46b63), or EDIT to revise first. Ask for Domain and Type before drafting.",
-        "timeoutSeconds": 600
-      },
-      "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "7057922182"
-      },
-      "state": {}
-    },
-    {
-      "id": "ee2e6627-2597-49eb-adef-41e9e0462ca7",
-      "agentId": "main",
-      "name": "wiki-health-check",
+      "name": "morning-digest",
       "enabled": true,
-      "createdAtMs": 1775905711891,
       "schedule": {
         "kind": "cron",
-        "expr": "30 9 * * 0",
+        "expr": "0 7 * * *",
         "tz": "Europe/Berlin"
       },
       "sessionTarget": "isolated",
-      "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Query the Personal Wiki DB (data_source_id: 33d78008-9100-8197-9f0f-000b205edfe8). Count pages by Domain and Type. Report concisely: (1) domains with fewer than 3 Career or Framework pages (Lenny Synthesis pages do not count), (2) pages where Last Reviewed is older than 30 days, (3) any pages missing ## My Take or ## Key Examples from My Career. Based on gaps, suggest 3 specific wiki pages to add or update this week, grounded in Akash's work at CheQ, Flipkart Pay, or Trade Republic. IMPORTANT: Keep total output under 3000 characters. Use short bullet format. Do not generate tables longer than 6 rows.",
-        "timeoutSeconds": 600
+        "message": "Morning digest for Akash. Do ALL steps in order, then send ONE clean Telegram message (max 750 words). Skip any empty section; never fabricate.\n\n1. EMAIL: Run `himalaya envelope list -s 10 -f INBOX`. Summarize total unread, any recruiter emails (flag job title + company), anything urgent needing a reply today (max 4 lines). If himalaya auth fails, write exactly one line: \"Email: unavailable - refresh Gmail app password\" and continue.\n\n2. NEWS: Run these direct commands:\n   /root/lyra-ai/scripts/openclaw-research-query.sh \"AI and tech news today\"\n   /root/lyra-ai/scripts/openclaw-research-query.sh \"fintech product launches this week\"\n   /root/lyra-ai/scripts/openclaw-research-query.sh \"European startup news this week\"\n   Pick 3-5 most interesting stories. For each: bold headline, 2-sentence summary, why it matters. Save each to Notion News Inbox (database_id: 8a900cb78c0c4be996347c5dfebec375).\n\n3. HEALTH: Run `/root/lyra-ai/scripts/openclaw-daily-summary.sh` and parse the JSON. Report yesterday's nutrition totals and today_workout. If meal_count is 0, say \"No meals logged yesterday\".\n\n4. DRAFTS DUE: Check the Notion Content Ideas database for drafts due today or this week. If any, list them in one line each; if none, skip this section.\n\n5. WIKI CANDIDATES: Query Twitter Insights DB (data_source_id: 32d7800891008191b853d73aea132065) for wiki_candidate=true AND Status=Draft added in last 24h, and Second Brain DB (data_source_id: e4027aafd2ff49e1babf7487725e2ef4) for rows added in last 24h with wiki_candidate=true. List up to 3 as: one-line gist (<=120 chars) + URL. If none, skip.\n\n6. FOOTER: Run `/root/lyra-usage-tracker.sh daily` and append one line: yesterday's usage + estimated cost (Hetzner EUR0.23 + MiniMax $0.33 + Anthropic estimate from calls).\n\nFormat the message with section headers: Email | News | Health | Drafts | Wiki | (footer line).",
+        "model": "minimax-direct/MiniMax-M2.7",
+        "timeoutSeconds": 900
       },
       "delivery": {
         "mode": "announce",
         "channel": "telegram",
-        "to": "7057922182",
-        "bestEffort": true
-      },
-      "state": {}
+        "to": "7057922182"
+      }
     }
   ]
 }

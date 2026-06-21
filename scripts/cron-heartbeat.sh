@@ -30,7 +30,7 @@ fi
 if [ "$COUNT" -lt "$MIN" ]; then
   echo "$TS ALERT cron_count=$COUNT (< $MIN)"
   if [ "$(cat "$STATE_FILE" 2>/dev/null)" != "down" ]; then
-    alert "⚠️ Lyra cron subsystem EMPTY (openclaw cron list = ${COUNT}). Scheduled digests/nudges will NOT fire. Likely an OpenClaw upgrade wiped the store again — re-import: python3 /root/lyra-restore-crons.py"
+    alert "⚠️ Lyra cron subsystem EMPTY (openclaw cron list = ${COUNT}). Scheduled digests/nudges will NOT fire. Likely an OpenClaw upgrade wiped the store again — re-import: python3 /root/lyra-ai/scripts/restore-crons.py"
     echo "down" > "$STATE_FILE"
   fi
 else
