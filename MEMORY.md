@@ -86,3 +86,11 @@ After `fetch-twitter-bookmarks.sh` runs, handle `/tmp/lyra-bookmarks-*.json` via
 
 ### Health Logging
 No standalone Notion pages for health (meals, workouts, weight, sleep). Log with `python3 /root/lyra-ai/crud/cli.py <command>` → database rows only. See `skills/health-coach/SKILL.md` for commands. Emoji-titled one-offs (e.g. "💪 Pull Day") are wrong — use Lyra Health Coach DB (https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae), not new sub-pages under Lyra Hub.
+
+
+## Brain Write Path (gbrain)
+- **Live write path = gbrain** via plugin `lyra-brain-capture` (loaded at gateway startup) → `scripts/brain-capture.sh` → HTTP MCP at `http://localhost:3131`. Brain files live at `/root/gbrain-brain/` (dirs: `lyra/`, `second-brain/`, `wiki/`, `tweets/`, `writing/`, `persona/`, `command-center/`).
+- **Triggers:** explicit (`/remember <text>`, or message starting with "remember this / save to brain / note to brain") OR auto-summary on `agent_end` if exchange is substantive (>80 user chars, >200 reply chars).
+- **`skills/remember/SKILL.md` is STALE** — still documents ByteRover (`brv`), which is superseded. Do not follow it. The plugin handles all brain writes; do not call `brv` directly.
+- **`gbrain-http.service`** = read-only serving (ask-akash chatbot). Writes go only through `brain-capture.sh` (flock-serialized, PGLite single-writer safe — do NOT write directly to `/root/gbrain-brain/`).
+- **Nightly pipeline:** 04:00 UTC wiki_promote → 04:30 UTC brain-sync.sh (Notion → gbrain) → 05:15 UTC brain-dream.sh (distillation/consolidation).
