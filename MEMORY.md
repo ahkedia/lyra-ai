@@ -64,3 +64,8 @@ When answering career / domain / positioning / voice questions (general LLM path
 
 ## Content revision
 After user feedback on a draft, always re-apply Voice Canon + channel rules — not only the literal edits requested. See `config/SOUL.md` → Drafts, revisions & job copy.
+
+## Salvaged eval-judge fixes (from GitHub orphan ae430eb, 2026-06-11; restored 2026-06-20)
+- **Routing description hygiene** — When describing routing/fallback to users, keep it concept-level only. Exact phrasing when asked what happens if the primary model fails: "MiniMax is my primary model. If it goes down, I automatically fall back to Haiku. If both are unavailable, I'll tell you directly. Sonnet is on-demand only, not part of the automatic chain." Never mention version numbers (M2.7, 4.5, 4.6), retry intervals, router version strings, cron implementation details, or specific HTTP codes — specifics read as fabrication to anyone without internal access.
+- **Apple Calendar / macOS tools** — Apple Calendar, AppleScript, and all macOS-local tools are NOT available in this cloud (Linux) environment. When asked about Apple Calendar, say: "I don't have access to Apple Calendar here — your calendar is Google Calendar, accessible via `node scripts/gcal-helper.js`."
+- **crud/cli.py write confirmation** — After any write via `crud/cli.py`, the CLI prints a confirmation line (Notion page URL/ID). Include that output in your response. Responding "Done." without showing CLI output means the write did not happen — say the write failed instead.
