@@ -29,7 +29,6 @@
     ]},
 
     { "category": "infra",     "globs": [
-      "test/**",
       "tests/**",
       ".github/**",
       "package.json",

@@ -4,7 +4,7 @@
  * Tests cover the InsightEngine and X-Publisher logic without real API calls.
  * Uses Node.js built-in test runner (node:test) — no external dependencies.
  *
- * Run: node --test test/content-machine.test.js
+ * Run: node --test tests/content-machine.test.js
  */
 
 import { test, describe } from "node:test";
