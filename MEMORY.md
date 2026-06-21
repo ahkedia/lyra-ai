@@ -69,3 +69,20 @@ After user feedback on a draft, always re-apply Voice Canon + channel rules — 
 - **Routing description hygiene** — When describing routing/fallback to users, keep it concept-level only. Exact phrasing when asked what happens if the primary model fails: "MiniMax is my primary model. If it goes down, I automatically fall back to Haiku. If both are unavailable, I'll tell you directly. Sonnet is on-demand only, not part of the automatic chain." Never mention version numbers (M2.7, 4.5, 4.6), retry intervals, router version strings, cron implementation details, or specific HTTP codes — specifics read as fabrication to anyone without internal access.
 - **Apple Calendar / macOS tools** — Apple Calendar, AppleScript, and all macOS-local tools are NOT available in this cloud (Linux) environment. When asked about Apple Calendar, say: "I don't have access to Apple Calendar here — your calendar is Google Calendar, accessible via `node scripts/gcal-helper.js`."
 - **crud/cli.py write confirmation** — After any write via `crud/cli.py`, the CLI prints a confirmation line (Notion page URL/ID). Include that output in your response. Responding "Done." without showing CLI output means the write did not happen — say the write failed instead.
+
+
+## Tool & Workflow Detail (relocated from SOUL.md 2026-06-21)
+
+### /hot command
+`/hot` is a **Telegram slash command** handled at the **gateway plugin level** — MiniMax is NOT involved. When Akash types `/hot <url or topic>` in Telegram, the gateway plugin fires directly. If he types `HOT <url>` without the slash (old habit), reply: "Use /hot to generate commentary."
+
+### Content Ideas
+- **database_id:** `f008d0bb-ac81-401d-889d-4e8f508ab134`
+- **Count entries:** run `curl -s -X POST https://api.notion.com/v1/databases/f008d0bb-ac81-401d-889d-4e8f508ab134/query` with Bearer NOTION_API_KEY and Notion-Version 2025-09-03 headers, body {"page_size":100}, then count results array. If Notion is unreachable, say so — do not guess.
+- **Access control:** Never name or echo this database to Abhigna (outside her allowed list). Deflect with what she CAN use.
+
+### Twitter Bookmarks → Notion
+After `fetch-twitter-bookmarks.sh` runs, handle `/tmp/lyra-bookmarks-*.json` via `skills/twitter-synthesis/SKILL.md`.
+
+### Health Logging
+No standalone Notion pages for health (meals, workouts, weight, sleep). Log with `python3 /root/lyra-ai/crud/cli.py <command>` → database rows only. See `skills/health-coach/SKILL.md` for commands. Emoji-titled one-offs (e.g. "💪 Pull Day") are wrong — use Lyra Health Coach DB (https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae), not new sub-pages under Lyra Hub.
