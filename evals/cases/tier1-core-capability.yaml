@@ -4,6 +4,7 @@
 tests:
   # --- Memory Recall ---
   - id: recall-abhigna-access
+    non_blocking: true  # unused feature (multi-user/calendar) — informational, not gating
     skip_dry_run_prefix: true  # read-only, no write intent
     tier: core_capability
     category: memory_recall

@@ -752,6 +752,7 @@ async function runTest(testCase) {
   return {
     id,
     tier: testCase.tier,
+    non_blocking: testCase.non_blocking || false,
     category: testCase.category,
     name: testCase.name || id,
     eval_lane: testCase.eval_lane || DEFAULT_EVAL_LANE,

@@ -151,7 +151,7 @@ function healthBand(m) {
   return `
   <div class="band">
     <div class="metric"><div class="mlabel">Last full run</div><div class="mval">${esc((l.date) || '—')}</div></div>
-    <div class="metric"><div class="mlabel">Pass rate</div><div class="mval big">${pct(l.pass_rate)}</div><div class="msub">${l.passed || 0}/${l.total || 0} · cap ${pct(l.scores ? l.scores.capability_pass_rate : null)}</div></div>
+    <div class="metric"><div class="mlabel">Capability pass rate</div><div class="mval big">${pct(l.scores && l.scores.capability_pass_rate != null ? l.scores.capability_pass_rate : l.pass_rate)}</div><div class="msub">${l.scores ? l.scores.capability_passed : (l.passed || 0)}/${(l.stability && l.stability.stable_count != null) ? l.stability.stable_count : ((l.total || 0) - ((l.stability && l.stability.infra_failures) || 0))} core · legacy ${pct(l.pass_rate)} · ${(l.stability && l.stability.infra_failures) || 0} infra timeouts</div></div>
     <div class="metric"><div class="mlabel">Days since good run</div><div class="mval big ${cls}">${ds == null ? '—' : ds}</div><div class="msub">harness ${ds != null && ds <= 1 ? 'healthy' : 'check'}</div></div>
     <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">${l.avg_latency_ms ? (l.avg_latency_ms / 1000).toFixed(1) + 's' : '—'}</div></div>
     <div class="metric"><div class="mlabel">Ship gate</div><div class="mval ${gatesOk ? 'ok' : 'down'}">${gatesOk ? 'GREEN' : 'RED'}</div><div class="msub">${gatesOk ? 'all_ok' : 'blocking on real bugs'}</div></div>

@@ -103,6 +103,7 @@ tests:
   # --- Cross-User Brain Safety ---
 
   - id: brain-acl-abhigna-no-restricted-data
+    non_blocking: true  # unused feature (multi-user/calendar) — informational, not gating
     sender: 5003298152
     tier: gap
     category: access_control

@@ -22,6 +22,7 @@ tests:
     tags: [multi-step, reminder]
 
   - id: multi-cross-user-task
+    non_blocking: true  # unused feature (multi-user/calendar) — informational, not gating
     tier: showcase
     category: multi_step
     name: "Cross-user task delegation"

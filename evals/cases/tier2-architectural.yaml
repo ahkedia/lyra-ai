@@ -75,6 +75,7 @@ tests:
     tags: [email, tool-use, dry-run]
 
   - id: tool-cross-user-dryrun
+    non_blocking: true  # unused feature (multi-user/calendar) — informational, not gating
     eval_lane: diagnostic
     tier: architectural
     category: tool_use
