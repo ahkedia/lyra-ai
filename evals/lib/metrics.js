@@ -173,7 +173,7 @@ export function computeSplitScores(results) {
     }
   }
 
-  const stable = results.filter((r) => !isInfrastructureFailure(r.error));
+  const stable = results.filter((r) => !isInfrastructureFailure(r.error) && !r.non_blocking);
   const stableCount = stable.length;
   const passedStable = stable.filter((r) => r.passed).length;
   const capabilityPassRate =

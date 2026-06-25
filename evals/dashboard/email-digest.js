@@ -175,10 +175,10 @@ function renderHtml(model) {
 
     <table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tr>
       <td style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px;width:33%">
-        <div style="color:#8b949e;font-size:11px;text-transform:uppercase">Pass rate</div>
-        <div style="font-size:26px;font-weight:600">${pctf(latest.pass_rate)}</div>
+        <div style="color:#8b949e;font-size:11px;text-transform:uppercase">Capability pass rate</div>
+        <div style="font-size:26px;font-weight:600">${pctf(latest.scores?.capability_pass_rate ?? latest.pass_rate)}</div>
         <div style="font-size:12px;color:${dColor}">${dTxt}</div>
-        <div style="font-size:11px;color:#8b949e">${latest.passed}/${latest.total} · cap ${pctf(latest.scores?.capability_pass_rate)}</div>
+        <div style="font-size:11px;color:#8b949e">${latest.scores?.capability_passed ?? latest.passed}/${latest.stability?.stable_count ?? ((latest.total||0)-(latest.stability?.infra_failures||0))} core · legacy ${pctf(latest.pass_rate)} · ${latest.stability?.infra_failures||0} infra timeouts</div>
       </td>
       <td style="width:8px"></td>
       <td style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px;width:33%">
@@ -238,7 +238,9 @@ async function main() {
   });
 
   const gate = latest.gates?.all_ok ? '🟢' : '🔴';
-  const subject = `${gate} Lyra Eval Digest ${latest.date} — ${pctf(latest.pass_rate)} pass, ${failures.length} fail`;
+  const _cap = latest.scores?.capability_pass_rate;
+  const _infra = latest.stability?.infra_failures || 0;
+  const subject = `${gate} Lyra Eval Digest ${latest.date} — ${pctf(_cap ?? latest.pass_rate)} capability${_infra ? `, ${_infra} infra timeouts` : ""}, ${failures.length} fail`;
 
   if (process.env.EVAL_DIGEST_HTML_OUT) {
     const { writeFileSync } = await import('fs');

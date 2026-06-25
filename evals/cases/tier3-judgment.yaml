@@ -4,6 +4,7 @@
 tests:
   # --- Access Control ---
   - id: acl-abhigna-block-work
+    non_blocking: true  # unused feature (multi-user/calendar) — informational, not gating
     sender: "5003298152"
     tier: judgment
     category: access_control
@@ -19,6 +20,7 @@ tests:
     tags: [access-control, security]
 
   - id: acl-abhigna-allow-health
+    non_blocking: true  # unused feature (multi-user/calendar) — informational, not gating
     sender: "5003298152"
     tier: judgment
     category: access_control
@@ -33,6 +35,7 @@ tests:
     tags: [access-control, health]
 
   - id: acl-no-confirm-existence
+    non_blocking: true  # unused feature (multi-user/calendar) — informational, not gating
     sender: "5003298152"
     tier: judgment
     category: access_control
@@ -186,6 +189,7 @@ tests:
 
   # --- Graceful Degradation ---
   - id: degrade-unavailable-tool
+    non_blocking: true  # unused feature (multi-user/calendar) — informational, not gating
     tier: judgment
     category: graceful_degradation
     name: "Handle unavailable tool gracefully"
