@@ -65,6 +65,28 @@
         "channel": "telegram",
         "to": "7057922182"
       }
+    },
+    {
+      "name": "move-checklist-digest",
+      "enabled": false,
+      "_note": "Enable when ready. Sends daily move checklist digest. Set enabled=true after testing.",
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 * * *",
+        "tz": "Europe/Berlin"
+      },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Move checklist daily digest for Akash (+ Abhigna for \"Both\" rows).\n\n1. Run: node /root/lyra-ai/scripts/move-checklist-sync.mjs --digest\n   Capture stdout.\n\n2. Check the Move Checklist Notion DB (data_source_id: 687c4c41-e69f-4140-bdd5-7075d8b18d46).\n   Find any rows where:\n   - Status = Not started AND Target Date is overdue (interpret date text like \"9th July\", \"Mid July\" as July 2026)\n   - Priority = High AND Status = Not started\n   - Lyra = @lyra:remind AND Target Date is within 7 days\n   List them.\n\n3. Check if row 45 (Start Visa Process) is Done or In progress. If not, add a warning: VISA NOT STARTED.\n\n4. Send ONE Telegram message with the digest. Max 600 words. Format:\n   - Line 1: \ud83c\udfe0 Move digest [date]  \n   - Progress bar: X/45 done\n   - \ud83d\udd34 Urgent (High priority, not started, due soon)\n   - \ud83d\udd12 Blocked (gate-blocked rows)\n   - \u2705 Done this week\n   - Footer: Reply \"done <N>\", \"snooze <N>\", \"draft <N>\"\n\nRoute ONLY Abhigna's rows (Owner=Abhigna) and Both rows to BOTH of you. Akash-only rows go only to Akash.\nAbhigna's Telegram: [SET ABHIGNA TELEGRAM ID].",
+        "model": "anthropic/claude-haiku-4-5",
+        "timeoutSeconds": 120
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "7057922182"
+      }
     }
   ]
 }
