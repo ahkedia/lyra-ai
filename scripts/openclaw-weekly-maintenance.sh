@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source /root/.openclaw/.env 2>/dev/null || true
+source /root/lyra-ai/scripts/ops-notify.sh
 
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 CHAT_ID="7057922182"
@@ -12,8 +13,7 @@ mkdir -p /var/lib/lyra "$(dirname "$LOG_FILE")"
 log() { echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') $*" | tee -a "$LOG_FILE"; }
 notify() {
   local msg="$1"
-  [ -z "$BOT_TOKEN" ] && return 0
-  curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" -d chat_id="$CHAT_ID" --data-urlencode "text=$msg" > /dev/null 2>&1 || true
+  ops_note weekly "OpenClaw maintenance" "$msg"
 }
 
 extract_ver() {

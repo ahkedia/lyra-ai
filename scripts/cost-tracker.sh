@@ -19,6 +19,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROUTING_LOG="${SCRIPT_DIR}/../logs/routing-decisions.jsonl"
 COST_LOG="${SCRIPT_DIR}/../logs/cost-history.jsonl"
+export ROUTING_LOG COST_LOG
 SEND_TELEGRAM=false
 
 # Source logger
@@ -30,6 +31,7 @@ fi
 
 # Source env for Telegram
 source /root/.openclaw/.env 2>/dev/null || true
+source /root/lyra-ai/scripts/ops-notify.sh
 
 # Parse args
 for arg in "$@"; do
@@ -40,12 +42,7 @@ done
 
 send_telegram() {
     local msg="$1"
-    if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
-        curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d chat_id="7057922182" \
-            -d text="$msg" \
-            -d parse_mode="Markdown" > /dev/null 2>&1
-    fi
+    ops_note daily "Cost tracker" "$msg"
 }
 
 if [ ! -f "$ROUTING_LOG" ]; then
@@ -146,5 +143,5 @@ log_info "eval" "Daily cost: $RESULT"
 if [ "$SEND_TELEGRAM" = true ]; then
     send_telegram "📊 Lyra Cost Report
 $RESULT"
-    echo "  Sent to Telegram"
+    echo "  Buffered for daily ops email"
 fi
