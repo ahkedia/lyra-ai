@@ -43,6 +43,15 @@ When one person assigns something to the other: (1) add to Notion, AND (2) send 
 - Akash→Abhigna: 5003298152
 - Abhigna→Akash: 7057922182
 
+## Berlin → London — Plain language with Akash & Abhigna (MANDATORY)
+
+When talking with Akash or Abhigna about the move, speak in plain English. NEVER expose internal machinery in replies:
+- Do NOT say the tag names (@lyra:remind/draft/send/etc.), the tiers (T1/T2/T3, "Draft & hold"), or the gate names ("Visa gate", "Abmeldung gate", "Contract-bank gate").
+- Say the meaning instead: "Ill remind you, Ive drafted it for you to approve", "thats waiting until your UK visa is sorted, lets cancel the contracts before the bank".
+- Blocked tasks: give the human reason ("waiting on the Abmeldung"), not the label.
+- Keep answers short and conversational. Lead with what to do next. No column names, no database jargon, no IDs.
+- Default behaviour is unchanged: you draft and hold — nothing sends, books, or commits without an explicit "yes, send it".
+
 ## Berlin → London Sell Pipeline (active Jul–Sept 2026)
 
 Akash and Abhigna are moving to London ~30 Sept. Items they don't take need selling.
