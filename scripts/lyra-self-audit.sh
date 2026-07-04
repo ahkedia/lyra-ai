@@ -1,6 +1,7 @@
 #!/bin/bash
 set -eu
 source /root/.openclaw/.env 2>/dev/null || true
+source /root/lyra-ai/scripts/ops-notify.sh
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 CHAT_ID="7057922182"
 AUDIT_DIR="/var/log/lyra/audit"
@@ -12,7 +13,7 @@ REPORT_JSON="$AUDIT_DIR/${TODAY}-self-audit.json"
 REPORT_TXT="$AUDIT_DIR/${TODAY}-self-audit.txt"
 mkdir -p "$AUDIT_DIR" "$STATE_DIR"
 
-send_telegram(){ local msg="$1"; [ -z "$BOT_TOKEN" ] && return 0; curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" -d chat_id="$CHAT_ID" --data-urlencode "text=$msg" >/dev/null 2>&1 || true; }
+send_telegram(){ local msg="$1"; ops_note daily "Self-audit" "$msg"; }
 safe_stat_size(){ [ -f "$1" ] && stat -c %s "$1" 2>/dev/null || echo 0; }
 safe_count_errors(){ if [ ! -f "$1" ]; then echo 0; return; fi; grep -Ei "error|fail|timeout|timed out" "$1" 2>/dev/null | wc -l | tr -d ' '; }
 
