@@ -140,7 +140,6 @@ const server = http.createServer(async (req, res) => {
     const raw = await readBody(req);
     res.writeHead(200); res.end('ok');
     const rawStr = raw.toString('utf8');
-    require('fs').writeFileSync('/tmp/cron-payload.json', rawStr);
     log('cron-deliver raw (first 600):', rawStr.slice(0, 600));
     const text = extractReply(rawStr);
     if (!text) { log('cron-deliver: no text extracted'); return; }
