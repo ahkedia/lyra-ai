@@ -19,7 +19,7 @@
       },
       "delivery": {
         "mode": "webhook",
-        "to": "https://wa.akashkedia.com/wa/cron-deliver?to=919916325222"
+        "to": "https://wa.akashkedia.com/wa/cron-deliver?to=919916325222&secret=${WA_CRON_SECRET}"
       }
     },
     {
@@ -39,7 +39,7 @@
       },
       "delivery": {
         "mode": "webhook",
-        "to": "https://wa.akashkedia.com/wa/cron-deliver?to=919916325222"
+        "to": "https://wa.akashkedia.com/wa/cron-deliver?to=919916325222&secret=${WA_CRON_SECRET}"
       }
     },
     {
@@ -60,7 +60,7 @@
       },
       "delivery": {
         "mode": "webhook",
-        "to": "https://wa.akashkedia.com/wa/cron-deliver?to=919916325222"
+        "to": "https://wa.akashkedia.com/wa/cron-deliver?to=919916325222&secret=${WA_CRON_SECRET}"
       }
     },
     {
@@ -81,7 +81,7 @@
       },
       "delivery": {
         "mode": "webhook",
-        "to": "https://wa.akashkedia.com/wa/cron-deliver?to=919916325222,4917682162578"
+        "to": "https://wa.akashkedia.com/wa/cron-deliver?to=919916325222,4917682162578&secret=${WA_CRON_SECRET}"
       },
       "_send_from": "ahkedia@gmail.com"
     }
