@@ -42,3 +42,45 @@ When one person assigns something to the other: (1) add to Notion, AND (2) send 
 `openclaw message send --channel telegram --target [ID] --message "[Name] asked me to tell you: [task]"`
 - Akash→Abhigna: 5003298152
 - Abhigna→Akash: 7057922182
+
+## Berlin → London Sell Pipeline (active Jul–Sept 2026)
+
+Akash and Abhigna are moving to London ~30 Sept. Items they don't take need selling.
+Sell Inventory DB: data_source_id a2353576-fddc-4987-b2aa-c77d9ef1b86c
+Move Checklist DB: data_source_id 687c4c41-e69f-4140-bdd5-7075d8b18d46
+
+### Sell commands (works via Telegram or voice)
+
+**"Add [item] to sell, floor €X, deadline [date]"**
+→ Create row in Sell Inventory DB. Set Status = Not listed yet.
+→ Immediately draft a listing (see format below) and reply with it.
+→ Remind: "Post this wherever makes sense — Kleinanzeigen, WhatsApp groups, expat FB groups, Nextdoor. Forward me any buyer messages."
+
+**"Draft listing for [item]" or "[item] listing"**
+→ Output a ready-to-paste listing in this format:
+  Title: [short, searchable, condition upfront]
+  Price: €X (firm / or nearest offer)
+  Condition: [be specific — age, wear, defects]
+  Details: [dimensions, brand, specs if relevant]
+  Location: [Berlin neighbourhood], collection only
+  Contact: [leave blank — Akash fills in]
+→ Keep it factual, no filler. Under 120 words.
+
+**"Buyer for [item]: [their message]"** or forward a buyer enquiry
+→ Screen for red flags: requests to pay via unusual method, shipping to a different country, overpayment offers, vague identity.
+→ If clean: draft a reply that confirms price, proposes a pickup window (lobby/public point), states cash or instant bank transfer only, payment before handover.
+→ If scam signals: flag clearly — "This looks like a scam: [reason]. Suggested reply: [decline politely]."
+
+**"Sold [item] for €X"**
+→ Update Sell Inventory: Status = Sold, Agreed Price = X, Payment Confirmed = Yes, Handover Done = Yes.
+→ Confirm: "Updated. €X received for [item]."
+
+**"Sell status"** or included in morning digest
+→ Query Sell Inventory. Report: listed, enquiries active, sold (total €), not listed yet, items at risk of missing deadline.
+
+### Hard rails (non-negotiable)
+- Payment confirmed BEFORE handover. Never release on a promise.
+- Pickup from lobby or agreed public point — never "come to the flat" for strangers.
+- Never share home address, passport, or bank details with buyers.
+- Floor price is the floor. Do not accept below it without checking with Akash/Abhigna first.
+- If deadline is within 2 weeks and item unsold: suggest price drop, donation, or disposal — surface it in the digest.
