@@ -52,13 +52,13 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 | Default AI model | MiniMax M2.7 (fast, cost-effective — 87% of LLM calls) |
 | Escalation models | Claude Haiku 4.5 (fallback, 9%) + Claude Sonnet 4.6 (synthesis, 4%) |
 | Messaging interface | Telegram Bot |
-| Databases | Notion (13 databases) |
+| Databases | Notion (~30 databases; IDs in the private repo) |
 | Email | [himalaya](https://himalaya.cli.rs) CLI (Gmail IMAP/SMTP) |
 | Calendar | Google Calendar API v3 (OAuth2) |
 | News & RSS | [blogwatcher](https://github.com/openclaw-ai/blogwatcher) CLI |
 | Web search | Tavily API |
-| Memory | SQLite (persistent semantic memory, local) |
-| Scheduled tasks | OpenClaw cron (7 jobs, Europe/Berlin timezone) |
+| Memory | gbrain (git-backed wiki + PGLite mirror, Ollama `nomic-embed-text` embeddings) |
+| Scheduled tasks | OpenClaw cron (4 jobs, Europe/Berlin timezone) |
 | Hosting | Hetzner VPS (Ubuntu 24.04, 4GB RAM, €5.99/mo) |
 | Persistence | systemd service + PostgreSQL (Docker) |
 | Secrets | `~/.openclaw/.env` (chmod 600, excluded from git and backups) |
