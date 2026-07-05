@@ -1,7 +1,7 @@
 #!/bin/bash
 # Source the first existing OpenClaw .env file, then exec the rest of the command line.
 # Use from cron when the daemon's environment is not inherited, e.g.:
-#   0 7 * * * /root/lyra-ai/scripts/run-with-openclaw-env.sh /root/lyra-ai/scripts/fetch-twitter-bookmarks.sh
+#   0 7 * * * /root/lyra-ai/scripts/run-with-openclaw-env.sh python3 /root/lyra-ai/scripts/twitter_bookmarks.py
 #
 # Override file: OPENCLAW_ENV_FILE=/path/to/.env
 

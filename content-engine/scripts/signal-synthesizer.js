@@ -55,37 +55,31 @@ const VOICE_CANON_MAX_CHARS = 4000;
 
 // ─── Negative style contract ──────────────────────────────────────────────────
 
-const NEGATIVE_STYLE = `
-# Negative Style: What Not To Sound Like
+// Negative style contract: single source of truth in voice-system/NEGATIVE_STYLE.md
+// (shared with crud/content_context.py and the other generators). Edit the file, not this script.
+const NEGATIVE_STYLE_FALLBACK = `
+# Negative Style (minimal fallback; voice-system/NEGATIVE_STYLE.md missing)
+- ABSOLUTE BAN: em dash (U+2014) and en dash (U+2013) as em-dash stand-ins. Use comma, colon, period, or parentheses.
+- All-lowercase body; first person as lowercase i; caps only for acronyms and brand spellings (CheQ).
+- No 'Not X, but Y' cadence in ANY variant; no anaphoric three-beat negation; no windup openers; no symmetrical closes.
+- Kill on sight: delve, crucial, robust, comprehensive, nuanced, pivotal, landscape, game-changer, paradigm shift, ecosystem, synergy, seamless, unlock.
+`;
+let NEGATIVE_STYLE;
+try {
+  NEGATIVE_STYLE = readFileSync(join(__dirname, "../../voice-system/NEGATIVE_STYLE.md"), "utf8");
+} catch {
+  NEGATIVE_STYLE = NEGATIVE_STYLE_FALLBACK;
+}
 
-## Punctuation (hard ban)
-- ABSOLUTE BAN: Never use the em dash character (—, Unicode U+2014). Use a comma, colon, period, or parentheses instead.
-- ABSOLUTE BAN: Never use an en dash (–) as a stand-in for an em dash.
+// Script-specific extension: signal insights carry at most one quiet judgment.
+NEGATIVE_STYLE += `
 
-## Casing
-- All-lowercase body. Allow caps only for acronyms (API, IPO) and brand names.
-- First person as lowercase i.
-
-## Judgments (most important rule)
+## Judgments (most important rule for signal insights)
 - Maximum ONE evaluative statement across the entire insight. Zero is fine.
 - The first sentence describes what's happening structurally. That's it. No verdict there.
-- If there's a second sentence, it can offer one quiet implication. Not a verdict. Not a declaration. Phrased like "when this pattern shows up, it usually means X" — not "this proves Y" or "this is a sign that Z."
+- If there's a second sentence, it can offer one quiet implication. Not a verdict. Not a declaration. Phrased like "when this pattern shows up, it usually means X", never "this proves Y" or "this is a sign that Z".
 - NEVER two judgments in the same piece. If sentence 1 already names the pattern, sentence 2 cannot restate it as a different verdict.
 - Ban: "this proves", "this shows us that", "this confirms", "most X companies are not doing Y", "the new moat is", "watch for", "operators should", "this is the moment when"
-
-## AI Symmetry Patterns (ban — AI detector load-bearing)
-- Tidy 3x3 bullets. Three points, each two words long, all parallel.
-- Too-perfect transitions: "Furthermore", "Moreover", "Additionally", "It's worth noting that"
-- The windup opener: "In today's fast-paced world...", "In an era where..."
-- The "Not X, but Y" cadence (ANY variant): "not X, but Y", "not X, it's Y", "not X, actually Y", "X isn't Y, it's Z", "it's not about X, it's about Y", "X — not Y", "Y, not X". The single most overused pattern in AI-generated content. Rewrite as two separate sentences or a concession-then-pivot. See voice-canon.md Rule 7.
-- Anaphoric three-beat negation: "Not a recap. Not a question. Not a flourish." Three-beat noun lists are fine; three-beat negation is template.
-- The symmetrical close: "The future belongs to those who..."
-
-## Words to Kill on Sight
-delve, crucial, robust, comprehensive, nuanced, multifaceted, pivotal, landscape, tapestry, underscore, foster, showcase, intricate, vibrant, interplay, game-changer, paradigm shift, ecosystem, synergy, seamless, unlock, mind-blowing
-
-## Core Test
-Would a sharp person who has been in the trenches say this out loud, or does it read like a newsletter summary?
 `;
 
 function sleep(ms) {

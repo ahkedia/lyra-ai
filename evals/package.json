@@ -10,6 +10,7 @@
     "notion-sync": "node notion-sync.js"
   },
   "dependencies": {
+    "nodemailer": "^8.0.10",
     "ws": "^8.16.0",
     "yaml": "^2.4.0"
   }

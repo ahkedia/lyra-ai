@@ -1,25 +1,26 @@
 # Voice System
 
-Versioned voice configuration for InsightEngine.
+Versioned voice/style contracts for the content pipeline (drafts, hot commentary,
+signal synthesis, job applications).
 
 ## Source of Truth
 
-Voice Canon is fetched **live** from the Personal LLM Wiki in Notion on every InsightEngine run.
-Notion data_source_id: `33d78008-9100-8197-9f0f-000b205edfe8`
-
-Do NOT hand-edit VOICE.md directly. It is exported from the Voice Canon wiki page.
+Voice Canon is fetched **live** from the Personal LLM Wiki in Notion by the content
+and job pipelines on every run. The maintained local snapshot (offline fallback) is
+`content-engine/config/voice-canon.md`.
 
 ## Files
 
-- `VOICE.md` — Exported snapshot of Voice Canon (auto-generated, do not edit)
-- `STYLE_CALIBRATION.md` — Style drift adjustments based on published post performance (Phase 4+)
-- `README.md` — This file
+- `NEGATIVE_STYLE.md` — what NOT to sound like; read at runtime by
+  `crud/content_context.py` and the content-engine generator scripts
+- `FORMAT_PLAYBOOK.md` — channel-specific formatting rules (read by `crud/content_context.py`)
+- `README.md` — this file
 
 ## Update Process
 
-When Voice Canon is updated in Notion:
-1. Run `node scripts/export-voice-canon.js` (Phase 2+)
-2. Or update manually by copying the Notion page body here
+Edit `NEGATIVE_STYLE.md` / `FORMAT_PLAYBOOK.md` here and commit. Voice Canon itself
+is edited in the Notion wiki (Type = Voice Canon); update the local snapshot in
+`content-engine/config/voice-canon.md` when it changes materially.
 
 ## Version
 

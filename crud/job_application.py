@@ -332,9 +332,15 @@ def _notion_req(method: str, path: str, body: dict = None) -> dict:
 
 
 def _voice_canon_from_local_file() -> str:
-    """Last-resort voice text when Notion is empty (repo snapshot)."""
+    """Last-resort voice text when Notion is empty (repo snapshot).
+
+    Reads content-engine/config/voice-canon.md — the maintained local snapshot.
+    (The old fallback, voice-system/VOICE.md, was an empty placeholder: drafts
+    silently ran with no voice grounding when Notion was unreachable.)
+    """
     try:
-        voice_path = os.path.join(os.path.dirname(__file__), '..', 'voice-system', 'VOICE.md')
+        voice_path = os.path.join(
+            os.path.dirname(__file__), '..', 'content-engine', 'config', 'voice-canon.md')
         voice_path = os.path.normpath(voice_path)
         with open(voice_path, encoding='utf-8') as f:
             return f.read().strip()[:8000]

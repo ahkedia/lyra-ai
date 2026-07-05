@@ -1,27 +1,23 @@
 ---
 name: voice-capture
-description: Transcribe Telegram voice messages, classify content, and save to Second Brain in Notion. Triggers on voice notes from Akash or Abhigna.
+description: Transcribe Telegram voice messages via OpenAI Whisper API, classify content, and save to Second Brain in Notion.
 ---
 
 # Voice Capture — Think Out Loud, Lyra Captures It
 
-## Step 1: Transcribe with mlx-whisper
+Cloud (Hetzner/Linux) pipeline. There is no local mlx-whisper here — transcription
+uses the OpenAI Whisper API.
+
+## Step 1: Transcribe with Whisper API
 
 When a voice message arrives, OpenClaw saves it as a file (usually `/tmp/voice_XXXX.ogg` or `.oga`).
 
 ```bash
-# Convert to wav first (mlx-whisper works best with wav)
-/opt/homebrew/bin/ffmpeg -i /tmp/VOICE_FILE.ogg /tmp/voice_transcript.wav -y -loglevel quiet
-
-# Transcribe (tiny model is fast; use small for better accuracy on Hinglish)
-/Users/akashkedia/Library/Python/3.9/bin/mlx_whisper \
-  --model mlx-community/whisper-small-mlx \
-  --output-format txt \
-  --output-dir /tmp \
-  /tmp/voice_transcript.wav
-
-# Read result
-cat /tmp/voice_transcript.txt
+curl -s https://api.openai.com/v1/audio/transcriptions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -F "file=@/tmp/VOICE_FILE.ogg" \
+  -F "model=whisper-1" \
+  -F "language=en"
 ```
 
 If the file path isn't known, check recent temp files:
@@ -29,7 +25,7 @@ If the file path isn't known, check recent temp files:
 ls -t /tmp/*.ogg /tmp/*.oga /tmp/*.m4a /tmp/*.wav 2>/dev/null | head -3
 ```
 
-Hinglish note: mlx-whisper handles Hindi-English code-switching well with `--language hi` if needed.
+Hinglish note: Whisper handles Hindi-English code-switching; pass `-F "language=hi"` if the note is mostly Hindi.
 
 ## Step 2: Classify
 
@@ -47,9 +43,8 @@ Extract:
 ## Step 3: Save to Second Brain
 
 ```bash
-NOTION_KEY=$(cat ~/.config/notion/api_key)
 curl -s -X POST "https://api.notion.com/v1/pages" \
-  -H "Authorization: Bearer $NOTION_KEY" \
+  -H "Authorization: Bearer $NOTION_API_KEY" \
   -H "Notion-Version: 2025-09-03" \
   -H "Content-Type: application/json" \
   -d '{
@@ -74,5 +69,6 @@ Example: `"Captured. Idea: Auto-draft Substack from X posts via Lyra → Second 
 ## Notes
 - Always save full verbatim transcription in Notes, not just the summary
 - Abhigna voice notes: tag "abhigna", still save to Second Brain (Akash's database)
-- If transcription fails (file not found, ffmpeg error), ask Akash to resend and explain why
-- Clean up temp files after: `rm -f /tmp/voice_transcript.wav /tmp/voice_transcript.txt`
+- If transcription fails (file not found, API error), ask to resend and explain why
+- `$NOTION_API_KEY` and `$OPENAI_API_KEY` are already loaded from the environment
+- Clean up temp files after: `rm -f /tmp/voice_transcript.*`

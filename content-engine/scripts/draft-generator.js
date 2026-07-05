@@ -71,38 +71,21 @@ const repurpose = readFileSync(join(__dirname, "../config/repurpose.md"), "utf8"
 const VOICE_CANON_MAX_CHARS = 7000;
 const SONNET_REWRITE_SCORE_THRESHOLD = 8;
 
-const NEGATIVE_STYLE = `
-# Negative Style: What Not To Sound Like
-
-## Punctuation (hard ban)
-- Never use the em dash character (Unicode U+2014). Readers associate it with generic AI prose. Use commas, periods, colons, or parentheses instead.
-- Do not use an en dash (Unicode U+2013) as a stand-in for an em dash. Hyphens in compound words are fine.
-
-## Casing (hard default)
-- All-lowercase body: blog, tweet, and LinkedIn output. No title case headings, no ALL CAPS emphasis, no LinkedIn-style Title Case sentences.
-- First person as lowercase i. Allow minimal caps only where required for clarity: acronyms (API, PR, YoY), and non-negotiable brand spellings (CheQ, Trade Republic as two words still lowercase except proper brand cap in CheQ).
-
-## AI Symmetry Patterns (highest priority — AI detector load-bearing)
-- Tidy 3x3 bullets. Three points, each two words long, all parallel.
-- Too-perfect transitions: "Furthermore", "Moreover", "Additionally", "It's worth noting that"
-- The windup opener: "In today's fast-paced world...", "In an era where..."
-- The "Not X, but Y" cadence (ANY variant): "not X, but Y", "not X, it's Y", "not X, actually Y", "X isn't Y, it's Z", "X wasn't Y, it was Z", "it's not about X, it's about Y", dash-bound "X — not Y" or "Y, not X". This is the single most overused pattern in AI-generated content. Rewrite as two separate sentences, concession-then-pivot, or the sharper claim delivered directly. See voice-canon.md Rule 7.
-- Anaphoric three-beat negation: "Not a recap. Not a question. Not a flourish." or "It's not the X. It's not the Y. It's the Z." Three-beat negation reads as template. Three-beat lists of nouns are fine ("faster, cheaper, better"). The slop is specifically negation in repeated form. Rewrite as one sentence stating the move plus one banning the alternatives, or two-beat negation.
-- The symmetrical close: "The future belongs to those who..."
-
-## Words to Kill on Sight
-delve, crucial, robust, comprehensive, nuanced, multifaceted, pivotal, landscape, tapestry, underscore, foster, showcase, intricate, vibrant, interplay, game-changer, paradigm shift, ecosystem, synergy, seamless, unlock, mind-blowing, "let that sink in"
-
-## Voice Anti-Patterns
-- Over-qualifying ("I think", "in my experience", "IMHO")
-- Hedging both sides without committing
-- False humility ("I'm no expert but...")
-- Motivational poster tone
-- Faux-casual that's corporate
-
-## Core Test
-Would a sharp operator who's been in the trenches actually say this? Or does it sound like someone performing competence?
+// Negative style contract: single source of truth in voice-system/NEGATIVE_STYLE.md
+// (shared with crud/content_context.py and the other generators). Edit the file, not this script.
+const NEGATIVE_STYLE_FALLBACK = `
+# Negative Style (minimal fallback; voice-system/NEGATIVE_STYLE.md missing)
+- ABSOLUTE BAN: em dash (U+2014) and en dash (U+2013) as em-dash stand-ins. Use comma, colon, period, or parentheses.
+- All-lowercase body; first person as lowercase i; caps only for acronyms and brand spellings (CheQ).
+- No 'Not X, but Y' cadence in ANY variant; no anaphoric three-beat negation; no windup openers; no symmetrical closes.
+- Kill on sight: delve, crucial, robust, comprehensive, nuanced, pivotal, landscape, game-changer, paradigm shift, ecosystem, synergy, seamless, unlock.
 `;
+let NEGATIVE_STYLE;
+try {
+  NEGATIVE_STYLE = readFileSync(join(__dirname, "../../voice-system/NEGATIVE_STYLE.md"), "utf8");
+} catch {
+  NEGATIVE_STYLE = NEGATIVE_STYLE_FALLBACK;
+}
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));

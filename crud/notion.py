@@ -3,7 +3,7 @@
 Lyra CRUD — Notion Health Handlers
 Zero-LLM health data logging. Called by crud/cli.py dispatch.
 
-Pattern: follow scripts/updater.py (urllib.request, no pip deps)
+Pattern: urllib.request only, no pip deps
 """
 
 import os
