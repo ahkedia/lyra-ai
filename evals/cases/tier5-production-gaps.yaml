@@ -45,11 +45,14 @@ tests:
     tags: [conversation, context, multi-turn]
 
   # --- Tier 0 CRUD Paths ---
-  - id: tier0-mark-done
+  - id: tier0-list-reminders
+    # E-2 fix: this case was previously (mis)named tier0-mark-done although the
+    # prompt is a read. Renamed honestly; the actual mark_done write path is
+    # covered by tier0-mark-done-actual below.
     eval_lane: diagnostic
     tier: gap
     category: crud
-    name: "Mark item done"
+    name: "List reminders (Tier 0 read)"
     prompt: "What are my current reminders? Just list them briefly."
     timeout_ms: 45000
     side_effects: read_only
@@ -59,6 +62,68 @@ tests:
       - type: latency_p95
         threshold_ms: 45000
     tags: [crud, tier0, read]
+
+  - id: tier0-mark-done-actual
+    # E-2: the real mark_done path — add a reminder, then check it off.
+    eval_lane: diagnostic
+    tier: gap
+    category: crud
+    name: "Mark reminder done (Tier 0 write)"
+    timeout_ms: 60000
+    side_effects: write
+    multi_turn: true
+    turns:
+      - role: user
+        message: "Add a reminder: [tc] return the library books"
+      - role: user
+        message: "Mark return the library books as done"
+    validators:
+      - type: llm_judge
+        rubric: "Does the second response confirm the reminder was marked done/completed/checked off in Notion? Confirming completion of 'return the library books' scores 5. Saying it cannot find the item, asking which item, or hallucinating a different item scores low."
+      - type: latency_p95
+        threshold_ms: 60000
+    cleanup:
+      action: notion_delete_matching
+      database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
+      title_contains: "return the library books"
+    tags: [crud, tier0, write, mark-done]
+
+  # --- Job application pipeline (E-4: highest-stakes Tier 0 flow) ---
+  - id: job-apply-phase-a
+    eval_lane: diagnostic
+    tier: gap
+    category: job
+    name: "Job pipeline Phase A: URL trigger → research + clarification"
+    prompt: "I'm applying to this role: https://jobs.lever.co/examplebank/senior-product-manager — Senior PM, ExampleBank. Can you help?"
+    timeout_ms: 90000
+    side_effects: none
+    validators:
+      - type: llm_judge
+        rubric: "Phase A of the job pipeline should trigger: the response should acknowledge the specific role/company and either (a) ask the clarification question about which artifact to produce (outreach message, cover letter, or both — typically offered as options 1/2/3), or (b) present initial research about the role. Score 5 if it routes into the pipeline with the correct role. Score 1 if it claims to have already applied or sent anything, invents interview details, or ignores the URL and answers generically."
+    tags: [job, tier0, phase-a]
+
+  - id: job-apply-phase-b-cover-letter
+    eval_lane: diagnostic
+    non_blocking: true  # depends on Phase A state + Gmail/Tavily availability; informational until stable
+    tier: gap
+    category: job
+    name: "Job pipeline Phase B: cover letter quality"
+    timeout_ms: 180000
+    side_effects: write
+    multi_turn: true
+    turns:
+      - role: user
+        message: "I'm applying to this role: https://jobs.lever.co/examplebank/senior-product-manager — Senior PM, ExampleBank. Can you help?"
+      - role: user
+        message: "cover letter"
+    validators:
+      - type: llm_judge
+        rubric: "Does the final response contain (or clearly confirm creation of a Gmail draft with) a cover letter for the Senior PM role at ExampleBank? Score on: (1) grounded in the operator's real background — fintech product work at CheQ / Flipkart Pay — with NO invented employers, degrees, or metrics; (2) voice: direct, concrete, no AI filler like 'delve', 'passionate about', em-dash-heavy prose; (3) specific to the role rather than a generic template. A fabricated biography scores 1 regardless of style."
+    cleanup:
+      action: notion_delete_matching
+      database: "31778008910080c09b6fec080955cf00"
+      title_contains: "ExampleBank"
+    tags: [job, tier0, phase-b, cover-letter]
 
   - id: tier0-shopping-list-add
     eval_lane: diagnostic

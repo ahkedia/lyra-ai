@@ -10,16 +10,16 @@ Consolidated list for all Lyra work — repo engineering, cron fixes, evals, con
 |----|------|-----|--------|------------|
 | L-8a | ~~Fix `morning-weight-nudge` stalling~~ | MiniMax M2.7 reasoning mode stalled daily at 9am Berlin | ✅ DONE 2026-06-07 | — |
 | L-8b | ~~Fix `wiki-candidate-review-merged` stalling~~ | No model set → MiniMax default stalled daily at 9pm Berlin | ✅ DONE 2026-06-07 | — |
-| L-14 | Delete old shell scripts | `cron-task-runner` flipped to python on 2026-04-22; 7-clean-run condition met weeks ago. Delete: `scripts/fetch-twitter-bookmarks.sh`, `scripts/bookmarks-to-notion.sh` from Mac repo + Hetzner. Keep `get-twitter-oauth-refresh-token.sh`. | Open | Verify `/var/log/lyra-twitter-cron.log` for 7 consecutive ok |
+| L-14 | ~~Delete old shell scripts~~ | Deleted in 2026-07 architecture cleanup (`fetch-twitter-bookmarks.sh`, `bookmarks-to-notion.sh`; kept `get-twitter-oauth-refresh-token.sh`). | ✅ DONE 2026-07-05 | — |
 | L-5 | Close heap observation window | Window ended 2026-04-28. No OOM observed. A3 alarm (L-6) guards recurrence. Just close. | Open (stale) | — |
 | L-15 | ~~Content engine quality gate + approval fix~~ | Options A+B implemented 2026-06-07. See Done section. | ✅ DONE 2026-06-07 | — |
 | L-1 | Atomic lock for content-engine hot paths | Removes rare double-acquire race between cron and manual runs | Low priority | — |
 | L-2 | bats in CI (GitHub Action) | Catches bash regressions without local brew | Low priority | Runner image with `bats` |
 | L-4 | Upstream OpenClaw #69787: 409 retry loop | Track until fixed in npm release, deploy, verify 409s → ~0 | Passive watch | — |
 | E-1 | Health logging evals (P0) | 14 Tier-0 patterns, highest daily frequency, zero eval coverage | Open | — |
-| E-2 | Fix mislabeled `tier0-mark-done` eval | Current test is a read, not a write. The actual mark_done path is uncovered. Quick fix. | Open | — |
+| E-2 | ~~Fix mislabeled `tier0-mark-done` eval~~ | Renamed to `tier0-list-reminders`; added `tier0-mark-done-actual` (real write path). | ✅ DONE 2026-07-05 | — |
 | E-3 | Email read eval (P1) | `tool-email-draft` tests drafting only; read path is a different code path | Open | — |
-| E-4 | Job application pipeline eval (P0) | Active job search; highest-stakes uneval'd path; regression costs real applications | Open | — |
+| E-4 | ~~Job application pipeline eval (P0)~~ | Added `job-apply-phase-a` + `job-apply-phase-b-cover-letter` (tier5); tracker upsert case still open. | ✅ DONE 2026-07-05 (partial: recruiter-tracker case open) | — |
 | E-5 | Content draft quality eval (P1) | Voice canon adherence untested despite voice system investment | Open | — |
 | E-6 | Wiki ops eval (P1) | 14 Tier-0 patterns across lenny-search, wiki-lint, wiki-dedup — all uneval'd | Open | — |
 | E-7 | HOT commentary eval (P1) | Bypasses LLM entirely; no eval for whether it returns content or fails silently | Open | — |
