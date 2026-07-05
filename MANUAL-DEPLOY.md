@@ -1,6 +1,6 @@
 # Manual Deployment to Hetzner - Step by Step
 
-**VPS IP:** `46.224.207.230`
+**VPS IP:** `<VPS_IP>`
 **User:** `root`
 
 ---
@@ -10,7 +10,7 @@
 Open Terminal on your Mac and run:
 
 ```bash
-ssh root@46.224.207.230
+ssh root@<VPS_IP>
 ```
 
 When prompted to accept the host key, type: `yes`
@@ -42,10 +42,10 @@ Open a **NEW Terminal window** (don't close the SSH one) and run:
 cd ~/Desktop/"Build AI Product Sense"/lyra-ai
 
 # Copy all files to VPS
-scp -r . root@46.224.207.230:/opt/lyra-agent/
+scp -r . root@<VPS_IP>:/opt/lyra-agent/
 
 # Verify it worked
-ssh root@46.224.207.230 "ls -la /opt/lyra-agent/"
+ssh root@<VPS_IP> "ls -la /opt/lyra-agent/"
 ```
 
 ---
@@ -55,7 +55,7 @@ ssh root@46.224.207.230 "ls -la /opt/lyra-agent/"
 SSH back into VPS (if not already connected):
 
 ```bash
-ssh root@46.224.207.230
+ssh root@<VPS_IP>
 ```
 
 Create the .env file:
@@ -219,4 +219,4 @@ Then I'll help you:
 
 ---
 
-**Ready? Open Terminal and start with Step 1: `ssh root@46.224.207.230`**
+**Ready? Open Terminal and start with Step 1: `ssh root@<VPS_IP>`**
