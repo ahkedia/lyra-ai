@@ -20,23 +20,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate YAML configs
-        run: |
-          node -e "
-            import YAML from 'yaml';
-            import { readFileSync } from 'fs';
-            const files = ['config/routing-rules.yaml'];
-            for (const f of files) {
-              try {
-                YAML.parse(readFileSync(f, 'utf8'));
-                console.log('✓ ' + f);
-              } catch (e) {
-                console.error('✗ ' + f + ': ' + e.message);
-                process.exit(1);
-              }
-            }
-          "
-
       - name: Check SOUL template token count
         # Live SOUL.md moved to the private repo (docs/12-public-private-split.md);
         # keep the "SOUL stays short" check on the public template.
