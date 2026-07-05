@@ -174,3 +174,63 @@ tests:
       database: "95e1d0de-496f-478e-9fe4-2e2a356c7970"
       title_contains: "water the plants"
     tags: [write-verification, reminder, multi-turn]
+
+  # --- Job Application Pipeline (Phase A) — added 2026-07-05 for §5.2 ---
+  # Phase B (Gmail draft + Recruiter Tracker write) tests require a dry-run
+  # flag in crud/job_application.py — see EVAL-TODOS.md for the follow-up.
+  # These 4 cases cover the highest-value Phase A behaviors:
+  #   • correct routing on a valid trigger
+  #   • refusal to fabricate on missing/invalid input
+  #   • artifact-menu shape (proves the voice-canon fix is wired)
+
+  - id: job-app-phase-a-trigger
+    eval_lane: diagnostic
+    tier: gap
+    category: job-app
+    name: "Phase A: valid job trigger returns clarification"
+    prompt: "[tc-eval] apply to Senior Product Manager role at Vercel, link: https://example.com/jobs/pm-vercel-eval"
+    timeout_ms: 45000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Does the response acknowledge the job trigger and ask a clarifying question about which artifact to draft (cover letter, LinkedIn reachout, resume tweaks) BEFORE generating anything? Correctly asking for clarification scores 5. Silently fabricating an application or missing the trigger routing scores 1. Errors score 1."
+    tags: [job-app, phase-a, routing]
+
+  - id: job-app-phase-a-missing-url
+    eval_lane: diagnostic
+    tier: gap
+    category: job-app
+    name: "Phase A: refuses to fabricate when URL is missing"
+    prompt: "[tc-eval] apply to Google"
+    timeout_ms: 45000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Does the response ask for a job URL / link / posting details rather than fabricating a cover letter or reachout? Requesting the missing input scores 5. Silently drafting an application with hallucinated role details scores 1. A generic career-advice response also scores low (fails to route to the job pipeline)."
+    tags: [job-app, phase-a, refusal]
+
+  - id: job-app-phase-a-invalid-url
+    eval_lane: diagnostic
+    tier: gap
+    category: job-app
+    name: "Phase A: graceful handling of malformed URL"
+    prompt: "[tc-eval] job link: not-a-real-url applying as staff engineer"
+    timeout_ms: 45000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Does the response gracefully handle the malformed link — either asking for a valid URL, or proceeding with only the role/context provided? A crash, stack trace, or fabricated URL scores 1. Graceful clarification or context-only continuation scores 5."
+    tags: [job-app, phase-a, error-handling]
+
+  - id: job-app-phase-a-artifact-menu
+    eval_lane: diagnostic
+    tier: gap
+    category: job-app
+    name: "Phase A: response offers artifact menu (voice canon wired)"
+    prompt: "[tc-eval] applying to https://example.com/jobs/staff-eng-stripe-eval as staff engineer with 8 years payments experience"
+    timeout_ms: 45000
+    side_effects: read_only
+    validators:
+      - type: llm_judge
+        rubric: "Does the response offer AT LEAST TWO of: cover letter, LinkedIn reachout, resume tweaks / edits — as the artifacts it can produce? Offering the artifact menu proves Phase A is correctly triggered AND the voice-canon-wired job_application.py path is being invoked (per commit 3ab9068). Offering 2+ artifacts scores 5. Offering only 1 or a generic response scores 2. No artifact menu at all scores 1."
+    tags: [job-app, phase-a, voice-canon-plumbing]

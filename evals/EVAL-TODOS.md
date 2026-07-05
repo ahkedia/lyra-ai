@@ -24,9 +24,19 @@ Audited 2026-06-07. Cross-referenced all 62 evals against Lyra's full capability
 
 ### E-4: Job application pipeline (Tier 0, 2-phase, highest stakes)
 Most complex Tier 0 flow: Phase A (detect job URL → Tavily research → clarification Qs), Phase B (`"both"` → cover letter + outreach → Gmail drafts → Recruiter Tracker upsert). A regression costs real job applications.
-- `job-apply-phase-a` — send a job URL → confirms research questions are returned, correct routing to Phase A
-- `job-apply-phase-b-cover-letter` — reply `"cover letter"` → LLM judge: cover letter quality, voice canon adherence
-- `job-apply-recruiter-tracker` — end-to-end: Recruiter Tracker row upserted after Phase B completes
+
+**Phase A — LANDED 2026-07-05 (§5.2, tier5-production-gaps.yaml, `job-app-phase-a-*` × 4):**
+- ✅ `job-app-phase-a-trigger` — valid trigger routes correctly, returns clarification
+- ✅ `job-app-phase-a-missing-url` — refuses to fabricate when URL missing
+- ✅ `job-app-phase-a-invalid-url` — graceful handling of malformed link
+- ✅ `job-app-phase-a-artifact-menu` — response offers 2+ artifacts (proves voice-canon plumbing per `3ab9068`)
+
+**Phase B — PENDING (prereq: dry-run flag in `crud/job_application.py`):**
+- ⏳ `job-app-phase-b-cover-letter` — reply `"cover letter"` → LLM judge: cover letter quality, voice canon adherence
+- ⏳ `job-app-phase-b-voice-canon-diff` — draft body must reflect voice canon (compare against `content-engine/config/voice-canon.md`)
+- ⏳ `job-app-phase-b-no-cross-contact-leak` — draft body must not reference other companies from Recruiter Tracker
+- ⏳ `job-apply-recruiter-tracker` — end-to-end Recruiter Tracker row upserted
+- **Blocker:** Phase B writes real Gmail drafts + Recruiter Tracker rows. Need `LYRA_JOB_APP_DRY_RUN=1` env-gated no-write path in `crud/job_application.py` before landing these. Small isolated change; eval-gate `[break-glass]` acceptable if 5.1 already enforcing.
 
 ---
 
