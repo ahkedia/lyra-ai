@@ -37,4 +37,9 @@ except a deliberate Hetzner→GitHub mirror).
 ## Project context
 
 - Agent instructions for the OpenClaw workspace also live in **`AGENTS.md`** (session/memory patterns for Lyra runtime).
-- Product rules: **`config/SOUL.md`**, **`MEMORY.md`** (when applicable).
+- **Public/private split:** live personal config (`SOUL.md`, `MEMORY.md`, `HEARTBEAT.md`,
+  `cron-jobs.json`, `notion/notion.md`) lives in the **private** repo `lyra-private`
+  (`/root/lyra-private` on Hetzner) — never in this public repo. See
+  **`docs/12-public-private-split.md`**. Public templates: `config/SOUL-template.md`,
+  `config/MEMORY-template.md`, `config/cron-jobs.example.json`.
+- Product rules: **`lyra-private/config/SOUL.md`**, **`lyra-private/MEMORY.md`** (when applicable).

@@ -9,7 +9,7 @@ Before running the deployment, ensure you have:
 - [ ] **Telegram Bot Token** (@BotFather)
 - [ ] **Your Telegram numeric ID** (@userinfobot)
 - [ ] **Notion API Key** (https://notion.so/my-integrations)
-- [ ] **Your WhatsApp number** (+<PHONE>)
+- [ ] **Your WhatsApp number** (e.g. +91XXXXXXXXXX)
 - [ ] SSH access to your VPS (usually pre-configured, check Hetzner console)
 
 ---
@@ -42,7 +42,7 @@ MINIMAX_API_KEY=your_minimax_key_here
 TELEGRAM_BOT_TOKEN=your_telegram_token_here
 TELEGRAM_USER_ID=your_numeric_telegram_id
 TELEGRAM_PARTNER_ID=abhigna_or_other_user_id
-WHATSAPP_USER_PHONE=+<PHONE>
+WHATSAPP_USER_PHONE=+91XXXXXXXXXX
 NOTION_API_KEY=your_notion_key_here
 ANTHROPIC_API_KEY=your_anthropic_key_here
 OPENCLAW_GATEWAY_TOKEN=<paste_generated_token_from_step_1>

@@ -3,7 +3,7 @@ set -euo pipefail
 source /root/.openclaw/.env 2>/dev/null || true
 source /root/lyra-ai/scripts/ops-notify.sh
 
-CHAT_ID="7057922182"
+CHAT_ID="${TELEGRAM_USER_ID:-}"
 STATE_FILE="/tmp/lyra-anthropic-balance-state"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 

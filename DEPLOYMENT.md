@@ -74,7 +74,7 @@ Before starting, you need:
    MINIMAX_API_KEY=your_minimax_key
    TELEGRAM_BOT_TOKEN=your_telegram_token
    TELEGRAM_USER_ID=your_telegram_numeric_id
-   WHATSAPP_USER_PHONE=+<PHONE>
+   WHATSAPP_USER_PHONE=+91XXXXXXXXXX
    NOTION_API_KEY=your_notion_key
    ANTHROPIC_API_KEY=your_anthropic_key (optional)
    ```

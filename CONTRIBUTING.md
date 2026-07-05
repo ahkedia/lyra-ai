@@ -4,6 +4,8 @@ Lyra is a personal AI agent that runs 24/7 on a cloud VPS, coordinates a househo
 
 This guide helps you contribute — whether that's a new skill, better routing rules, more eval cases, or infrastructure improvements.
 
+> **Public/private split:** this repo is public and contains no live personal config. Live `SOUL.md`/`MEMORY.md`/`cron-jobs.json`/Notion IDs live in a private companion repo (`lyra-private`). Contributions here must never include phone numbers, personal identities, or live database IDs — a pre-push PII hook and CI enforce this. See [`docs/12-public-private-split.md`](docs/12-public-private-split.md).
+
 ---
 
 ## Quick Setup

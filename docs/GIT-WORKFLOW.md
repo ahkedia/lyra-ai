@@ -3,6 +3,18 @@
 **Audience:** Cursor Agent, Claude Code, and any automation touching `lyra-ai`.  
 **Rule:** GitHub `main` is the single source of truth. This file is the contract—follow it before commit/push/deploy.
 
+## Two repos (public/private split)
+
+Since the split (`docs/12-public-private-split.md`) there are **two** repos:
+
+- **`lyra-ai` (public):** code, skills, docs, templates. Never commit live personal
+  config here — the pre-push PII hook and CI will block it.
+- **`lyra-private` (private):** live `SOUL.md`, `MEMORY.md`, `HEARTBEAT.md`,
+  `cron-jobs.json`, `notion/notion.md`. Cloned at `/root/lyra-private` on Hetzner.
+
+Edits to Lyra's live personality/memory/crons go to `lyra-private`; everything else
+follows the rules below unchanged.
+
 ## Before editing code (every session / every handoff)
 
 1. `cd` to the repo: `/Users/akashkedia/AI/lyra-ai` (or the single clone you use).

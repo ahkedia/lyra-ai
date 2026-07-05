@@ -72,7 +72,7 @@ TELEGRAM_USER_ID=your_telegram_numeric_id
 TELEGRAM_PARTNER_ID=abhigna_partner_id
 
 # WhatsApp Configuration
-WHATSAPP_USER_PHONE=+<PHONE>
+WHATSAPP_USER_PHONE=+91XXXXXXXXXX
 EVOLUTION_API_URL=http://evolution-api:9000
 
 # Notion Configuration

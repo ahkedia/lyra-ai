@@ -3,7 +3,7 @@ set -eu
 source /root/.openclaw/.env 2>/dev/null || true
 source /root/lyra-ai/scripts/ops-notify.sh
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-CHAT_ID="7057922182"
+CHAT_ID="${TELEGRAM_USER_ID:-}"
 AUDIT_DIR="/var/log/lyra/audit"
 STATE_DIR="/var/lib/lyra/audit"
 HISTORY_FILE="$STATE_DIR/history.jsonl"

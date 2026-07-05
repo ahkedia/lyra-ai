@@ -4,7 +4,7 @@
 # Pushes when prod is ahead; ALERTS (does not auto-resolve) if histories ever diverge.
 set -uo pipefail
 source /root/.openclaw/.env 2>/dev/null || true
-CHAT="7057922182"
+CHAT="${TELEGRAM_USER_ID:-}"
 cd /root/lyra-ai || exit 1
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 git fetch origin --quiet 2>/dev/null || { echo "$TS fetch-failed"; exit 0; }

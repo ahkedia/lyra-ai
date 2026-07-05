@@ -6,7 +6,7 @@ set -uo pipefail
 source /root/.openclaw/.env 2>/dev/null || true
 
 REPO="/root/lyra-ai"
-CHAT_ID="7057922182"
+CHAT_ID="${TELEGRAM_USER_ID:-}"
 LOG="/tmp/lyra-git-autopush.log"
 LOCK="/tmp/lyra-git-autopush.lock"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
