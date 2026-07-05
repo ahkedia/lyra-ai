@@ -16,7 +16,9 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
 import { dirname, join as pathJoin } from "path";
 import { fileURLToPath } from "url";
 
-const ABHIGNA_ID = "5003298152";
+// Abhigna's Telegram numeric ID comes from the environment (loaded via systemd
+// EnvironmentFile). Empty string disables the ID-based checks safely below.
+const ABHIGNA_ID = process.env.TELEGRAM_PARTNER_ID || "";
 
 const _pluginDir = dirname(fileURLToPath(import.meta.url));
 const _repoRoot = pathJoin(_pluginDir, "..", "..");
@@ -468,7 +470,7 @@ function decideTier(features, scores, sessionKey, mode) {
     if (sonnetAllowlisted && sonnetStrong) return { tier: "sonnet", reason: "emergency_allowlisted_sonnet", thresholdMode: mode.mode };
     return { tier: "minimax", reason: "emergency_forced_minimax", thresholdMode: mode.mode };
   }
-  if (sessionKey.includes(ABHIGNA_ID) && haikuStrong) {
+  if (ABHIGNA_ID && sessionKey.includes(ABHIGNA_ID) && haikuStrong) {
     return { tier: "haiku", reason: "abhigna_acl_haiku", thresholdMode: mode.mode };
   }
   if (sonnetStrong && sonnetMarginOk) {
@@ -794,7 +796,7 @@ const plugin = {
         const sender = String(ctx?.sender || "");
         const rawPrompt = event?.prompt || "";
         const isAbhigna =
-          sender === ABHIGNA_ID ||
+          (ABHIGNA_ID && sender === ABHIGNA_ID) ||
           /\bI(?:'m| am) Abhigna\b/i.test(rawPrompt);
         const brainCtx = fetchBrainContext(rawPrompt);
         if (brainCtx) {

@@ -35,7 +35,7 @@ send_alert() {
     local msg="$1"
     if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
         curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d chat_id="7057922182" \
+            -d chat_id="${TELEGRAM_USER_ID:-}" \
             -d text="$msg" > /dev/null 2>&1
     fi
 }

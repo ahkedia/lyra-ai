@@ -15,7 +15,7 @@ set -euo pipefail
 source /root/.openclaw/.env 2>/dev/null
 
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-CHAT_ID="7057922182"
+CHAT_ID="${TELEGRAM_USER_ID:-}"
 LOG_FILE="/var/log/lyra/openclaw-updates.log"
 CURRENT_VERSION_FILE="/tmp/openclaw-last-known-version"
 
@@ -153,7 +153,7 @@ Then produce a short analysis (max 300 words) for Akash:
 2. How could each one specifically improve Lyra (e.g., better memory, new model support, stability)?
 3. What's the one thing Akash should actually do this week to take advantage of it?
 
-Format as a clean Telegram message. Send it via Telegram to chat ID 7057922182."
+Format as a clean Telegram message. Send it via Telegram to chat ID ${CHAT_ID}."
 
     curl -s -X POST "http://localhost:18789/api/cron" \
         -H "Authorization: Bearer $OPENCLAW_GATEWAY_TOKEN" \

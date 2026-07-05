@@ -5,7 +5,7 @@ source /root/.openclaw/.env 2>/dev/null || true
 source /root/lyra-ai/scripts/ops-notify.sh
 
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-CHAT_ID="7057922182"
+CHAT_ID="${TELEGRAM_USER_ID:-}"
 LOG_FILE="/var/log/lyra/openclaw-updates.log"
 STATE_FILE="/var/lib/lyra/openclaw-weekly-state.json"
 mkdir -p /var/lib/lyra "$(dirname "$LOG_FILE")"

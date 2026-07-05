@@ -6,6 +6,15 @@ This folder is home. Treat it that way.
 
 GitHub **`main`** is canonical. Before editing tracked files: `git fetch origin && git pull --ff-only origin main`. After a change: commit and `git push origin main`. Do not leave unpushed commits only on the VPS. Full contract: **`docs/GIT-WORKFLOW.md`** and root **`CLAUDE.md`**.
 
+### Two repos — public/private split (MANDATORY routing)
+
+There are **two** repos since the split (`docs/12-public-private-split.md`):
+
+- **`lyra-ai` (PUBLIC):** code, scripts, plugins, skills, evals, docs, sanitized templates. Never put phone numbers, Telegram IDs, personal facts, or live Notion IDs here.
+- **`lyra-private` (PRIVATE, `/root/lyra-private` on Hetzner):** live `config/SOUL.md`, `config/MEMORY.md`, `config/HEARTBEAT.md`, **`config/cron-jobs.json`** (the cron mirror — edit crons HERE), `notion/notion.md`, operator facts `MEMORY.md`.
+
+Rules of thumb before committing: if the diff contains a phone number, a person's identity, or a live database ID → `lyra-private`. If unsure, check whether the file path is in the public repo's `.gitignore` private-layer block. The public repo has a pre-push PII hook + CI check that reject personal data — never bypass with `--no-verify`. At runtime nothing changed: workspace files (`~/.openclaw/workspace/`) are still the merged view; `deploy-lyra.sh` routes self-edits to the right repo automatically.
+
 ## Session Startup
 
 Before doing anything else:

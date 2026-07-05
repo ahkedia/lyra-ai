@@ -86,6 +86,6 @@ Consolidated list for all Lyra work — repo engineering, cron fixes, evals, con
 
 ## Maintenance notes
 
-- `config/cron-jobs.json` in this repo mirrors `/root/.openclaw/cron/jobs.json` on Hetzner. Sync after any cron change.
+- `lyra-private/config/cron-jobs.json` (PRIVATE repo, `/root/lyra-private` on Hetzner) mirrors `/root/.openclaw/cron/jobs.json`. Sync after any cron change. It moved out of this public repo — see `docs/12-public-private-split.md`.
 - `/root/.openclaw/openclaw.json` is immutable (`chattr +i`). Unlock before editing: `ssh hetzner "chattr -i /root/.openclaw/openclaw.json"`, re-lock after.
 - Eval gate is in shadow mode until PHASE-4 is started. Check `evals/gate/logs/shadow-decisions.jsonl` on Hetzner for false-positive rate.

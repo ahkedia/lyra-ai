@@ -1,9 +1,17 @@
 #!/bin/bash
-# deploy-lyra.sh — Bidirectional sync: push local edits to GitHub, then pull updates
-# Runs every 5 minutes via cron on Hetzner VPS
+# deploy-lyra.sh — Bidirectional sync across the PUBLIC and PRIVATE repos.
+# Runs every 30 minutes via cron on Hetzner VPS.
+#
+# Public repo  (/root/lyra-ai)      : code, skills, docs, templates → github.com/ahkedia/lyra-ai (PUBLIC)
+# Private repo (/root/lyra-private) : live SOUL/MEMORY/HEARTBEAT, cron-jobs.json, notion IDs
+#                                     → github.com/ahkedia/lyra-private (PRIVATE)
+# See docs/12-public-private-split.md. Until the private repo exists (run
+# scripts/setup-private-split.sh once), private-layer syncing is skipped and the
+# workspace files are simply left alone — nothing breaks.
 set -euo pipefail
 
 REPO_DIR="/root/lyra-ai"
+PRIVATE_DIR="/root/lyra-private"
 WORKSPACE="/root/.openclaw/workspace"
 LOG="/tmp/lyra-deploy.log"
 
@@ -11,16 +19,18 @@ log() { echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') $1" >> "$LOG"; }
 
 log "Starting sync..."
 
+HAVE_PRIVATE=false
+if [ -d "$PRIVATE_DIR/.git" ]; then
+    HAVE_PRIVATE=true
+fi
+
 cd "$REPO_DIR"
 
 # ──────────────────────────────────────────────
-# PHASE 1: Push local self-edits to GitHub first
+# PHASE 1: Push local self-edits — public repo
+# (skills only; personal-layer files go to the private repo in Phase 1b)
 # ──────────────────────────────────────────────
 PUSHED=false
-
-# Memory files (SOUL.md, MEMORY.md, HEARTBEAT.md) are synced separately
-# by the daily memory-backup cron (3 AM) — not every 30 min.
-# Changes take effect on next session start; no restart or immediate sync needed.
 
 # Check skills (use checksum comparison to avoid false positives from timestamp drift)
 if [ -d "$WORKSPACE/skills" ]; then
@@ -32,60 +42,87 @@ if [ -d "$WORKSPACE/skills" ]; then
                 rsync -a --checksum "$skill_dir" "$REPO_DIR/skills/$skill_name/"
                 git add "skills/$skill_name/"
                 PUSHED=true
-                log "  Local skill edit: $skill_name → pushing to GitHub"
+                log "  Local skill edit: $skill_name → pushing to GitHub (public)"
             fi
         fi
     done
 fi
 
-# Check notion references
-if [ -f "$WORKSPACE/references/notion.md" ] && [ -f "$REPO_DIR/notion/notion.md" ]; then
-    if [ "$WORKSPACE/references/notion.md" -nt "$REPO_DIR/notion/notion.md" ]; then
-        cp "$WORKSPACE/references/notion.md" "$REPO_DIR/notion/notion.md"
-        git add "notion/notion.md"
-        PUSHED=true
-        log "  Local edit: notion.md → pushing to GitHub"
-    fi
-fi
-
 if [ "$PUSHED" = true ]; then
     git commit -m "Auto-sync: Lyra self-edits from Hetzner ($(date -u '+%Y-%m-%d %H:%M'))" || true
-    git push origin main || log "  WARNING: git push failed"
-    log "  Pushed local edits to GitHub"
+    # The pre-push PII scan hook (scripts/pii-scan.sh) guards this push.
+    git push origin main || log "  WARNING: public git push failed (PII scan block or network?)"
+    log "  Pushed local edits to GitHub (public)"
 fi
 
 # ──────────────────────────────────────────────
-# PHASE 2: Pull remote changes from GitHub
+# PHASE 1b: Push local self-edits — private repo
+# (notion references; SOUL/MEMORY/HEARTBEAT are backed up daily by memory-backup.sh)
+# ──────────────────────────────────────────────
+if [ "$HAVE_PRIVATE" = true ]; then
+    cd "$PRIVATE_DIR"
+    PRIVATE_PUSHED=false
+    if [ -f "$WORKSPACE/references/notion.md" ]; then
+        mkdir -p "$PRIVATE_DIR/notion"
+        if [ ! -f "$PRIVATE_DIR/notion/notion.md" ] || [ "$WORKSPACE/references/notion.md" -nt "$PRIVATE_DIR/notion/notion.md" ]; then
+            if ! diff -q "$WORKSPACE/references/notion.md" "$PRIVATE_DIR/notion/notion.md" > /dev/null 2>&1; then
+                cp "$WORKSPACE/references/notion.md" "$PRIVATE_DIR/notion/notion.md"
+                git add "notion/notion.md"
+                PRIVATE_PUSHED=true
+                log "  Local edit: notion.md → pushing to GitHub (private)"
+            fi
+        fi
+    fi
+    if [ "$PRIVATE_PUSHED" = true ]; then
+        git commit -m "Auto-sync: Lyra self-edits from Hetzner ($(date -u '+%Y-%m-%d %H:%M'))" || true
+        git push origin main || log "  WARNING: private git push failed"
+    fi
+    cd "$REPO_DIR"
+else
+    log "  Private repo not set up yet — skipping private-layer push (run setup-private-split.sh)"
+fi
+
+# ──────────────────────────────────────────────
+# PHASE 2: Pull remote changes (public, then private)
 # ──────────────────────────────────────────────
 git fetch origin
 BEFORE=$(git rev-parse HEAD)
 git pull origin main --ff-only 2>/dev/null || {
-    log "WARNING: pull --ff-only failed (merge conflict?). Skipping deploy."
+    log "WARNING: public pull --ff-only failed (merge conflict?). Skipping deploy."
     exit 0
 }
 AFTER=$(git rev-parse HEAD)
 
+if [ "$HAVE_PRIVATE" = true ]; then
+    cd "$PRIVATE_DIR"
+    git fetch origin 2>/dev/null || log "WARNING: private fetch failed"
+    git pull origin main --ff-only 2>/dev/null || log "WARNING: private pull --ff-only failed"
+    cd "$REPO_DIR"
+fi
+
 # ──────────────────────────────────────────────
-# PHASE 3: Always sync workspace from repo (content-based, not commit-gated)
-# This ensures workspace stays in sync even when BEFORE == AFTER
-# (e.g. after a rebase that resolved with "already up to date")
+# PHASE 3: Always sync workspace from repos (content-based, not commit-gated)
+# Personal layer comes from the PRIVATE repo; code/skills from the PUBLIC repo.
 # ──────────────────────────────────────────────
 SYNCED=false
 
-# Sync config files (SOUL.md, MEMORY.md, HEARTBEAT.md) — content-based
-for f in SOUL.md MEMORY.md HEARTBEAT.md; do
-    REPO_FILE="$REPO_DIR/config/$f"
-    WORKSPACE_FILE="$WORKSPACE/$f"
-    if [ -f "$REPO_FILE" ]; then
-        if ! diff -q "$REPO_FILE" "$WORKSPACE_FILE" > /dev/null 2>&1; then
-            cp "$REPO_FILE" "$WORKSPACE_FILE"
-            SYNCED=true
-            log "  Synced $f (content drift fixed)"
+# Sync config files (SOUL.md, MEMORY.md, HEARTBEAT.md) — from private repo only.
+# If the private repo is absent, leave the live workspace files untouched.
+if [ "$HAVE_PRIVATE" = true ]; then
+    for f in SOUL.md MEMORY.md HEARTBEAT.md; do
+        REPO_FILE="$PRIVATE_DIR/config/$f"
+        WORKSPACE_FILE="$WORKSPACE/$f"
+        if [ -f "$REPO_FILE" ]; then
+            if ! diff -q "$REPO_FILE" "$WORKSPACE_FILE" > /dev/null 2>&1; then
+                cp "$REPO_FILE" "$WORKSPACE_FILE"
+                SYNCED=true
+                log "  Synced $f from private repo (content drift fixed)"
+            fi
         fi
-    fi
-done
+    done
+fi
 
-# Sync AGENTS.md — content-based
+# Sync AGENTS.md — content-based (public)
 if [ -f "$REPO_DIR/AGENTS.md" ]; then
     if ! diff -q "$REPO_DIR/AGENTS.md" "$WORKSPACE/AGENTS.md" > /dev/null 2>&1; then
         cp "$REPO_DIR/AGENTS.md" "$WORKSPACE/AGENTS.md"
@@ -94,7 +131,7 @@ if [ -f "$REPO_DIR/AGENTS.md" ]; then
     fi
 fi
 
-# Sync skills — content-based
+# Sync skills — content-based (public)
 if [ -d "$REPO_DIR/skills" ]; then
     DIFF=$(rsync -a --checksum --dry-run --itemize-changes "$REPO_DIR/skills/" "$WORKSPACE/skills/" 2>/dev/null | grep -v '^\.' || true)
     if [ -n "$DIFF" ]; then
@@ -104,14 +141,21 @@ if [ -d "$REPO_DIR/skills" ]; then
     fi
 fi
 
-# Sync notion references — content-based
-if [ -d "$REPO_DIR/notion" ]; then
-    DIFF=$(rsync -a --checksum --dry-run --itemize-changes "$REPO_DIR/notion/" "$WORKSPACE/references/" 2>/dev/null | grep -v '^\.' || true)
-    if [ -n "$DIFF" ]; then
-        mkdir -p "$WORKSPACE/references"
-        rsync -a --checksum "$REPO_DIR/notion/" "$WORKSPACE/references/"
+# Sync notion references — live IDs from PRIVATE repo, schemas from public
+if [ "$HAVE_PRIVATE" = true ] && [ -f "$PRIVATE_DIR/notion/notion.md" ]; then
+    mkdir -p "$WORKSPACE/references"
+    if ! diff -q "$PRIVATE_DIR/notion/notion.md" "$WORKSPACE/references/notion.md" > /dev/null 2>&1; then
+        cp "$PRIVATE_DIR/notion/notion.md" "$WORKSPACE/references/notion.md"
         SYNCED=true
-        log "  Synced notion references"
+        log "  Synced notion.md from private repo"
+    fi
+fi
+if [ -f "$REPO_DIR/notion/database-schemas.md" ]; then
+    mkdir -p "$WORKSPACE/references"
+    if ! diff -q "$REPO_DIR/notion/database-schemas.md" "$WORKSPACE/references/database-schemas.md" > /dev/null 2>&1; then
+        cp "$REPO_DIR/notion/database-schemas.md" "$WORKSPACE/references/database-schemas.md"
+        SYNCED=true
+        log "  Synced database-schemas.md"
     fi
 fi
 
