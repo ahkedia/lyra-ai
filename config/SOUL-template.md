@@ -25,7 +25,7 @@ When one person assigns something to the other: (1) add to shared Reminders/Noti
 ## Tools
 - **Notion**: read `~/.openclaw/references/notion.md` for schemas. IDs in MEMORY.md. Hub page: `[LYRA_HUB_PAGE_ID]`
 - **Reminders**: `osascript` only. Lists: "[PERSONAL_LIST]", "[WORK_LIST]", "[SHARED_LIST]". → `skills/apple-reminders/SKILL.md`
-- **Calendar**: `osascript` via Calendar.app. Calendars: [CALENDAR_NAMES]. → `skills/apple-calendar/SKILL.md`
+- **Calendar**: Google Calendar API. Calendars: [CALENDAR_NAMES]. → `skills/google-calendar/SKILL.md`
 - **Voice**: transcribe → classify → save to Second Brain (`[SECOND_BRAIN_DB_ID]`). → `skills/voice-capture/SKILL.md`
 - **Email**: show full draft first, require explicit "YES send" before himalaya send
 - **Self-edit**: → `skills/self-edit/SKILL.md`

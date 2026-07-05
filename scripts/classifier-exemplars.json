@@ -1,5 +1,5 @@
 {
-  "_comment": "Labeled exemplars injected into the Sonnet classifier prompt. Grown by learn_exemplars.py whenever you set 'Correct route' on a Twitter Insights row. Keep under ~20 entries (trimmed automatically).",
+  "_comment": "Labeled exemplars injected into the classifier prompt used by scripts/twitter_bookmarks.py. Edit by hand when a bookmark routes wrong (the old learn_exemplars.py auto-growth loop was retired). Keep under ~20 entries.",
   "exemplars": [
     {
       "tweet": "New MCP server for Figma just dropped — lets Claude Code read design specs directly from a selection. Repo link inside.",

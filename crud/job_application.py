@@ -373,7 +373,7 @@ def _fetch_voice_canon_notion() -> str:
 
 
 def _wiki_pages_via_database_query() -> list:
-    """Primary path: same API as insight-engine / MEMORY.md (database query)."""
+    """Primary path: standard Notion database query (same API the content engine uses)."""
     all_results = []
     cursor = None
     for _ in range(5):
