@@ -7,6 +7,15 @@ alwaysApply: true
 
 Read **`docs/GIT-WORKFLOW.md`** for the full contract. On every task that changes tracked files:
 
+## Two repos — route changes to the RIGHT one (mandatory)
+
+| Change | Repo |
+|--------|------|
+| Code, scripts, plugins, skills, evals, docs, templates | `lyra-ai` (public, this repo) |
+| Live `SOUL.md` / `MEMORY.md` / `HEARTBEAT.md`, `cron-jobs.json`, `notion/notion.md`, phone numbers, personal facts | `lyra-private` (PRIVATE, `/root/lyra-private` on Hetzner) |
+
+Never commit personal data here — a pre-push PII hook (`scripts/pii-scan.sh`) and CI will reject it; do NOT bypass with `--no-verify`. **Cron changes go to `lyra-private/config/cron-jobs.json`** (mirror of `/root/.openclaw/cron/jobs.json`), not this repo. Full design: `docs/12-public-private-split.md`.
+
 1. **Start:** `git fetch origin && git pull --ff-only origin main` (from the project root). If `--ff-only` fails, stop and fix divergence before editing.
 2. **End:** `git add` → `git commit` with a clear message → `git push origin main`.
 3. **VPS:** Do not commit only on the server. Deploy with pull from `main` + service restart when needed; see `docs/GIT-WORKFLOW.md`.
