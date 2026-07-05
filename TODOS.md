@@ -31,7 +31,7 @@ Consolidated list for all Lyra work — repo engineering, cron fixes, evals, con
 | E-13 | Write→read consistency (Shopping, Second Brain) | Only reminders tested for write+read consistency | Deferrable | — |
 | E-14 | Competitor digest quality eval | Zero eval despite being in `always_sonnet` | Deferrable | — |
 | E-15 | Akash-specific ambiguity patterns | "Update that", "Check the status" — not covered | Deferrable | — |
-| PHASE-4 | Flip eval gate to blocking + Telegram authoring approval | Shadow data accumulating since 2026-05-31; ~2 weeks was the exit criteria — met. Ready to flip. | Open — gate ready | Phase 2 shadow data clean |
+| PHASE-4 | ~~Flip eval gate to blocking~~ | Flipped 2026-07-05: `--enforce` + no `continue-on-error` in eval-gate.yml. (Telegram authoring approval still open.) | ✅ DONE 2026-07-05 (gate) | — |
 
 ---
 

@@ -1,8 +1,9 @@
-name: Eval Coverage Gate (shadow)
+name: Eval Coverage Gate
 
-# Phase 2 of "evals before changes": WARN-ONLY. Flags PRs that change Lyra's
-# behavior without touching an eval case, but never fails the build. Flip to
-# enforcement (Phase 4) by adding --enforce in the run step + a required check.
+# Phase 4 of "evals before changes": ENFORCED. A PR that changes Lyra's behavior
+# without touching an eval case fails this check. Escape hatch: include
+# "[break-glass: <reason>]" in a commit message (logged + flagged, not silent).
+# Shadow phase history: 2026-05 → 2026-07 warn-only, decisions in evals/gate/logs/.
 
 on:
   pull_request:
@@ -15,7 +16,7 @@ permissions:
 
 jobs:
   eval-coverage:
-    name: Eval coverage (warn-only)
+    name: Eval coverage (enforced)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -42,21 +43,20 @@ jobs:
             echo "head=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run eval-coverage gate (warn-only)
+      - name: Run eval-coverage gate (enforced)
         run: |
           set -o pipefail
           node evals/gate/check-eval-coverage.js \
+            --enforce \
             --base "${{ steps.range.outputs.base }}" \
             --head "${{ steps.range.outputs.head }}" \
             --log /tmp/shadow-decisions.jsonl | tee /tmp/gate-output.txt
           {
-            echo '## Eval Coverage Gate (shadow / warn-only)'
+            echo '## Eval Coverage Gate (enforced)'
             echo ''
             echo '```'
             cat /tmp/gate-output.txt
             echo '```'
             echo ''
-            echo '_Warn-only: this check never fails the build. It flags behavior changes that ship without an eval. When this is flipped to enforcement, an uncovered behavior change will block — add a case in `evals/cases/` or tag the commit `[break-glass: <reason>]`._'
+            echo '_An uncovered behavior change blocks the build — add a case in `evals/cases/` or tag the commit `[break-glass: <reason>]`._'
           } >> "$GITHUB_STEP_SUMMARY"
-        # Belt-and-suspenders: the script already exits 0 in shadow mode.
-        continue-on-error: true

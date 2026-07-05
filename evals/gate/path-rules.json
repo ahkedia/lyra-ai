@@ -11,6 +11,7 @@
       "prompts/**",
       "voice-system/**",
       "src/**",
+      "skills/**",
       "SOUL.md",
       "**/SOUL.md",
       "config/routing-rules.yaml",
@@ -31,8 +32,14 @@
     { "category": "infra",     "globs": [
       "tests/**",
       ".github/**",
+      ".cursor/**",
+      ".gitignore",
+      ".env.example",
       "package.json",
       "package-lock.json",
+      "tsconfig*.json",
+      "Dockerfile",
+      "docker-compose.yml",
       "dist/**",
       "scripts/**",
       "migrations/**",
@@ -40,7 +47,9 @@
       "workspace/**",
       "logs/**",
       "templates/**",
-      "config/**"
+      "whatsapp-webhook/**",
+      "config/**",
+      "*.txt"
     ]}
   ]
 }
