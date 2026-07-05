@@ -1,6 +1,7 @@
 # Architecture
 
-How Lyra is designed and why each decision was made.
+How Lyra is designed and why each decision was made. (Updated for the current
+Hetzner deployment — the original Mac-hosted, Telegram-only design is in git history.)
 
 ---
 
@@ -15,18 +16,19 @@ The key things OpenClaw provides that matter here:
 - **Cron scheduler** — no external cron service needed, runs inside the same process
 - **Skill system** — drop a folder into `~/.openclaw/workspace/skills/` and Lyra gains a new capability
 - **Session memory hook** — automatically compacts and retains context across conversations
-- **LaunchAgent daemon** — one command to make it survive reboots
+- **Plugin hooks** — the model router and Tier-0 CRUD bypass live in `plugins/lyra-model-router/`
+- **systemd service** — survives reboots; watchdog + recovery scripts handle crashes
 
-### 2. Telegram as the only interface
+### 2. Hetzner VPS as the host
 
-Telegram was chosen over iMessage, WhatsApp, or a web UI because:
-- No monthly cost (WhatsApp Business API costs money at scale)
-- Works on iOS, Android, Mac, and web — same interface everywhere
-- Supports voice messages natively (critical for the voice capture pipeline)
-- Allowlist-based access means only specific numeric user IDs can message Lyra
-- Streaming can be turned off for cleaner message delivery
+Lyra runs 24/7 on a small Hetzner cloud VPS (~€4/month) as a systemd service. The original build ran on a Mac (zero hosting cost, Apple Reminders/Calendar access), but a laptop that sleeps is a bad pager. The cloud move traded `osascript` integrations for always-on reliability; reminders and calendar moved to Notion + Google Calendar.
 
-### 3. Notion as the cockpit
+### 3. Telegram + WhatsApp as the interfaces
+
+- **Telegram** is the primary chat interface: free, allowlist-based (numeric user IDs), native voice messages, works everywhere.
+- **WhatsApp** is delivery-focused: scheduled digests and the household channel go out via the Meta WhatsApp Cloud API through a small webhook bridge (`whatsapp-webhook/server.cjs`), authenticated with a shared secret.
+
+### 4. Notion as the cockpit
 
 Notion is not just storage. It is the single source of truth for every domain. The design principle: **Lyra is the interface, Notion is the database**. Every action Lyra takes that creates or changes information writes to Notion. This means:
 - The data survives if the agent setup changes
@@ -37,42 +39,46 @@ The Notion API (version `2025-09-03`) introduces a dual-ID system:
 - `database_id` — used when creating new pages (`parent: {"database_id": "..."}`)
 - `data_source_id` — used when querying or reading (`POST /v1/data_sources/{id}/query`)
 
-This distinction is documented in `NOTION-CONTEXT.md` so Lyra always uses the right one.
+Live database IDs are private and live in the `lyra-private` repo (`notion/notion.md`), synced to the workspace at runtime. Public schema documentation: `notion/database-schemas.md`.
 
-### 4. Mac as the host, not the cloud
+### 5. Four-tier model routing (cost control)
 
-Running on a Mac that is always on (or wakes for scheduled tasks) instead of a cloud server means:
-- Zero hosting cost
-- Access to local tools — Apple Reminders via `osascript`, Apple Calendar, the local filesystem
-- The agent can modify its own workspace files (self-edit capability)
-- LaunchAgent ensures it runs in the user's session context, which matters for macOS TCC permissions
+Every inbound message passes through `plugins/lyra-model-router/`:
 
-The one downside: if your Mac is off, Lyra is off. For most personal use cases this is acceptable.
+| Tier | What | Cost |
+|------|------|------|
+| **Tier 0** | Deterministic CRUD (reminders, groceries, meals…) via `crud/cli.py` — no LLM at all | ~0 tokens |
+| **MiniMax M2.7** | Simple single-action tasks (~85%+ of LLM traffic) | cheap |
+| **Claude Haiku 4.5** | Moderate complexity, partner-ACL traffic | moderate |
+| **Claude Sonnet 4.6** | Synthesis, judgment, strategic work, content drafts | premium |
 
-### 5. Two access tiers, one agent
+Routing decisions are logged to JSONL and audited by the eval framework in `evals/`. See `docs/11-model-routing.md`.
 
-Rather than running two separate bots, both people in the household message the same Telegram bot. OpenClaw's allowlist identifies who is speaking by their numeric Telegram user ID. `SOUL.md` defines what each person can see and do. The information boundaries are enforced in the agent's instructions, not in config.
+### 6. Two access tiers, one agent
 
-This is simpler to maintain than two separate deployments and keeps the shared databases accessible to both without duplication.
+Rather than running two separate bots, both people in the household message the same bot. OpenClaw's allowlist identifies who is speaking by their numeric user ID. `SOUL.md` (private repo) defines what each person can see and do; the router additionally pins partner traffic to the Haiku tier.
+
+### 7. Public/private repo split
+
+Code, skills, docs, and evals are public (`lyra-ai`). Live personal config — `SOUL.md`, `MEMORY.md`, `HEARTBEAT.md`, `cron-jobs.json`, live Notion IDs — lives in a private companion repo (`lyra-private`). A pre-push PII hook and CI checks guard the boundary. See `docs/12-public-private-split.md`.
 
 ---
 
 ## Data flow
 
-### Inbound message (Akash or partner sends a text)
+### Inbound message
 ```
-Telegram message → OpenClaw gateway → agent turn starts
-→ SOUL.md + MEMORY.md + NOTION-CONTEXT.md loaded
-→ relevant skills available in context
-→ Claude Sonnet processes with full context
-→ tool calls executed (Notion, osascript, blogwatcher, etc.)
+Telegram message → OpenClaw gateway → model router plugin
+→ Tier 0? execute crud/cli.py, reply directly (no LLM)
+→ otherwise: SOUL.md + MEMORY.md + notion context loaded, tier selected
+→ model processes with full context, tool calls executed (Notion, bash, web)
 → response delivered back via Telegram
 ```
 
 ### Inbound voice message
 ```
 Telegram voice message → OpenClaw receives audio
-→ transcribed to text
+→ transcribed (OpenAI Whisper API)
 → voice-capture skill pipeline activated
 → classified (Insight/Decision/Idea/Question/Pattern)
 → saved to Second Brain Notion database
@@ -81,23 +87,32 @@ Telegram voice message → OpenClaw receives audio
 
 ### Scheduled task (cron fires)
 ```
-OpenClaw cron scheduler → isolated agent turn
-→ only HEARTBEAT.md loaded (lightweight context)
-→ task executed (RSS fetch, Notion query, web search)
-→ summary delivered to Telegram via announce
+OpenClaw cron scheduler (jobs mirrored in lyra-private/config/cron-jobs.json)
+→ isolated agent turn, lightweight context
+→ task executed (Notion queries, research scripts, health data)
+→ digest delivered via WhatsApp (household) or Telegram/email (ops)
 ```
 
 ---
 
 ## Workspace file roles
 
-| File | Loaded when | Purpose |
-|------|------------|---------|
-| `SOUL.md` | Every conversation | Personality, rules, access levels, tool instructions |
-| `MEMORY.md` | Every conversation | Permanent facts about you, your context, your preferences |
-| `NOTION-CONTEXT.md` | Every conversation | All database IDs and property names |
-| `HEARTBEAT.md` | Cron runs only | Lightweight context for scheduled tasks |
-| `skills/*/SKILL.md` | On demand | Modular capability definitions |
+| File | Loaded when | Purpose | Repo |
+|------|------------|---------|------|
+| `SOUL.md` | Every conversation | Personality, rules, access levels | private |
+| `MEMORY.md` | Every conversation | Permanent facts and preferences | private |
+| `references/notion.md` | Every conversation | All database IDs and property names | private |
+| `HEARTBEAT.md` | Cron runs only | Lightweight context for scheduled tasks | private |
+| `skills/*/SKILL.md` | On demand | Modular capability definitions | public |
+
+---
+
+## Long-term memory (gbrain)
+
+Alongside Notion, a separate brain pipeline (`/root/gbrain-brain/` on the server) keeps
+distilled long-term memory: a nightly job (`brain-dream.sh`) summarizes the day's
+sessions into durable notes the router can inject as context. Notion holds structured
+domain data; gbrain holds narrative memory. See `docs/9-supermemory.md`.
 
 ---
 
@@ -105,22 +120,22 @@ OpenClaw cron scheduler → isolated agent turn
 
 ```
 ┌─────────────────────────────────┐
-│  Telegram allowlist             │
-│  Only numeric IDs in allowFrom  │
-│  can send messages              │
+│  Channel allowlists             │
+│  Telegram numeric IDs;          │
+│  WhatsApp webhook shared secret │
 └────────────┬────────────────────┘
              │
 ┌────────────▼────────────────────┐
 │  SOUL.md access control         │
 │  Person A → all databases       │
 │  Person B → shared databases    │
-│             only                │
+│  (+ router pins partner tier)   │
 └────────────┬────────────────────┘
              │
 ┌────────────▼────────────────────┐
-│  denyCommands in gateway        │
-│  Blocks: camera, screen record, │
-│  contacts.add                   │
+│  Gateway constraints            │
+│  denyCommands, token auth,      │
+│  localhost-bound services       │
 └─────────────────────────────────┘
 ```
 
@@ -137,17 +152,4 @@ The key insight: **skills are documentation, not code**. The agent reads the ski
 - They can include examples, decision logic, and edge cases
 - You can update a skill by editing a markdown file
 
-Custom skills in this setup:
-- `voice-capture` — the voice → Second Brain pipeline
-- `self-edit` — instructions for Lyra to modify her own workspace files
-- `apple-reminders` — Reminders via `osascript` (not `remindctl`, which has macOS TCC issues when running as a daemon)
-
----
-
-## Why osascript instead of remindctl
-
-`remindctl` is a well-built CLI for Apple Reminders but relies on macOS TCC (Transparency, Consent, and Control) permissions tied to the calling application's bundle ID. When OpenClaw runs as a LaunchAgent (background daemon process), the calling context is `node` — not Terminal.app. Even if you grant Terminal permission, the daemon is blocked.
-
-`osascript` (Apple Events / AppleScript) uses a different permission model. It runs under the user's session and inherits the broader Apple Events permissions which the daemon process can access. Testing confirmed `osascript` works; `remindctl` does not from the daemon context.
-
-This is documented in the `apple-reminders` skill so Lyra never attempts to use `remindctl`.
+The live skill set is in `skills/` (one folder per skill). Heavier logic that shouldn't burn tokens — CRUD, content generation, research — lives in versioned scripts (`crud/`, `content-engine/`, `scripts/`) that skills and crons invoke.

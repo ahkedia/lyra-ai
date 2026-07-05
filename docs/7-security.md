@@ -1,6 +1,6 @@
 # Security Model
 
-Lyra has access to your calendar, email, Notion, and can run shell commands on your Mac. The security model reflects that.
+Lyra has access to your calendar, email, Notion, and can run shell commands on the server that hosts her (a Hetzner VPS in the current deployment). The security model reflects that.
 
 ---
 
@@ -115,14 +115,26 @@ By design and by lack of setup:
 - Post to social media autonomously (requires explicit approval per post)
 - Delete Notion entries without confirmation
 - Send emails without explicit per-send confirmation
-- Access other users' data on the Mac
-- Run as root or with elevated privileges
+
+> **Honest caveat (Hetzner deployment):** on the VPS the gateway currently runs as
+> `root` on a single-purpose machine. That trades user isolation for operational
+> simplicity — acceptable only because the box runs nothing else and exposes no
+> public ports beyond the WhatsApp webhook. Running as a dedicated non-root user
+> is the documented hardening follow-up.
 
 ---
 
 ## Credential storage and hardening
 
-### Gmail App Password — macOS Keychain
+> **Current deployment (Hetzner/Linux):** credentials live in `/root/.openclaw/.env`
+> (chmod 600, root-only box), loaded via the systemd unit's `EnvironmentFile`. There is
+> no OS keychain on a headless VPS; the mitigations are file permissions, a
+> single-purpose machine, no public inbound ports beyond the authenticated WhatsApp
+> webhook, and rotating any key that ever leaks. The pre-push PII/secret scan
+> (`scripts/pii-scan.sh`) and CI secret checks keep keys out of the public repo.
+> The macOS instructions below are kept for anyone running the original Mac setup.
+
+### Gmail App Password — macOS Keychain (Mac-era setup)
 
 The Gmail App Password (used by himalaya for IMAP/SMTP) should never live in plaintext. Store it in macOS Keychain and have himalaya fetch it at runtime:
 

@@ -26,7 +26,7 @@
 
 - **Text:** `APPROVE` / `SKIP` / `FEEDBACK <text>` (approval-bot).
 - **Visual:** separate step after text approval (not combined with text in one Telegram step).
-- `FEEDBACK` appends to `config/learnings.json` and refreshes **cumulativeLearnings** for the next runs.
+- `FEEDBACK` rewrites the **current** draft with the correction applied (revision appended to the page body, draft back to pending), and also appends to `config/learnings.json` / refreshes **cumulativeLearnings** for the next runs.
 
 ## 5. Notion properties to maintain
 

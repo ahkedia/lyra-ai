@@ -43,10 +43,10 @@ Bookmarks content_create ──► same Topic Pool (classify-and-route) ──�
 | Script | Purpose | Cron |
 |--------|---------|------|
 | `topic-collector.js` | Aggregate topics from 4 sources → Topic Pool as **Candidate** (Wiki/Lenny stay Candidate until manual Shortlist); **ingest cap** default **5** new rows/run (`topicPool.queue.ingestCap`) | 07:30 daily |
-| `topic-quality-gate.js` | Q2 Haiku score ≥ 7; promote Twitter / SecondBrain **Candidate** → **Shortlisted**; **max 2** Shortlisted per calendar day (`Shortlisted on` date) | ~07:45 daily (after collector) |
+| `topic-quality-gate.js` | Q2 Haiku score ≥ `qualityMinScore` (config `sources.json`, currently **5**); promote Twitter / SecondBrain **Candidate** → **Shortlisted**; **max 2** Shortlisted per calendar day (`Shortlisted on` date) | ~07:45 daily (after collector) |
 | `draft-generator.js` | Wiki-grounded blog + tweet + LinkedIn via Sonnet/Haiku; Topic Pool **Author brief** injected into blog prompt; full Voice Canon from wiki blocks; if Haiku score is below 8, Sonnet voice rewrite before social copy | Hourly 09:00-22:00 |
 | `visual-generator.js` | Gemini image → Imgur URL if needed → Notion `visual_url` + page block | Triggered by text approval |
-| `approval-bot.js` | Poll Telegram for APPROVE/SKIP/FEEDBACK/REDO/HOT/HELP/STATUS | Every 5 min |
+| `approval-bot.js` | Approvals: primary path is `--cmd` direct mode (Lyra routes APPROVE/SKIP/FEEDBACK/REDO/STATUS straight to the script, no Telegram polling); standalone Telegram-polling mode remains for the cron | Every 5 min (polling mode) |
 | `pull-quote-scheduler.js linkedin` | Send next unused pull-quote from a recent approved draft to Telegram for one-tap LinkedIn copy-paste | Wed 09:00 Berlin |
 | `pull-quote-scheduler.js x` | Same, for X | Fri 14:00 Berlin |
 
@@ -60,7 +60,7 @@ Bookmarks content_create ──► same Topic Pool (classify-and-route) ──�
 | `SKIP` | Visual pending | Skip visual, text-only publish |
 | `REDO` | Visual pending | Regenerate visual |
 | `REDO <hint>` | Visual pending | Regenerate with specific hint (e.g., "REDO more colorful") |
-| `FEEDBACK <text>` | Text pending | Record structural feedback, affects future drafts |
+| `FEEDBACK <text>` | Text pending | Rewrite the CURRENT draft with the feedback applied (re-queued as pending), and record it so future drafts honor it too |
 | `HOT <topic>` | Any | If daily Shortlist slots remain, **Shortlisted** + draft generator; else saved as **Candidate** (cap includes auto + HOT) |
 | `STATUS` | Any | Show queue status |
 | `HELP` | Any | Show command list |
@@ -75,7 +75,7 @@ Topics get **collector score** = source weight + recency tier bonus (24h / 48h /
 | Last 48h | +1.5 | Fresh |
 | Last 7d | +0.5 | Recent |
 
-**Shortlisted** (draft-eligible) comes from: (1) **topic-quality-gate.js** — Haiku Q2 ≥ 7, only **Twitter / SecondBrain**, max **2 per day** with **Shortlisted on** set; (2) **manual** Shortlist in Notion for Wiki/Lenny or any row; (3) **HOT** if slots remain that day.
+**Shortlisted** (draft-eligible) comes from: (1) **topic-quality-gate.js** — Haiku Q2 ≥ `qualityMinScore` (currently 5), only **Twitter / SecondBrain**, max **2 per day** with **Shortlisted on** set; (2) **manual** Shortlist in Notion for Wiki/Lenny or any row; (3) **HOT** if slots remain that day.
 
 **Config:** `config/sources.json` → `topicPool.queue` (`dailyShortlistCap`, `qualityMinScore`, `autoPromoteSources`).
 
@@ -86,7 +86,8 @@ Topics get **collector score** = source weight + recency tier bonus (24h / 48h /
 When you provide `FEEDBACK <text>`, the system:
 1. Stores feedback in the Notion page's `feedback` property
 2. Adds to `config/learnings.json` (last 20 feedbacks kept)
-3. Future drafts automatically incorporate cumulative learnings in the prompt
+3. **Rewrites the current draft** with the feedback applied (Sonnet), appends the revision to the page body, refreshes the `blog_content` preview, and sets the draft back to `pending` for re-approval
+4. Future drafts automatically incorporate cumulative learnings in the prompt
 
 Example: `FEEDBACK blogs need more specific examples from CheQ - vague claims don't land`
 

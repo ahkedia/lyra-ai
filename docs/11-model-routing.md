@@ -73,26 +73,36 @@ User message
 
 ## Classification methods
 
-### 1. Rule-based (handles ~80%)
+> **Where the live logic runs:** production routing happens in the OpenClaw plugin
+> `plugins/lyra-model-router/index.js` — a synchronous, rule-based scorer with its own
+> compiled pattern tables plus the Tier-0 CRUD bypass (`crud/cli.py`) and gbrain
+> retrieve-then-synthesize hook. There is **no LLM classifier in the live path** (the
+> plugin must return synchronously; the Haiku fallback below exists only in the CLI
+> tool `scripts/model-router.js`).
 
-Pattern matching against `config/routing-rules.yaml`:
-- **Regex patterns** per category (e.g., `"add .+ to .+ list"` → minimax)
+### 0. Tier-0 deterministic bypass
+
+Before any model routing, deterministic CRUD messages (reminders, groceries, meals…)
+are regex-matched and executed directly via `crud/cli.py`. Zero tokens, ~100ms.
+
+### 1. Rule-based scoring (the live path)
+
+Pattern + signal scoring in the plugin:
+- **Regex patterns** per tier (e.g., `"add .+ to .+ list"` → minimax)
 - **Keyword detection** (e.g., "synthesize" → sonnet)
 - **Complexity signals** (conjunction count, message length, question marks)
 - **Override rules** (greetings always minimax, "weekly review" always sonnet)
+- **ACL pinning** (partner traffic pinned to Haiku)
+- **Emergency/threshold modes** (cost-pressure mode forces cheaper tiers)
 
-### 2. LLM classifier (handles ~20%)
+### 2. LLM classifier (CLI tool only)
 
-When rules produce < 0.7 confidence, Claude Haiku classifies the message:
-- Cost: ~$0.001 per classification
-- Latency: ~500ms
-- Returns tier + category + reasoning
-- If LLM agrees with rules → confidence boosted
-- If LLM disagrees → LLM wins (better judgment)
+`scripts/model-router.js` (offline experiments) can escalate <0.7-confidence messages
+to a Haiku classification. This never runs in production.
 
 ## Configuration
 
-All routing rules live in `config/routing-rules.yaml`. To add a new category:
+The CLI/documentation rules live in `config/routing-rules.yaml` (see the banner at the top of that file). To add a new category there:
 
 ```yaml
 tiers:
@@ -155,7 +165,7 @@ The router adds ~$0.50-1.00/month in Haiku classification calls (for ~20% of mes
 |------|---------|
 | `config/routing-rules.yaml` | Routing rules configuration |
 | `scripts/model-router.js` | Main router module + CLI |
-| `scripts/router-hook.js` | OpenClaw hook integration |
+| `plugins/lyra-model-router/index.js` | **Live** OpenClaw plugin (own pattern tables + Tier-0 bypass) |
 | `skills/model-router/SKILL.md` | Skill definition for Lyra |
 | `docs/11-model-routing.md` | This documentation |
 | `logs/routing-decisions.jsonl` | Routing decision log |

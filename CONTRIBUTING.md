@@ -53,7 +53,8 @@ Include: what the skill does, how to invoke it, example commands, decision logic
 
 ### 4. Add routing patterns (if needed)
 
-If your skill handles a new type of message, add patterns to `config/routing-rules.yaml` under the appropriate tier:
+If your skill handles a new type of message, the **live** routing tables are in `plugins/lyra-model-router/index.js` (deterministic Tier-0 patterns must also be implemented in `crud/parse.py`). `config/routing-rules.yaml` is documentation + CLI-experiment config only. The tiers:
+- **tier0**: Deterministic CRUD — regex → `crud/cli.py`, no LLM
 - **minimax**: Simple, single-action commands
 - **haiku**: Multi-step or nuanced tasks
 - **sonnet**: Synthesis, strategic analysis, complex reasoning

@@ -1,4 +1,11 @@
 # Lyra Model Routing Rules
+#
+# ⚠️ DOCUMENTATION + CLI ONLY. The LIVE router is plugins/lyra-model-router/index.js,
+# which has its own compiled pattern tables and does NOT read this file at runtime.
+# This YAML backs `scripts/model-router.js` (CLI experiments, --test, --stats) and
+# serves as readable documentation of the tiering philosophy. If you change live
+# routing behavior, change the plugin (and its evals); update this file to match.
+#
 # Maps task categories to models based on patterns, keywords, and complexity signals.
 #
 # Three tiers:

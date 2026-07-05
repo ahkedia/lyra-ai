@@ -51,14 +51,14 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 | Tier 0 (CRUD bypass) | Python scripts — deterministic ops at $0/call, ~100ms |
 | Default AI model | MiniMax M2.7 (fast, cost-effective — 87% of LLM calls) |
 | Escalation models | Claude Haiku 4.5 (fallback, 9%) + Claude Sonnet 4.6 (synthesis, 4%) |
-| Messaging interface | Telegram Bot |
-| Databases | Notion (13 databases) |
+| Messaging interface | Telegram Bot + WhatsApp Cloud API (digest delivery) |
+| Databases | Notion (15+ databases) |
 | Email | [himalaya](https://himalaya.cli.rs) CLI (Gmail IMAP/SMTP) |
 | Calendar | Google Calendar API v3 (OAuth2) |
 | News & RSS | [blogwatcher](https://github.com/openclaw-ai/blogwatcher) CLI |
 | Web search | Tavily API |
-| Memory | SQLite (persistent semantic memory, local) |
-| Scheduled tasks | OpenClaw cron (7 jobs, Europe/Berlin timezone) |
+| Memory | gbrain (nightly-distilled long-term memory) + Notion + workspace files |
+| Scheduled tasks | OpenClaw cron (digests) + system crontab (ops), Europe/Berlin timezone |
 | Hosting | Hetzner VPS (Ubuntu 24.04, 4GB RAM, €5.99/mo) |
 | Persistence | systemd service + PostgreSQL (Docker) |
 | Secrets | `~/.openclaw/.env` (chmod 600, excluded from git and backups) |
@@ -110,15 +110,15 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 │   NOTION    │    │    CRONS      │    │   INTEGRATIONS   │
 │   Cockpit   │    │               │    │                  │
 │             │    │ 7am  digest   │    │ himalaya (email) │
-│ 13 DBs:    │    │ noon content  │    │ blogwatcher (RSS)│
-│ News       │    │ Sun  reviews  │    │ Tavily (search)  │
-│ Competitors│    │ Sun  brain    │    │ wttr.in (weather)│
-│ Recruiters │    │ Mon  health   │    │ IFTTT (reminders)│
-│ Content    │    │ 9pm  log      │    │ SQLite Memory    │
-│ Health     │    │               │    │                  │
-│ Meals      │    │ All Europe/   │    │                  │
-│ Trips      │    │ Berlin tz     │    │                  │
-│ Reminders  │    │               │    │                  │
+│ 15+ DBs:   │    │ 8am  move     │    │ blogwatcher (RSS)│
+│ News       │    │ Sun  review   │    │ Tavily (search)  │
+│ Competitors│    │ + ops crontab │    │ wttr.in (weather)│
+│ Recruiters │    │ (audit, brain │    │ IFTTT (reminders)│
+│ Content    │    │  dream, X     │    │ gbrain memory    │
+│ Health     │    │  bookmarks…)  │    │ WhatsApp bridge  │
+│ Meals      │    │               │    │                  │
+│ Trips      │    │ All Europe/   │    │                  │
+│ Reminders  │    │ Berlin tz     │    │                  │
 │ 2nd Brain  │    │               │    │                  │
 └─────────────┘    └───────────────┘    └──────────────────┘
 
@@ -155,18 +155,19 @@ This setup originally ran on my Mac as a LaunchAgent daemon. I migrated it to a 
 
 **What changed:**
 - `osascript` (Apple Reminders, Calendar) → Notion databases + IFTTT bridge to iPhones
-- `mlx-whisper` (local transcription) → Planned: OpenAI Whisper API (not yet migrated)
+- `mlx-whisper` (local transcription) → OpenAI Whisper API
 - `himalaya` (macOS Keychain auth) → `himalaya` (Gmail App Password auth)
 - LaunchAgent → systemd service
-- Local LanceDB + Ollama memory → SQLite Memory (local, persistent, no external dependency)
+- Local LanceDB + Ollama memory → gbrain (nightly distillation + retrieve-then-synthesize)
 - Default model: Claude Haiku → MiniMax M2.7 (cost reduction + speed)
-- Added: Tier 0 Python CRUD bypass ($0/call for deterministic ops), bidirectional GitHub sync, daily activity log, cron failure alerting, Postgres persistence
+- Telegram-only → Telegram + WhatsApp Cloud API digests (household channel)
+- Added: Tier 0 Python CRUD bypass ($0/call for deterministic ops), bidirectional GitHub sync, daily activity log, cron failure alerting, eval framework with coverage gate
 
 **What stayed the same:**
 - SOUL.md personality and rules
-- All 13 Notion database integrations
+- All Notion database integrations
 - Multi-user access control (Akash full / Abhigna sandboxed)
-- 7 scheduled cron heartbeats
+- Scheduled cron heartbeats
 - Self-edit capability
 - Prompt injection defenses
 

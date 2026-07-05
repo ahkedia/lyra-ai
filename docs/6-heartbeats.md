@@ -1,6 +1,10 @@
 # Heartbeats — Scheduled Intelligence
 
-Lyra does not wait to be asked. Five cron jobs fire on schedule and deliver to Telegram whether or not you have messaged the bot that day.
+Lyra does not wait to be asked. Cron jobs fire on schedule and deliver digests whether or not you have messaged the bot that day.
+
+**Where the live config lives:** the OpenClaw cron jobs are mirrored in `lyra-private/config/cron-jobs.json` (private repo — real recipients and live database IDs). Edit crons there, then apply with `scripts/restore-crons.py`. This doc keeps sanitized templates for anyone building their own set.
+
+**Current live set (as of 2026-07):** a weekly review (Sunday), a daily morning digest, and a daily move-checklist digest — all delivered via **WhatsApp** on the MiniMax tier — plus system-crontab jobs for ops (self-audit, health checks, twitter bookmarks, gbrain distillation). The five-job Telegram layout below is the original design and still a good starting template.
 
 ---
 
@@ -8,11 +12,11 @@ Lyra does not wait to be asked. Five cron jobs fire on schedule and deliver to T
 
 Each heartbeat does one thing well. The temptation is to bundle everything into the morning digest — news, tasks, competitors, health, calendar. This leads to timeouts, incomplete responses, and a wall of text you stop reading.
 
-Each cron has a single focused job. Combined, they cover your week.
+Each cron has a single focused job. Combined, they cover your week. (The current live digests deliberately bundle a few sections per message to reduce WhatsApp noise — if a job starts timing out or truncating, split it back out per the principle above.)
 
 ---
 
-## The five heartbeats
+## The five heartbeats (template set)
 
 ### 1. Morning Digest — 7am daily
 

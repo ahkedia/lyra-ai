@@ -42,7 +42,7 @@ holds the merged result. Only where files are version-controlled changes.
 - All ops/alert scripts now read `CHAT_ID` from `$TELEGRAM_USER_ID` (already in
   `/root/.openclaw/.env`, which every script sources) instead of a hardcoded ID.
 - `plugins/lyra-model-router/index.js` reads `ABHIGNA_ID` from `$TELEGRAM_PARTNER_ID`.
-- Docs (`QUICKSTART.md`, `DEPLOYMENT.md`, `MANUAL-DEPLOY.md`) use placeholder phone numbers.
+- Public docs use placeholder phone numbers only. (The legacy Docker-based deploy docs — `QUICKSTART.md`, `DEPLOYMENT.md`, `MANUAL-DEPLOY.md` — were deleted in the architecture cleanup; they described a deployment that never matched production.)
 - `skills/self-edit/SKILL.md` uses `$TELEGRAM_USER_ID` in its example command.
 
 **Known remaining, accepted:** eval cases (`evals/cases/tier3-judgment.yaml`,

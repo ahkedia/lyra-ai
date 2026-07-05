@@ -17,8 +17,12 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
-import { notionQuery, notionPatch, extractTitle, extractSelect, extractRichText, extractUrl, notionGetPage } from "./lib/notion.js";
+import {
+  notionQuery, notionPatch, extractTitle, extractSelect, extractRichText, extractUrl, notionGetPage,
+  notionFetchBlockTreeAsPlainText, blogPlainTextToParagraphBlocks, notionAppendChildrenBatched,
+} from "./lib/notion.js";
 import { getTelegramUpdates, validateChatId, getMessageText, sendTelegram } from "./lib/telegram.js";
+import { generateWithSonnet } from "./lib/anthropic.js";
 import { acquireLock, releaseLock } from "./lib/lockfile.js";
 import { generateVisualForDraft } from "./visual-generator.js";
 
@@ -167,8 +171,62 @@ async function handleFeedback(draft, feedback) {
   }
   learnings.cumulativeLearnings = cumulative;
   saveLearnings(learnings);
-  
-  await sendTelegram(`📝 Feedback recorded for: "${title}"\n\nThis feedback will be incorporated into future drafts.\n\n*Current queue:* Draft moved to "feedback" status. Send a new topic to generate an improved version, or manually edit in Notion.`);
+
+  // 4. Rewrite the CURRENT draft with the feedback applied and re-queue it for
+  // approval. (Previously feedback only affected future drafts and this draft
+  // was shelved in "feedback" status — the operator's correction never landed
+  // on the piece they were actually reviewing.)
+  try {
+    const revised = await rewriteDraftWithFeedback(draft, feedback);
+    await sendTelegram(`📝 Feedback applied to: "${title}"\n\nDraft rewritten (revision appended to the Notion page) and re-queued as pending. Reply APPROVE / SKIP / FEEDBACK <more>.\n\nPreview:\n${revised.slice(0, 600)}`);
+  } catch (err) {
+    console.error(`Feedback rewrite failed: ${err.message}`);
+    await sendTelegram(`📝 Feedback recorded for: "${title}" (rewrite failed: ${err.message}).\n\nIt will still shape future drafts. Draft left in "feedback" status — edit in Notion or send FEEDBACK again to retry.`);
+  }
+}
+
+function loadVoiceContract() {
+  const parts = [];
+  for (const rel of ["../config/voice-canon.md", "../../voice-system/NEGATIVE_STYLE.md"]) {
+    try {
+      parts.push(readFileSync(join(__dirname, rel), "utf8"));
+    } catch {
+      /* optional grounding; skip if missing */
+    }
+  }
+  return parts.join("\n\n").slice(0, 12000);
+}
+
+async function rewriteDraftWithFeedback(draft, feedback) {
+  const title = extractTitle(draft);
+  const fullBlog = await notionFetchBlockTreeAsPlainText(draft.id, 12000);
+  const currentText = fullBlog && fullBlog.trim().length > 200
+    ? fullBlog
+    : extractRichText(draft, "blog_content");
+  if (!currentText || !currentText.trim()) {
+    throw new Error("no draft text found on the page");
+  }
+
+  const system = `You revise a blog draft based on the author's direct feedback. Preserve the argument and evidence; change only what the feedback requires plus anything that violates the voice contract below. Output ONLY the revised blog text, no preamble.\n\n${loadVoiceContract()}`;
+  const user = `FEEDBACK (non-negotiable, apply throughout):\n${feedback}\n\nCURRENT DRAFT — "${title}":\n${currentText}`;
+  const revised = (await generateWithSonnet(system, user, 3000)).trim();
+  if (revised.length < 200) {
+    throw new Error("rewrite came back suspiciously short");
+  }
+
+  // Append the revision to the page body (originals stay above for comparison),
+  // refresh the preview property, and put the draft back in the approval queue.
+  const marker = `Revised draft — feedback applied ${new Date().toISOString().slice(0, 10)}`;
+  await notionAppendChildrenBatched(draft.id, [
+    { type: "heading_2", heading_2: { rich_text: [{ type: "text", text: { content: marker } }] } },
+    ...blogPlainTextToParagraphBlocks(revised),
+  ]);
+  const preview = revised.length > 1960 ? `${revised.slice(0, 1960)}\n…(full revision in page body)` : revised;
+  await notionPatch(draft.id, {
+    blog_content: { rich_text: [{ type: "text", text: { content: preview } }] },
+    text_approval_status: { select: { name: "pending" } },
+  });
+  return revised;
 }
 
 
