@@ -115,8 +115,12 @@ By design and by lack of setup:
 - Post to social media autonomously (requires explicit approval per post)
 - Delete Notion entries without confirmation
 - Send emails without explicit per-send confirmation
-- Access other users' data on the Mac
-- Run as root or with elevated privileges
+
+> **Honest caveat on privilege:** the gateway currently runs as `root` on the
+> Hetzner VPS. That is a real blast-radius risk we are actively reducing —
+> migrating to a dedicated non-root service user is tracked work. Do not read
+> this page as a claim that Lyra is sandboxed from the host; it runs shell
+> commands with the privileges of its service account.
 
 ---
 
