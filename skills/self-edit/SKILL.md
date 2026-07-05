@@ -78,7 +78,7 @@ openclaw cron add \
   --tz "Europe/Berlin" \
   --message "What to do at this time" \
   --announce \
-  --to "$TELEGRAM_USER_ID" \
+  --to 7057922182 \
   --channel telegram \
   --agent main \
   --timeout-seconds 120
