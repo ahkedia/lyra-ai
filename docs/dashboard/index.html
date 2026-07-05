@@ -29,26 +29,17 @@
   .foot{color:var(--mut);font-size:11px;margin-top:28px;border-top:1px solid var(--bd);padding-top:12px}
 </style></head><body>
   <h1>Lyra Eval Dashboard</h1>
-  <div class="sub">evals-before-changes · generated 2026-07-03T04:34:16.096Z · 49 full runs</div>
+  <div class="sub">evals-before-changes · generated 2026-07-05T04:33:56.455Z · 50 full runs</div>
   
   <div class="band">
-    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-07-03</div></div>
-    <div class="metric"><div class="mlabel">Capability pass rate</div><div class="mval big">90%</div><div class="msub">27/30 core · legacy 72% · 6 infra timeouts</div></div>
+    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-07-05</div></div>
+    <div class="metric"><div class="mlabel">Capability pass rate</div><div class="mval big">86%</div><div class="msub">24/28 core · legacy 67% · 8 infra timeouts</div></div>
     <div class="metric"><div class="mlabel">Days since good run</div><div class="mval big ok">0</div><div class="msub">harness healthy</div></div>
-    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">28.5s</div></div>
-    <div class="metric"><div class="mlabel">Ship gate</div><div class="mval ok">GREEN</div><div class="msub">all_ok</div></div>
+    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">28.2s</div></div>
+    <div class="metric"><div class="mlabel">Ship gate</div><div class="mval down">RED</div><div class="msub">blocking on real bugs</div></div>
   </div>
   <h2>Pass-rate trend (last 8 runs)</h2>
   <table class="trend"><thead><tr><th>Date</th><th>Pass</th><th>Core</th><th>Judgment</th><th>Showcase</th><th>Gap</th><th>Latency</th></tr></thead><tbody>
-    <tr>
-      <td>2026-06-19</td>
-      <td class="num">74%</td>
-      <td class="num">89%</td>
-      <td class="num">87%</td>
-      <td class="num">60%</td>
-      <td class="num">55%</td>
-      <td class="num">30.3s</td>
-    </tr>
     <tr>
       <td>2026-06-21</td>
       <td class="num">70%</td>
@@ -111,10 +102,29 @@
       <td class="num">0%</td>
       <td class="num">73%</td>
       <td class="num">28.5s</td>
+    </tr>
+    <tr>
+      <td>2026-07-05</td>
+      <td class="num">67%</td>
+      <td class="num">78%</td>
+      <td class="num">80%</td>
+      <td class="num">40%</td>
+      <td class="num">45%</td>
+      <td class="num">28.2s</td>
     </tr></tbody></table>
   <h2>Change → eval-delta timeline</h2>
   <div class="sub">Each run shows its pass-rate delta and the commits that landed since the prior run. <span class="badge warn">⚠ behavior · no eval</span> = a change to Lyra's behavior that shipped without an eval (what the gate will block).</div>
   
+    <div class="run">
+      <div class="runhead">
+        <div class="rundate">2026-07-05</div>
+        <div class="runpass">67% <span class="rsub">29/43</span></div>
+        <div class="rundelta"><span class="d down">▼ -5 pts</span></div>
+      </div>
+      <div class="tierrow"><span class="tierd down">core capability 100%→78%</span><span class="tierd up">architectural 67%→100%</span><span class="tierd up">showcase 0%→40%</span><span class="tierd down">gap 73%→45%</span></div>
+      <div class="fbrow">failures: timeout:6 · judge:6 · infra:2</div>
+      <ul class="commits"><li class="commit "><code>540b5512</code> <span class="badge muted">infra/docs</span> <span class="csubj">Consolidate ops alerts into daily/weekly email (drop per-script Telegram)</span></li><li class="commit "><code>bbdad97f</code> <span class="badge muted">infra/docs</span> <span class="csubj">Switch move-checklist-digest from claude-haiku to MiniMax-M2.7</span></li><li class="commit "><code>b2f9d4cc</code> <span class="badge muted">infra/docs</span> <span class="csubj">move-checklist: send full digest to both recipients (drop per-row routing)</span></li><li class="commit "><code>6937c302</code> <span class="badge muted">infra/docs</span> <span class="csubj">Fix cron webhook delivery: agents output final text, not nodes/send tool</span></li><li class="commit "><code>4db9b6db</code> <span class="badge muted">infra/docs</span> <span class="csubj">Fix morning-digest news search: use Tavily news topic with recency window</span></li><li class="commit "><code>f6a42d95</code> <span class="badge muted">infra/docs</span> <span class="csubj">Harden WhatsApp bridge: auth cron endpoint, chunk long msgs, retry sends, per-session lock, heartbeat</span></li><li class="commit flag"><code>6c379775</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (1)</span> <span class="csubj">Move: make Lyra speak plain to Akash &amp; Abhigna (hide tags/tiers/gate jargon)</span></li><li class="commit "><code>9c90a154</code> <span class="badge muted">infra/docs</span> <span class="csubj">Remove debug writeFileSync from cron-deliver handler</span></li><li class="commit "><code>44350156</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update cron prompts: Telegram → WhatsApp, Abhigna Telegram ID → WhatsApp number</span></li><li class="commit "><code>9d9885e3</code> <span class="badge muted">infra/docs</span> <span class="csubj">Add WhatsApp Cloud API webhook bridge; migrate cron delivery from Telegram to WhatsApp</span></li><li class="commit flag"><code>76b36894</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (1)</span> <span class="csubj">Add generic sell pipeline + enable move-checklist-digest cron</span></li><li class="commit "><code>1d0f9024</code> <span class="badge muted">infra/docs</span> <span class="csubj">Add Berlin→London move checklist integration (Phase 1 + 2)</span></li><li class="commit "><code>3ce9a6a1</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update eval dashboard data 2026-07-03</span></li></ul>
+    </div>
     <div class="run">
       <div class="runhead">
         <div class="rundate">2026-07-03</div>
