@@ -178,6 +178,28 @@ if [ -d "$REPO_DIR/workspace" ]; then
     fi
 fi
 
+# ──────────────────────────────────────────────
+# PHASE 3b: Prune stale files from workspace that were deleted from the repo.
+# rsync has no --delete so deletions don't auto-propagate; remove known dead files.
+# ──────────────────────────────────────────────
+DEAD_SCRIPTS=(
+    "$WORKSPACE/scripts/router-hook.js"
+    "$WORKSPACE/scripts/updater.py"
+    "$WORKSPACE/scripts/aggregate-morning-digest.js"
+    "$WORKSPACE/scripts/insight-engine.js"
+    "$WORKSPACE/scripts/x-publisher.js"
+    "$WORKSPACE/scripts/fetch-twitter-bookmarks.sh"
+    "$WORKSPACE/scripts/bookmarks-to-notion.sh"
+    "$WORKSPACE/config/routing-rules.yaml"
+)
+for dead in "${DEAD_SCRIPTS[@]}"; do
+    if [ -f "$dead" ]; then
+        rm -f "$dead"
+        SYNCED=true
+        log "  Pruned stale workspace file: $(basename "$dead")"
+    fi
+done
+
 if [ "$BEFORE" = "$AFTER" ] && [ "$PUSHED" = false ] && [ "$SYNCED" = false ]; then
     log "No changes in either direction."
     exit 0

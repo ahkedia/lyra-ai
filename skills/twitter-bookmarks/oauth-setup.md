@@ -151,7 +151,7 @@ If you see `invalid_grant`, the `code` expired — run `start` again, then `exch
 Run the fetch script manually:
 
 ```bash
-ssh hetzner "/root/fetch-twitter-bookmarks.sh"
+ssh hetzner "python3 /root/lyra-ai/scripts/twitter_bookmarks.py"
 ```
 
 Expected output:
@@ -196,7 +196,7 @@ Expected output:
 
 Your refresh token is long-lived (6 months of inactivity), but the access token expires every 2 hours.
 
-`fetch-twitter-bookmarks.sh` handles this automatically:
+`twitter_bookmarks.py` handles this automatically:
 1. Caches access token in `/tmp/twitter-access-token`
 2. Reuses token for 1 hour
 3. Refreshes automatically when expired
@@ -223,7 +223,7 @@ This is minimal and read-only.
 
 1. Complete this setup
 2. Save credentials to `/root/.openclaw/.env`
-3. Test with `./fetch-twitter-bookmarks.sh`
+3. Test with `python3 /root/lyra-ai/scripts/twitter_bookmarks.py --dry-run`
 4. Create Twitter Insights Notion database (see `notion-setup.md`)
 5. Deploy synthesis skill (see `skills/twitter-synthesis/SKILL.md`)
 6. Add 7am cron to OpenClaw (see `MEMORY.md`)
