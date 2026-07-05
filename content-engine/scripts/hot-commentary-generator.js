@@ -25,7 +25,7 @@ import {
   extractTitle,
   notionFetchBlockTreeAsPlainText,
 } from "./lib/notion.js";
-import { sendTelegram } from "./lib/telegram.js";
+import { sendTelegram, sendWhatsApp } from "./lib/telegram.js";
 import { generateWithSonnet, parseJsonLoose } from "./lib/anthropic.js";
 import { sanitizeInput, truncate } from "./lib/sanitize.js";
 
@@ -330,12 +330,11 @@ async function main() {
 
   const sourceNote = sourceUrl ? `\n\n📎 ${sourceUrl}` : "";
 
-  await sendTelegram(
-    `🔥 *HOT commentary ready*: "${label}"${sourceNote}\n\n` +
+  { const _m = `🔥 *HOT commentary ready*: "${label}"${sourceNote}\n\n` +
     `𝕏 TWEET (${tweet_take.length} chars):\n${twitterPreview}\n\n` +
     `LINKEDIN:\n${linkedinPreview}\n\n` +
-    `→ APPROVE to mark ready | SKIP to discard | FEEDBACK <text>`
-  );
+    `→ APPROVE to mark ready | SKIP to discard | FEEDBACK <text>`;
+    await Promise.all([sendTelegram(_m), sendWhatsApp(_m)]); }
 
   console.log("=== Done ===");
 }
@@ -343,7 +342,7 @@ async function main() {
 main().catch(async (err) => {
   console.error("Fatal error:", err);
   try {
-    await sendTelegram(`❌ HOT commentary failed: ${err.message}`);
+    await Promise.all([sendTelegram(`❌ HOT commentary failed: ${err.message}`), sendWhatsApp(`❌ HOT commentary failed: ${err.message}`)]);
   } catch {}
   process.exit(1);
 });

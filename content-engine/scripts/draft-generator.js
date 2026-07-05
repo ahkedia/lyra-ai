@@ -33,7 +33,7 @@ import {
   notionFetchBlockTreeAsPlainText,
   richTextChunks,
 } from "./lib/notion.js";
-import { sendTelegram } from "./lib/telegram.js";
+import { sendTelegram, sendWhatsApp } from "./lib/telegram.js";
 import { generateWithSonnet, humanizeWithHaiku, parseJsonLoose } from "./lib/anthropic.js";
 import { sanitizeInput, truncate } from "./lib/sanitize.js";
 import { acquireLock, releaseLock } from "./lib/lockfile.js";
@@ -803,7 +803,7 @@ ${quotesPreview || "—"}
 
 Reply APPROVE or SKIP`;
       
-      await sendTelegram(msg);
+      await Promise.all([sendTelegram(msg), sendWhatsApp(msg)]);
       processed++;
       
       await sleep(1000);
@@ -812,7 +812,7 @@ Reply APPROVE or SKIP`;
       
       try {
         await markTopicShortlisted(topicPage.id);
-        await sendTelegram(`⚠️ Draft generation failed for "${topic}": ${err.message}`);
+        await Promise.all([sendTelegram(`⚠️ Draft generation failed for "${topic}": ${err.message}`), sendWhatsApp(`⚠️ Draft generation failed for "${topic}": ${err.message}`)]);
       } catch {}
     }
   }

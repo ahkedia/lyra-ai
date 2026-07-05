@@ -26,7 +26,7 @@ import {
   extractRichText,
   extractNumber,
 } from "./lib/notion.js";
-import { sendTelegram } from "./lib/telegram.js";
+import { sendTelegram, sendWhatsApp } from "./lib/telegram.js";
 import { acquireLock, releaseLock } from "./lib/lockfile.js";
 
 const LOCKFILE = "/tmp/content-pull-quote-scheduler.lock";
@@ -109,7 +109,7 @@ ${quote}
 Copy-paste to ${label}. No link. No context.
 (Slot ${slot} of 3 used; ${3 - (used + 1)} remain on this blog.)`;
 
-  await sendTelegram(msg);
+  await Promise.all([sendTelegram(msg), sendWhatsApp(msg)]);
   await markQuoteUsed(page.id, used + 1);
 
   console.log(`Sent quote ${slot} from "${topic}" for ${label}`);

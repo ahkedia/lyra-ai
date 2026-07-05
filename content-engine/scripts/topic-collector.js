@@ -19,7 +19,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 import { notionQueryAll, notionCreatePage, extractTitle, extractText, extractSelect, extractDate, extractUrl } from "./lib/notion.js";
-import { sendTelegram } from "./lib/telegram.js";
+import { sendTelegram, sendWhatsApp } from "./lib/telegram.js";
 import { acquireLock, releaseLock } from "./lib/lockfile.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -224,7 +224,7 @@ async function main() {
     `Rows are *Candidate*. Run *topic-quality-gate* (cron after this) for Q2 Shortlist up to 2/day, or Shortlist in Notion.`;
   
   try {
-    await sendTelegram(summary);
+    await Promise.all([sendTelegram(summary), sendWhatsApp(summary)]);
   } catch (err) {
     console.error("Telegram send failed:", err.message);
   }

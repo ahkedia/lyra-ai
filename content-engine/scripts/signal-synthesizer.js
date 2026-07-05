@@ -36,7 +36,7 @@ import {
   extractDate,
 } from "./lib/notion.js";
 import { generateWithSonnet } from "./lib/anthropic.js";
-import { sendTelegram } from "./lib/telegram.js";
+import { sendTelegram, sendWhatsApp } from "./lib/telegram.js";
 import { acquireLock, releaseLock } from "./lib/lockfile.js";
 import { parseJsonLoose } from "./lib/anthropic.js";
 
@@ -331,7 +331,7 @@ async function run() {
     const tgMessage = `🔗 *SIGNAL INSIGHT*\n\n${cleanInsight}\n\n---\n📣 *Tweet draft:*\n${cleanTweet}\n\n_(${cleanTweet.length} chars)_\n\nReply \`APPROVE\` to queue for posting or \`SKIP\` to discard.`;
 
     if (!DRY_RUN) {
-      await sendTelegram(tgMessage);
+      await Promise.all([sendTelegram(tgMessage), sendWhatsApp(tgMessage)]);
     } else {
       console.log(`[signal-synthesizer] [dry-run] Would send Telegram:\n${tgMessage}`);
     }

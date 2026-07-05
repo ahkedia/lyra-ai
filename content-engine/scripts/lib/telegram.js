@@ -73,6 +73,22 @@ export async function sendPhoto(photoUrl, caption, chatId = TELEGRAM_CHAT_ID) {
   return json.result;
 }
 
+const WA_BRIDGE_URL = "https://wa.akashkedia.com/wa/cron-deliver";
+
+export async function sendWhatsApp(text, to = process.env.WA_TO_AKASH) {
+  const secret = process.env.WA_CRON_SECRET;
+  if (!secret || !to) return;
+  const url = `${WA_BRIDGE_URL}?to=${to}&secret=${secret}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ summary: text }),
+  });
+  if (!res.ok) {
+    throw new Error(`WhatsApp send failed: ${res.status}`);
+  }
+}
+
 export async function getTelegramUpdates(offset, timeout = 30) {
   const params = new URLSearchParams({ timeout: timeout.toString() });
   if (offset) params.set("offset", offset.toString());

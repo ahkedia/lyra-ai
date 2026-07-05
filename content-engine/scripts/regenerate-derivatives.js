@@ -24,7 +24,7 @@ import {
   notionFetchBlockTreeAsPlainText,
   richTextChunks,
 } from "./lib/notion.js";
-import { sendTelegram } from "./lib/telegram.js";
+import { sendTelegram, sendWhatsApp } from "./lib/telegram.js";
 import { generateDerivativesFromBlog } from "./draft-generator.js";
 
 const MIN_BLOG_CHARS = 400;
@@ -107,7 +107,7 @@ ${result.newsletterHook || "—"}
 (Existing approval status unchanged.)`;
 
   try {
-    await sendTelegram(msg);
+    await Promise.all([sendTelegram(msg), sendWhatsApp(msg)]);
   } catch (e) {
     console.warn(`Telegram send failed (non-fatal): ${e.message}`);
   }

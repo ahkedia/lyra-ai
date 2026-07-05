@@ -17,7 +17,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 import { notionPatch, notionGetPage, notionAppendBlock, extractTitle, extractSelect, extractRichText, extractNumber } from "./lib/notion.js";
-import { sendTelegram, sendPhoto } from "./lib/telegram.js";
+import { sendTelegram, sendPhoto, sendWhatsApp } from "./lib/telegram.js";
 import { generateImage, buildDoodlePrompt } from "./lib/image.js";
 import { uploadToImgur } from "./lib/imgur.js";
 
@@ -62,7 +62,7 @@ async function generateVisualForDraft(pageId, redoHint = null) {
     await notionPatch(pageId, {
       visual_approval_status: { select: { name: "not_required" } },
     });
-    await sendTelegram(`⚠️ Visual generation skipped for "${title}" after ${MAX_REDO_COUNT} failed attempts`);
+    await Promise.all([sendTelegram(`⚠️ Visual generation skipped for "${title}" after ${MAX_REDO_COUNT} failed attempts`), sendWhatsApp(`⚠️ Visual generation skipped for "${title}" after ${MAX_REDO_COUNT} failed attempts`)]);
     return null;
   }
   
@@ -144,7 +144,7 @@ async function generateVisualForDraft(pageId, redoHint = null) {
     return finalUrl;
   } catch (err) {
     console.error(`Visual generation failed: ${err.message}`);
-    await sendTelegram(`⚠️ Visual generation failed for "${title}": ${err.message}\n\nReply SKIP to skip visual, or REDO to retry.`);
+    await Promise.all([sendTelegram(`⚠️ Visual generation failed for "${title}": ${err.message}\n\nReply SKIP to skip visual, or REDO to retry.`), sendWhatsApp(`⚠️ Visual generation failed for "${title}": ${err.message}`)]);
     return null;
   }
 }

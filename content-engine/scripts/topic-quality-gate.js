@@ -17,7 +17,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 import { notionQuery, notionPatch, extractTitle, extractSelect, extractNumber } from "./lib/notion.js";
-import { sendTelegram } from "./lib/telegram.js";
+import { sendTelegram, sendWhatsApp } from "./lib/telegram.js";
 import { acquireLock, releaseLock } from "./lib/lockfile.js";
 import { evaluateTopicGate } from "./lib/anthropic.js";
 import { countShortlistedToday, remainingSlots, getTodayYmd } from "./lib/topic-pool-quota.js";
@@ -48,9 +48,7 @@ async function run() {
     promotedToday = await countShortlistedToday(TOPIC_POOL_DB, SHORTLISTED_ON, notionQuery);
   } catch (e) {
     console.error(`Count Shortlisted today failed: ${e.message}`);
-    await sendTelegram(
-      `⚠️ *Topic Quality Gate skipped*\n\nAdd Notion date property *${SHORTLISTED_ON}* to Content Topic Pool (used for daily cap).`
-    );
+    { const _m = `⚠️ *Topic Quality Gate skipped*\n\nAdd Notion date property *${SHORTLISTED_ON}* to Content Topic Pool (used for daily cap).`; await Promise.all([sendTelegram(_m), sendWhatsApp(_m)]); }
     return;
   }
 
@@ -140,7 +138,7 @@ async function run() {
     `Candidates evaluated: ${evaluated}`;
 
   try {
-    await sendTelegram(msg);
+    await Promise.all([sendTelegram(msg), sendWhatsApp(msg)]);
   } catch (e) {
     console.error("Telegram:", e.message);
   }
