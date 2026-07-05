@@ -302,7 +302,9 @@ chmod 600 ~/.openclaw/.env
 
 # 5. Install skills
 cp -r skills/ ~/.openclaw/workspace/skills/
-cp notion/notion.md ~/.openclaw/workspace/references/notion.md
+# Fill in ~/.openclaw/workspace/references/notion.md with your own
+# database IDs + schemas (public repo only ships schemas at notion/database-schemas.md;
+# personal IDs live in your private companion repo — see docs/12-public-private-split.md).
 
 # 6. Set up systemd service
 cp scripts/openclaw.service /etc/systemd/system/
