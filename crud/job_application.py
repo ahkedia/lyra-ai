@@ -332,14 +332,29 @@ def _notion_req(method: str, path: str, body: dict = None) -> dict:
 
 
 def _voice_canon_from_local_file() -> str:
-    """Last-resort voice text when Notion is empty (repo snapshot)."""
-    try:
-        voice_path = os.path.join(os.path.dirname(__file__), '..', 'voice-system', 'VOICE.md')
-        voice_path = os.path.normpath(voice_path)
-        with open(voice_path, encoding='utf-8') as f:
-            return f.read().strip()[:8000]
-    except OSError:
-        return ''
+    """Last-resort voice text when Notion is empty.
+
+    Prefers the real voice canon pointed to by VOICE_CANON_FILE (on the server
+    this is the content-engine canon); falls back to the repo snapshot at
+    voice-system/VOICE.md. That snapshot is an unpopulated placeholder (its
+    InsightEngine populator was removed), so skip it while it still is one.
+    """
+    candidates = []
+    env_path = os.environ.get('VOICE_CANON_FILE')
+    if env_path:
+        candidates.append(env_path)
+    candidates.append(
+        os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'voice-system', 'VOICE.md'))
+    )
+    for path in candidates:
+        try:
+            with open(path, encoding='utf-8') as f:
+                text = f.read().strip()
+        except OSError:
+            continue
+        if text and 'Placeholder' not in text[:200]:
+            return text[:8000]
+    return ''
 
 
 def _fetch_voice_canon_notion() -> str:
