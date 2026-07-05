@@ -4,7 +4,7 @@ source /root/.openclaw/.env 2>/dev/null || true
 
 HEALTH_URL="http://localhost:18789/health"
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-CHAT_ID="7057922182"
+CHAT_ID="${TELEGRAM_USER_ID:-}"
 STATE_FILE="/tmp/lyra-health-state"
 CRON_STATE="/tmp/lyra-cron-error-state"
 

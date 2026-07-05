@@ -18,7 +18,7 @@
  *   openclaw.json → hooks.internal.entries.model-router
  *
  * Standalone:
- *   echo '{"message":"Add milk to list","sender":"7057922182"}' | node router-hook.js
+ *   echo '{"message":"Add milk to list","sender":"123456789"}' | node router-hook.js
  */
 
 import { routeMessage } from './model-router.js';

@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "_note": "SANITIZED EXAMPLE. The live cron config (real recipients, real prompts) lives in the PRIVATE repo: lyra-private/config/cron-jobs.json. scripts/restore-crons.py reads the private copy and expands ${VAR} placeholders in delivery URLs from the environment (source /root/.openclaw/wa-webhook.env first).",
+  "jobs": [
+    {
+      "name": "morning-digest",
+      "enabled": true,
+      "schedule": { "kind": "cron", "expr": "0 7 * * *", "tz": "Europe/Berlin" },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Morning digest. Keep context lean. Sections: 1. EMAIL: summarize unread via himalaya. 2. NEWS: run the research script for your topics, save top stories to the News Inbox Notion DB. 3. HEALTH: parse the daily-summary script output. 4. IDEAS: list open content ideas from Notion. Output the digest as your FINAL reply (plain text) — delivery to WhatsApp is automatic; do not call any send/notify tool.",
+        "model": "minimax-direct/MiniMax-M2.7",
+        "timeoutSeconds": 900,
+        "lightContext": true
+      },
+      "delivery": {
+        "mode": "webhook",
+        "to": "https://wa.example.com/wa/cron-deliver?to=${WA_TO_PRIMARY}&secret=${WA_CRON_SECRET}"
+      }
+    },
+    {
+      "name": "weekly-review",
+      "enabled": true,
+      "schedule": { "kind": "cron", "expr": "0 18 * * 0", "tz": "Europe/Berlin" },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Weekly review. Sections: health summary, competitor news (research script + save to Notion), second-brain synthesis of the week, wiki health. Skip empty sections; never fabricate. Output the review as your FINAL reply — delivery is automatic.",
+        "model": "minimax-direct/MiniMax-M2.7",
+        "timeoutSeconds": 900
+      },
+      "delivery": {
+        "mode": "webhook",
+        "to": "https://wa.example.com/wa/cron-deliver?to=${WA_TO_PRIMARY}&secret=${WA_CRON_SECRET}"
+      }
+    },
+    {
+      "name": "shared-digest-example",
+      "enabled": false,
+      "_note": "Example of delivering one digest to two allowlisted recipients.",
+      "schedule": { "kind": "cron", "expr": "0 8 * * *", "tz": "Europe/Berlin" },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Daily shared digest for both household members. Query the shared Notion databases and output one digest as your FINAL reply.",
+        "model": "minimax-direct/MiniMax-M2.7",
+        "timeoutSeconds": 120
+      },
+      "delivery": {
+        "mode": "webhook",
+        "to": "https://wa.example.com/wa/cron-deliver?to=${WA_TO_PRIMARY},${WA_TO_PARTNER}&secret=${WA_CRON_SECRET}"
+      }
+    }
+  ]
+}

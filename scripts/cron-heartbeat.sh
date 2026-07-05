@@ -5,7 +5,7 @@
 set -uo pipefail
 source /root/.openclaw/.env 2>/dev/null || true
 source /root/lyra-ai/scripts/ops-notify.sh
-CHAT_ID="7057922182"
+CHAT_ID="${TELEGRAM_USER_ID:-}"
 STATE_FILE="/tmp/lyra-cron-heartbeat-state"
 MIN=${LYRA_CRON_MIN:-1}
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)

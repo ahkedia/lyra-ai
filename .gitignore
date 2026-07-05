@@ -9,6 +9,17 @@ secrets.json
 api_key
 config.toml
 
+# Live personal layer — lives in the PRIVATE repo (lyra-private), never here.
+# See docs/12-public-private-split.md. Templates (config/*-template.md,
+# config/cron-jobs.example.json) stay tracked. Root MEMORY.md is a tracked
+# pointer stub, not the live memory.
+/SOUL.md
+/config/SOUL.md
+/config/MEMORY.md
+/config/HEARTBEAT.md
+/config/cron-jobs.json
+/notion/notion.md
+
 # macOS
 .DS_Store
 .AppleDouble

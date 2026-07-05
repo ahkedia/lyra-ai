@@ -201,7 +201,7 @@ const server = http.createServer(async (req, res) => {
 
   // Cron delivery endpoint — OpenClaw POSTs finished cron result here.
   // Auth: WA_CRON_SECRET via X-Cron-Secret header or ?secret= query (OpenClaw --webhook is URL-only).
-  // ?to=919916325222,4917682162578  (comma-separated E.164 without +, all must be in ALLOWLIST)
+  // ?to=91XXXXXXXXXX,49XXXXXXXXXXX  (comma-separated E.164 without +, all must be in ALLOWLIST)
   if (req.method === 'POST' && u.pathname === '/wa/cron-deliver') {
     const provided = req.headers['x-cron-secret'] || u.searchParams.get('secret') || '';
     if (!CRON_SECRET || !safeEqual(provided, CRON_SECRET)) {
