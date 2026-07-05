@@ -2,7 +2,7 @@
 # Lyra WhatsApp bridge heartbeat.
 # Every run: check the bridge is alive (localhost:8091/wa/health).
 # With --deep (daily): also verify the Graph API token still works.
-# Alerts go via TELEGRAM (independent of the WA bridge, so a down bridge can still page).
+# Failures are buffered to the consolidated ops email (scripts/ops-notify.sh -> ops-email.sh).
 # State files prevent alert spam; a recovery message is sent once when it clears.
 set -euo pipefail
 
@@ -17,14 +17,11 @@ set -a; . "$ENV_FILE"; . "$WA_ENV_FILE"; set +a
 
 BOT="${TELEGRAM_BOT_TOKEN:-}"
 CHAT="${TELEGRAM_USER_ID:-}"
+source /root/lyra-ai/scripts/ops-notify.sh
 
 alert() {
   local msg="$1"
-  [ -n "$BOT" ] && [ -n "$CHAT" ] || { echo "no telegram creds; $msg" >&2; return; }
-  curl -s -o /dev/null --max-time 15 \
-    "https://api.telegram.org/bot${BOT}/sendMessage" \
-    --data-urlencode "chat_id=${CHAT}" \
-    --data-urlencode "text=${msg}" || true
+  ops_note event "WA bridge" "$msg"
 }
 
 # --- liveness ---

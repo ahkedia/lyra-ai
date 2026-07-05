@@ -48,14 +48,18 @@ seed() {
             return 0
         fi
     done
-    # Last resort: recover from public git history (file may already be deleted
-    # from the worktree if the split commit was pulled first).
+    # Last resort: recover the LATEST version from public git history (the file
+    # may already be deleted from the worktree if the split commit was pulled
+    # first — walk back to the newest commit that still contains it).
     local histpath="${dest#./}"
-    if git -C "$REPO_DIR" cat-file -e "HEAD:$histpath" 2>/dev/null; then
-        git -C "$REPO_DIR" show "HEAD:$histpath" > "$dest"
-        say "Seeded $dest  ←  lyra-ai git HEAD"
-        return 0
-    fi
+    local commit
+    for commit in $(git -C "$REPO_DIR" log --format=%H -- "$histpath"); do
+        if git -C "$REPO_DIR" cat-file -e "$commit:$histpath" 2>/dev/null; then
+            git -C "$REPO_DIR" show "$commit:$histpath" > "$dest"
+            say "Seeded $dest  ←  lyra-ai git history (${commit:0:7})"
+            return 0
+        fi
+    done
     say "SKIP $dest (no source found)"
     return 0
 }
