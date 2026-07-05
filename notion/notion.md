@@ -179,15 +179,16 @@ Every database has two IDs. Use the right one depending on what you're doing:
 ### Second Brain
 - **database_id:** `e4027aaf-d2ff-49e1-babf-7487725e2ef4`
 - **data_source_id:** `f1ce4e0f-9e0d-43da-87f8-94dae2732962`
+- **Properties:** Name (title), wiki_candidate (checkbox)
+- **Who can access:** Akash only
+- **Purpose:** Long-term thinking capture — voice notes, spontaneous ideas, key decisions, patterns. This is the core of the second brain.
 
 ### AI Evals Dashboard
 - **database_id:** `a028ad4e-43d2-4406-bae7-65f9b41f006f`
 - **data_source_id:** `63d1d1cd-a7d9-4518-b91e-b3013fea9171`
 - **Properties:** Date (date), Total Tests (number), Passed (number), Failed (number), Pass Rate (number), Avg Latency (ms) (number), Top Failure (rich_text), Notes (rich_text)
-- **Purpose:** Track Lyra's performance over time for the AI portfolio
-- **Properties:** Name (title), Type (select: Insight, Decision, Idea, Question, Pattern), Source (select: Voice, Telegram, Manual, Weekly Synthesis), Date (date), Tags (multi_select: job-hunt, relocation, content, n26, sme-lending, ai, personal, abhigna), Notes (rich_text)
 - **Who can access:** Akash only
-- **Purpose:** Long-term thinking capture — voice notes, spontaneous ideas, key decisions, patterns. This is the core of the second brain.
+- **Purpose:** Track Lyra's performance over time for the AI portfolio.
 
 ### Reminders - Akash
 - **database_id:** `32678008-9100-802f-ad9f-fb48ff5f4c1d`
@@ -363,26 +364,3 @@ curl -s -X PATCH "https://api.notion.com/v1/pages/PAGE_ID_HERE" \
 - **Properties:** Date (date), Weight kg (number), Body Fat pct (number), Waist cm (number), Notes (rich_text), Source (select: Manual/Lab/DXA), Photo (files)
 - **Who can access:** Akash only
 - **Purpose:** Monthly body measurements and lab result snapshots
-
----
-
-## Berlin → London Move Databases (added 2026-07-03)
-
-Live under Lyra Hub → 🏠 Berlin → London Move page.
-
-| Database | database_id / data_source_id | Purpose |
-|---|---|---|
-| Move Checklist | `82bdfcae-9a54-41f6-8109-e0a84608d54a` / `687c4c41-e69f-4140-bdd5-7075d8b18d46` | 45-task relocation checklist |
-| Lyra Move Log | `a224d6cb-3a4b-474f-a073-aa7dd2a43a43` / `cdeddfc7-da2a-44d9-8f3b-5564e5bb92e5` | Audit trail of Lyra actions |
-| Sell Inventory | `d109bbd6-ad1f-43fb-a3ab-f767f6e38bac` / `a2353576-fddc-4987-b2aa-c77d9ef1b86c` | Items to sell before departure |
-
-**Parent page:** `39278008-9100-8125-bb2b-ea753ed90af7`
-**URL:** https://app.notion.com/p/3927800891008125bb2bea753ed90af7
-
-### Three gates (enforced nightly by move-checklist-sync.js)
-1. **Visa gate** — rows with Gate='Visa gate' Blocked until row 45 Done/In progress
-2. **Abmeldung gate** — rows with Gate='Abmeldung gate' Blocked until row 12 Done
-3. **Contract-bank gate** — row 21 Blocked until rows 16, 31, 32 all Done
-
-### Script
-`/root/lyra-ai/scripts/move-checklist-sync.js --dry-run --digest`
