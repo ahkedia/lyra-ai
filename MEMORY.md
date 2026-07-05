@@ -1,96 +1,19 @@
-# Lyra Memory
+# Lyra Memory — moved to the private repo
 
-**Authoritative operational log:** [`config/MEMORY.md`](config/MEMORY.md) — cold start, derisking, crons, rules, persistent fixes. Read it at session start together with `config/SOUL.md`.
+This repo is public. Lyra's live memory (operator facts, personal context, the
+operational log) now lives in the **private** companion repo:
 
-## Glossary — Two distinct knowledge stores (NEVER conflate)
+- `lyra-private/MEMORY.md` — operator facts + glossary (Second Brain vs Personal Wiki)
+- `lyra-private/config/MEMORY.md` — operational log: cold start, cron notes, persistent fixes
+- `lyra-private/config/SOUL.md` — live personality, boundaries, access control
 
-Akash uses two Notion entities that are easy to confuse. They are **separate databases with separate purposes**. Never use one name for the other.
+On Hetzner the private repo is cloned at `/root/lyra-private` and synced into the
+OpenClaw workspace by `scripts/deploy-lyra.sh`. At runtime nothing changes: the
+workspace copies (`~/.openclaw/workspace/SOUL.md`, `MEMORY.md`, …) are still loaded
+on every session.
 
-| | **Second Brain** | **Personal Wiki** (aka Personal Knowledge Base) |
-|---|---|---|
-| **Purpose** | Low-friction thought/idea/decision capture from Akash via Lyra. Lyra appends on every "remember this", "save this thought", voice dump. Weekly synthesis cron reviews it. | Curated reference corpus: CV, Voice Canon, career narratives, domain expertise (AI/ML, Payments, etc.), interview stories, Lenny synthesis. Akash curates it manually; Lyra reads it to ground drafts. |
-| **Write direction** | Lyra writes, Akash reads | Akash writes, Lyra reads |
-| **Notion database_id** | `e4027aaf-d2ff-49e1-babf-7487725e2ef4` | `33d78008-9100-8183-850d-e7677ac46b63` |
-| **Notion data_source_id** | `f1ce4e0f-9e0d-43da-87f8-94dae2732962` | `33d78008-9100-8197-9f0f-000b205edfe8` |
-| **Canonical doc** | `docs/5-second-brain.md` | `/Users/akashkedia/AI/projects/personal-kb-raw/WIKI-NOTION.md` |
-| **When to query** | "What did I think about X last week?", weekly brain-brief cron | Voice Canon for drafts, CV for applications, career narratives for interviews, positioning for outreach |
+Public templates for forkers: [`config/SOUL-template.md`](config/SOUL-template.md),
+[`config/MEMORY-template.md`](config/MEMORY-template.md),
+[`config/cron-jobs.example.json`](config/cron-jobs.example.json).
 
-**Rules:**
-- When drafting content/outreach/applications → query **Personal Wiki** (Voice Canon, career narratives). Never "second brain" for voice/positioning.
-- When capturing raw thoughts → write to **Second Brain**. Never to the wiki.
-- If a user message is ambiguous ("check my knowledge base"), default to Personal Wiki and state which one you're using.
-- Never say the wiki "isn't listed" or "can't be found" without actually querying `33d78008-9100-8183-850d-e7677ac46b63` first.
-
-## Operator Facts (NEVER re-ask these — read this block first)
-
-These are stable facts about Akash. Lyra must read this block before drafting any outreach/application/cover letter. If a field is missing, ask for **that specific field** — never list 4 of them as if all are unknown.
-
-- **Name:** Akash Kedia
-- **Email:** ahkedia@gmail.com
-- **GitHub:** github.com/ahkedia
-- **Location:** Germany (Europe/Berlin)
-- **Wife:** Abhigna Bararia (abhighnabararia@gmail.com)
-- **Phone:** (not in repo — if needed, ask once; do not list alongside facts that ARE known)
-- **Current CV / resume:** stored in Personal Wiki (`33d78008-…`), `Type = Career` or `Type = CV`. Query Personal Wiki before asking for a filesystem path.
-- **Voice Canon:** Personal Wiki, filter `Type = Voice Canon`.
-- **Career context:** Personal Wiki, filter `Type = Career`. Key employers: CheQ, Flipkart Pay, Trade Republic.
-- **Domain pages:** Personal Wiki, filter `Domain = [AI/ML | Payments | ...]`.
-
-**Rule:** if a draft needs Akash's contact details, pull from this block + Personal Wiki. Do NOT re-ask email, GitHub, location, CV, or Voice Canon. If a field is genuinely missing, name it in one line and continue drafting with placeholder.
-
-## Notion
-Read `references/notion.md` or `~/.openclaw/references/notion.md` for schemas and IDs. Lyra Hub: `31778008-9100-806b-b935-dc1810971e87`
-
-## Schedules
-7am: news digest | noon: content draft | Sun 9am: job review | Sun 6pm: competitor digest | Sun 8pm: brain brief | Mon 9am: health check
-
-## Session Log
-[date — fact]
-
-## Personal Wiki — query recipe
-
-(IDs are in the glossary above. Never confuse this with Second Brain.)
-
-**Lenny episode synthesis (Type = Lenny Synthesis):** The wiki stores curated “Lenny Synthesis” pages (per-episode and theme notes) alongside other types. For **zero-token** lookups from Telegram, messages matching natural phrases (e.g. *what does Lenny say about …*) route to `crud/cli.py parse` → `wiki_notion.lenny_wiki_search`, which queries the Personal Wiki data source for `Type = Lenny Synthesis` and `Title` contains the topic, then pulls block text for excerpts. **CLI (debug):** `python3 crud/cli.py wiki-lenny "<topic>"`. **Related Tier 0:** `wiki-lint` (orphan / stale / “My take” scan) and `wiki-dedup "<keywords>"` (similar titles before creating a new page). Router patterns live in `plugins/lyra-model-router/index.js` (`WIKI_TIER0_PATTERNS`).
-
-**News Inbox — arXiv auto-intake (dedupe on Link):** `python3 crud/cli.py news-inbox-rss [max_new]` runs `crud/news_inbox_rss.py` (latest **cs.LG** from arXiv Atom, skip if `Link` already exists). Suitable for a daily cron on Hetzner.
-
-When answering career / domain / positioning / voice questions (general LLM path):
-  - **Primary:** `POST /v1/databases/33d78008-9100-8183-850d-e7677ac46b63/query` (same path as job pipeline). For Voice Canon only: filter `Type` = `Voice Canon`. Filter examples: `Domain = [relevant domain]` or `Type = Career | Voice Canon`.
-  - **Alternate:** `POST /v1/data_sources/33d78008-9100-8197-9f0f-000b205edfe8/query`.
-  - **Step 2:** For each page_id, `GET /v1/blocks/{page_id}/children` — page body is required; titles alone are not enough.
-  - **Creating new pages:** use `database_id = 33d78008-9100-8183-850d-e7677ac46b63`.
-  - Cite the page title in your answer.
-
-## Content revision
-After user feedback on a draft, always re-apply Voice Canon + channel rules — not only the literal edits requested. See `config/SOUL.md` → Drafts, revisions & job copy.
-
-## Salvaged eval-judge fixes (from GitHub orphan ae430eb, 2026-06-11; restored 2026-06-20)
-- **Routing description hygiene** — When describing routing/fallback to users, keep it concept-level only. Exact phrasing when asked what happens if the primary model fails: "MiniMax is my primary model. If it goes down, I automatically fall back to Haiku. If both are unavailable, I'll tell you directly. Sonnet is on-demand only, not part of the automatic chain." Never mention version numbers (M2.7, 4.5, 4.6), retry intervals, router version strings, cron implementation details, or specific HTTP codes — specifics read as fabrication to anyone without internal access.
-- **Apple Calendar / macOS tools** — Apple Calendar, AppleScript, and all macOS-local tools are NOT available in this cloud (Linux) environment. When asked about Apple Calendar, say: "I don't have access to Apple Calendar here — your calendar is Google Calendar, accessible via `node scripts/gcal-helper.js`."
-- **crud/cli.py write confirmation** — After any write via `crud/cli.py`, the CLI prints a confirmation line (Notion page URL/ID). Include that output in your response. Responding "Done." without showing CLI output means the write did not happen — say the write failed instead.
-
-
-## Tool & Workflow Detail (relocated from SOUL.md 2026-06-21)
-
-### /hot command
-`/hot` is a **Telegram slash command** handled at the **gateway plugin level** — MiniMax is NOT involved. When Akash types `/hot <url or topic>` in Telegram, the gateway plugin fires directly. If he types `HOT <url>` without the slash (old habit), reply: "Use /hot to generate commentary."
-
-### Content Ideas
-- **database_id:** `f008d0bb-ac81-401d-889d-4e8f508ab134`
-- **Count entries:** run `curl -s -X POST https://api.notion.com/v1/databases/f008d0bb-ac81-401d-889d-4e8f508ab134/query` with Bearer NOTION_API_KEY and Notion-Version 2025-09-03 headers, body {"page_size":100}, then count results array. If Notion is unreachable, say so — do not guess.
-- **Access control:** Never name or echo this database to Abhigna (outside her allowed list). Deflect with what she CAN use.
-
-### Twitter Bookmarks → Notion
-After `fetch-twitter-bookmarks.sh` runs, handle `/tmp/lyra-bookmarks-*.json` via `skills/twitter-synthesis/SKILL.md`.
-
-### Health Logging
-No standalone Notion pages for health (meals, workouts, weight, sleep). Log with `python3 /root/lyra-ai/crud/cli.py <command>` → database rows only. See `skills/health-coach/SKILL.md` for commands. Emoji-titled one-offs (e.g. "💪 Pull Day") are wrong — use Lyra Health Coach DB (https://www.notion.so/akashkedia/Lyra-Health-Coach-32c78008910081009c81fb7254abc9ae), not new sub-pages under Lyra Hub.
-
-
-## Brain Write Path (gbrain)
-- **Live write path = gbrain** via plugin `lyra-brain-capture` (loaded at gateway startup) → `scripts/brain-capture.sh` → HTTP MCP at `http://localhost:3131`. Brain files live at `/root/gbrain-brain/` (dirs: `lyra/`, `second-brain/`, `wiki/`, `tweets/`, `writing/`, `persona/`, `command-center/`).
-- **Triggers:** explicit (`/remember <text>`, or message starting with "remember this / save to brain / note to brain") OR auto-summary on `agent_end` if exchange is substantive (>80 user chars, >200 reply chars).
-- **`skills/remember/SKILL.md` is STALE** — still documents ByteRover (`brv`), which is superseded. Do not follow it. The plugin handles all brain writes; do not call `brv` directly.
-- **`gbrain-http.service`** = read-only serving (ask-akash chatbot). Writes go only through `brain-capture.sh` (flock-serialized, PGLite single-writer safe — do NOT write directly to `/root/gbrain-brain/`).
-- **Nightly pipeline:** 04:00 UTC wiki_promote → 04:30 UTC brain-sync.sh (Notion → gbrain) → 05:15 UTC brain-dream.sh (distillation/consolidation).
+Full design and runbook: [`docs/12-public-private-split.md`](docs/12-public-private-split.md).

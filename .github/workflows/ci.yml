@@ -37,14 +37,40 @@ jobs:
             }
           "
 
-      - name: Check SOUL.md token count
+      - name: Check SOUL template token count
+        # Live SOUL.md moved to the private repo (docs/12-public-private-split.md);
+        # keep the "SOUL stays short" check on the public template.
         run: |
-          TOKENS=$(wc -w < config/SOUL.md)
-          echo "SOUL.md: $TOKENS words"
+          TOKENS=$(wc -w < config/SOUL-template.md)
+          echo "SOUL-template.md: $TOKENS words"
           if [ "$TOKENS" -gt 700 ]; then
-            echo "FAIL: SOUL.md has $TOKENS words (limit: 700)"
+            echo "FAIL: SOUL-template.md has $TOKENS words (limit: 700)"
             exit 1
           fi
+
+      - name: Block private-layer files in public repo
+        run: |
+          BAD=""
+          for f in config/SOUL.md config/MEMORY.md config/HEARTBEAT.md config/cron-jobs.json notion/notion.md SOUL.md; do
+            [ -f "$f" ] && BAD="$BAD $f"
+          done
+          if [ -n "$BAD" ]; then
+            echo "FAIL: private-layer file(s) present — these belong in lyra-private:$BAD"
+            exit 1
+          fi
+          echo "✓ No private-layer files tracked"
+
+      - name: Check for phone numbers in webhook URLs
+        run: |
+          FOUND=$(grep -rn --include='*.json' --include='*.sh' --include='*.md' --include='*.js' \
+            -E 'cron-deliver\?to=[0-9]|[?&]to=[0-9]{10,15}' \
+            --exclude-dir=node_modules --exclude-dir=.git . | grep -v 'XXXXXXXXXX\|\${WA_TO_' || true)
+          if [ -n "$FOUND" ]; then
+            echo "FAIL: real phone numbers found in webhook URLs:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "✓ No phone numbers in webhook URLs"
 
       - name: Check skill frontmatter descriptions
         run: |

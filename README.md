@@ -190,7 +190,7 @@ Lyra has two access tiers on the same bot. My wife has her own conversation, acc
 
 **4. Self-modifying agent with audit trail**
 
-Lyra can edit her own SOUL.md, MEMORY.md, skills, and Notion references. Every change auto-syncs to this GitHub repo within 5 minutes. The commit history is the audit trail. If something breaks, `git revert` fixes it.
+Lyra can edit her own SOUL.md, MEMORY.md, skills, and Notion references. Every change auto-syncs to GitHub — code and skills to this public repo, personal config to a private companion repo (`lyra-private`), with a pre-push PII scan guarding the boundary (see [`docs/12-public-private-split.md`](docs/12-public-private-split.md)). The commit history is the audit trail. If something breaks, `git revert` fixes it.
 
 **5. Resilience-first cloud design**
 
@@ -224,9 +224,9 @@ lyra-ai/
 │   ├── openclaw-template.json        ← OpenClaw config (secrets removed)
 │   ├── SOUL-template.md              ← personality + rules template
 │   ├── MEMORY-template.md            ← memory structure template
-│   ├── SOUL.md                       ← live config (auto-synced from Hetzner)
-│   ├── MEMORY.md                     ← live config (auto-synced from Hetzner)
-│   └── HEARTBEAT.md                  ← live cron context
+│   └── cron-jobs.example.json        ← sanitized cron config example
+│   (live SOUL/MEMORY/HEARTBEAT/cron-jobs sync to the PRIVATE repo
+│    `lyra-private` — see docs/12-public-private-split.md)
 ├── workspace/
 │   ├── TOOLS.md                      ← tool index (Chief of Staff; synced to VPS workspace)
 │   └── tasks/current.md              ← today focus scratchpad
@@ -257,8 +257,7 @@ lyra-ai/
 │   ├── chief-of-staff/SKILL.md       ← EA / morning prep / pipeline hygiene
 │   └── _template/SKILL.md            ← template for new skills
 ├── notion/
-│   ├── notion.md                     ← live database IDs (auto-synced)
-│   └── database-schemas.md           ← all 13 database structures
+│   └── database-schemas.md           ← database structures (live IDs are private)
 └── .gitignore
 ```
 

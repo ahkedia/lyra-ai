@@ -15,7 +15,18 @@ Background: the 2026-06 OpenClaw upgrade silently wiped the cron store; the hear
 (scripts/cron-heartbeat.sh) now watches for a recurrence. See MEMORY note 'OpenClaw crons'."""
 import json, subprocess, os, string
 
-SRC = os.path.join(os.path.dirname(__file__), "..", "config", "cron-jobs.json")
+# The live cron config moved to the PRIVATE repo (it contains real recipient
+# numbers). Resolution order: $LYRA_CRON_CONFIG → private repo → legacy public
+# path (pre-split clones). See docs/12-public-private-split.md.
+_CANDIDATES = [
+    os.environ.get("LYRA_CRON_CONFIG", ""),
+    "/root/lyra-private/config/cron-jobs.json",
+    os.path.join(os.path.dirname(__file__), "..", "config", "cron-jobs.json"),
+]
+SRC = next((p for p in _CANDIDATES if p and os.path.isfile(p)), None)
+if SRC is None:
+    raise SystemExit("cron-jobs.json not found — clone lyra-private or set LYRA_CRON_CONFIG")
+print(f"Using cron config: {SRC}")
 data = json.load(open(SRC))
 added, skipped, failed = [], [], []
 
