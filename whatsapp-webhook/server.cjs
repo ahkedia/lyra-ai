@@ -212,6 +212,10 @@ const server = http.createServer(async (req, res) => {
     const rawStr = raw.toString('utf8');
     const text = extractReply(rawStr);
     if (!text) { log('cron-deliver: no text extracted'); return; }
+    // Split digests (section 6.6c): a section cron replies with exactly "SKIP" when it
+    // has nothing to report. Suppress it so empty sections never ping. Interactive
+    // messages use a different code path and are unaffected.
+    if (/^skip$/i.test(text)) { log('cron-deliver: section returned SKIP, suppressed'); return; }
     const toParam = u.searchParams.get('to') || ALLOWLIST[0];
     const targets = toParam.split(',').map(s => s.trim().replace(/^\+/, '')).filter(n => ALLOWLIST.includes(n));
     if (!targets.length) { log('cron-deliver: no valid targets in', toParam); return; }
