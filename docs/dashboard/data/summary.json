@@ -1,27 +1,27 @@
 {
-  "date": "2026-07-17",
-  "timestamp": "2026-07-17T04:32:34.655Z",
+  "date": "2026-07-19",
+  "timestamp": "2026-07-19T04:32:39.963Z",
   "total_tests": 43,
-  "passed": 30,
-  "failed": 13,
-  "pass_rate": 0.7,
-  "avg_latency_ms": 28013,
-  "p95_latency_ms": 75001,
+  "passed": 29,
+  "failed": 14,
+  "pass_rate": 0.67,
+  "avg_latency_ms": 27773,
+  "p95_latency_ms": 72459,
   "by_tier": {
     "core_capability": {
       "total": 9,
-      "passed": 6,
-      "pass_rate": 0.67
+      "passed": 7,
+      "pass_rate": 0.78
     },
     "architectural": {
       "total": 3,
-      "passed": 3,
-      "pass_rate": 1
+      "passed": 0,
+      "pass_rate": 0
     },
     "judgment": {
       "total": 15,
-      "passed": 13,
-      "pass_rate": 0.87
+      "passed": 14,
+      "pass_rate": 0.93
     },
     "showcase": {
       "total": 5,
@@ -47,23 +47,23 @@
     },
     "retrieval_quality": {
       "total": 2,
-      "passed": 0,
-      "pass_rate": 0
+      "passed": 1,
+      "pass_rate": 0.5
     },
     "tool_use": {
       "total": 3,
-      "passed": 3,
-      "pass_rate": 1
+      "passed": 0,
+      "pass_rate": 0
     },
     "access_control": {
       "total": 5,
-      "passed": 4,
-      "pass_rate": 0.8
+      "passed": 2,
+      "pass_rate": 0.4
     },
     "safety": {
       "total": 9,
-      "passed": 8,
-      "pass_rate": 0.89
+      "passed": 9,
+      "pass_rate": 1
     },
     "graceful_degradation": {
       "total": 3,
@@ -87,8 +87,8 @@
     },
     "digest": {
       "total": 2,
-      "passed": 1,
-      "pass_rate": 0.5
+      "passed": 2,
+      "pass_rate": 1
     },
     "write_verification": {
       "total": 1,
@@ -97,8 +97,8 @@
     },
     "brain_retrieval": {
       "total": 4,
-      "passed": 2,
-      "pass_rate": 0.5
+      "passed": 3,
+      "pass_rate": 0.75
     }
   },
   "stability": {
@@ -106,33 +106,33 @@
     "infra_failures": 8,
     "infra_failure_rate": 0.186,
     "by_reason": {
-      "timeout": 6,
-      "transport": 2,
+      "timeout": 7,
+      "transport": 1,
       "infra": 0,
       "error": 0
     },
     "by_failure_kind": {
-      "timeout": 6,
-      "infra": 2,
+      "timeout": 7,
+      "infra": 1,
       "heartbeat_leak": 0,
-      "judge": 4,
+      "judge": 6,
       "latency_threshold": 0,
-      "assertion": 1,
+      "assertion": 0,
       "auth": 0,
       "other": 0
     },
-    "stable_count": 27,
-    "unstable_count": 16
+    "stable_count": 29,
+    "unstable_count": 14
   },
   "scores": {
-    "legacy_pass_rate": 0.6977,
-    "legacy_passed": 30,
-    "capability_pass_rate": 0.8889,
+    "legacy_pass_rate": 0.6744,
+    "legacy_passed": 29,
+    "capability_pass_rate": 0.8276,
     "capability_passed": 24,
     "integration_total": 6,
     "integration_stable": 5,
-    "integration_passed": 3,
-    "integration_pass_rate": 0.6,
+    "integration_passed": 2,
+    "integration_pass_rate": 0.4,
     "stable_retrieval_judge_failures": 0
   },
   "gates": {
@@ -151,16 +151,15 @@
   "eval_lane_counts": {
     "production_representative": {
       "total": 43,
-      "passed": 30,
-      "pass_rate": 0.7
+      "passed": 29,
+      "pass_rate": 0.67
     }
   },
   "run_mode": "e2e_live_tools",
   "failure_breakdown": {
-    "timeout": 6,
-    "assertion": 1,
-    "judge": 4,
-    "infra": 2
+    "timeout": 7,
+    "judge": 6,
+    "infra": 1
   },
   "eval_config": {
     "batch_size": 12,
@@ -176,49 +175,24 @@
   },
   "error_fingerprint_top": [
     {
-      "fingerprint": "bef4dff95e30",
+      "fingerprint": "37e2f218ae56",
       "count": 1,
-      "example_error": "Chat timeout after 30000ms (stage=await_run_final; idle_ms=28911; lifecycle_events=1; tool_events=0)"
+      "example_error": "Chat timeout after 30000ms (stage=await_run_final; idle_ms=28545; lifecycle_events=1; tool_events=0)"
     },
     {
-      "fingerprint": "6f832cd358b7",
+      "fingerprint": "c71e835d99dd",
       "count": 1,
-      "example_error": "Chat timeout after 45000ms (stage=await_run_final; idle_ms=43511; lifecycle_events=1; tool_events=0)"
+      "example_error": "Chat timeout after 45000ms (stage=await_run_final; idle_ms=43061; lifecycle_events=1; tool_events=0)"
     },
     {
-      "fingerprint": "2077b61a42aa",
-      "count": 1,
-      "example_error": "Chat timeout after 45000ms (stage=await_run_final; idle_ms=39765; lifecycle_events=1; tool_events=0)"
-    },
-    {
-      "fingerprint": "e089aec88e59",
+      "fingerprint": "d91c86febafe",
       "count": 1,
       "example_error": ""
     },
     {
-      "fingerprint": "6f4cadd36049",
+      "fingerprint": "f7b94a6bda31",
       "count": 1,
-      "example_error": ""
-    },
-    {
-      "fingerprint": "bd108427e021",
-      "count": 1,
-      "example_error": ""
-    },
-    {
-      "fingerprint": "00f0fcd01a70",
-      "count": 1,
-      "example_error": ""
-    },
-    {
-      "fingerprint": "1037beb4e97a",
-      "count": 1,
-      "example_error": "Chat timeout after 90000ms (stage=await_run_final; idle_ms=88432; lifecycle_events=1; tool_events=0)"
-    },
-    {
-      "fingerprint": "ba730889009b",
-      "count": 1,
-      "example_error": "Chat timeout after 90000ms (stage=await_run_final; idle_ms=88085; lifecycle_events=1; tool_events=0)"
+      "example_error": "Chat timeout after 45000ms (stage=history_fetch; idle_ms=1018; lifecycle_events=3; tool_events=0)"
     },
     {
       "fingerprint": "4ca863309d7b",
@@ -226,19 +200,49 @@
       "example_error": "Connection closed: 1006 "
     },
     {
-      "fingerprint": "f6793d7d060e",
+      "fingerprint": "5d206c39f52f",
       "count": 1,
-      "example_error": "WebSocket error: "
+      "example_error": "Chat timeout after 60000ms (stage=await_run_final; idle_ms=58870; lifecycle_events=1; tool_events=0)"
     },
     {
-      "fingerprint": "4c7fc0b22c0e",
+      "fingerprint": "1396a9cb7daf",
+      "count": 1,
+      "example_error": "Chat timeout after 45000ms (stage=await_run_final; idle_ms=43875; lifecycle_events=1; tool_events=0)"
+    },
+    {
+      "fingerprint": "7b3237920417",
       "count": 1,
       "example_error": ""
     },
     {
-      "fingerprint": "e0768431376e",
+      "fingerprint": "312c6e0a507b",
       "count": 1,
-      "example_error": "Chat timeout after 75000ms (stage=await_run_final; idle_ms=74013; lifecycle_events=1; tool_events=0)"
+      "example_error": ""
+    },
+    {
+      "fingerprint": "768e80967e72",
+      "count": 1,
+      "example_error": "Chat timeout after 90000ms (stage=await_run_final; idle_ms=88785; lifecycle_events=1; tool_events=0)"
+    },
+    {
+      "fingerprint": "a37673879f74",
+      "count": 1,
+      "example_error": "Chat timeout after 60000ms (stage=await_run_final; idle_ms=58888; lifecycle_events=1; tool_events=0)"
+    },
+    {
+      "fingerprint": "bf1a4f8c9776",
+      "count": 1,
+      "example_error": ""
+    },
+    {
+      "fingerprint": "1ad7513db4fd",
+      "count": 1,
+      "example_error": ""
+    },
+    {
+      "fingerprint": "57726ab9205d",
+      "count": 1,
+      "example_error": ""
     }
   ]
 }
