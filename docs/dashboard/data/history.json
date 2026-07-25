@@ -2643,5 +2643,70 @@
       "assertion": 1,
       "infra": 1
     }
+  },
+  {
+    "date": "2026-07-24",
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "pass_rate": 0,
+    "avg_latency_ms": 45004,
+    "p95_latency_ms": 45004,
+    "by_tier": {
+      "gap": {
+        "total": 1,
+        "passed": 0,
+        "pass_rate": 0
+      }
+    },
+    "infra_failure_rate": 1,
+    "eval_lane": "diagnostic",
+    "failure_breakdown": {
+      "timeout": 1
+    }
+  },
+  {
+    "date": "2026-07-25",
+    "total": 43,
+    "passed": 33,
+    "failed": 10,
+    "pass_rate": 0.77,
+    "avg_latency_ms": 27292,
+    "p95_latency_ms": 60402,
+    "by_tier": {
+      "core_capability": {
+        "total": 9,
+        "passed": 8,
+        "pass_rate": 0.89
+      },
+      "architectural": {
+        "total": 3,
+        "passed": 3,
+        "pass_rate": 1
+      },
+      "judgment": {
+        "total": 15,
+        "passed": 13,
+        "pass_rate": 0.87
+      },
+      "showcase": {
+        "total": 5,
+        "passed": 1,
+        "pass_rate": 0.2
+      },
+      "gap": {
+        "total": 11,
+        "passed": 8,
+        "pass_rate": 0.73
+      }
+    },
+    "capability_pass_rate": 0.9355,
+    "infra_failure_rate": 0.093,
+    "eval_lane": "production_representative",
+    "failure_breakdown": {
+      "timeout": 4,
+      "assertion": 2,
+      "judge": 4
+    }
   }
 ]
