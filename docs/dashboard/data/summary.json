@@ -1,44 +1,44 @@
 {
-  "date": "2026-07-25",
-  "timestamp": "2026-07-25T04:32:31.021Z",
+  "date": "2026-07-27",
+  "timestamp": "2026-07-27T04:33:49.442Z",
   "total_tests": 43,
-  "passed": 33,
-  "failed": 10,
-  "pass_rate": 0.77,
-  "avg_latency_ms": 27292,
-  "p95_latency_ms": 60402,
+  "passed": 27,
+  "failed": 16,
+  "pass_rate": 0.63,
+  "avg_latency_ms": 29057,
+  "p95_latency_ms": 65134,
   "by_tier": {
     "core_capability": {
       "total": 9,
-      "passed": 8,
-      "pass_rate": 0.89
+      "passed": 6,
+      "pass_rate": 0.67
     },
     "architectural": {
       "total": 3,
-      "passed": 3,
-      "pass_rate": 1
+      "passed": 0,
+      "pass_rate": 0
     },
     "judgment": {
       "total": 15,
-      "passed": 13,
-      "pass_rate": 0.87
+      "passed": 12,
+      "pass_rate": 0.8
     },
     "showcase": {
       "total": 5,
-      "passed": 1,
-      "pass_rate": 0.2
+      "passed": 2,
+      "pass_rate": 0.4
     },
     "gap": {
       "total": 11,
-      "passed": 8,
-      "pass_rate": 0.73
+      "passed": 7,
+      "pass_rate": 0.64
     }
   },
   "by_category": {
     "memory_recall": {
       "total": 3,
-      "passed": 3,
-      "pass_rate": 1
+      "passed": 2,
+      "pass_rate": 0.67
     },
     "instruction_following": {
       "total": 4,
@@ -47,33 +47,33 @@
     },
     "retrieval_quality": {
       "total": 2,
-      "passed": 2,
-      "pass_rate": 1
+      "passed": 1,
+      "pass_rate": 0.5
     },
     "tool_use": {
       "total": 3,
-      "passed": 3,
-      "pass_rate": 1
+      "passed": 0,
+      "pass_rate": 0
     },
     "access_control": {
       "total": 5,
-      "passed": 2,
-      "pass_rate": 0.4
+      "passed": 4,
+      "pass_rate": 0.8
     },
     "safety": {
       "total": 9,
-      "passed": 9,
-      "pass_rate": 1
+      "passed": 8,
+      "pass_rate": 0.89
     },
     "graceful_degradation": {
       "total": 3,
-      "passed": 3,
-      "pass_rate": 1
+      "passed": 2,
+      "pass_rate": 0.67
     },
     "multi_step": {
       "total": 3,
-      "passed": 1,
-      "pass_rate": 0.33
+      "passed": 2,
+      "pass_rate": 0.67
     },
     "proactive_quality": {
       "total": 2,
@@ -97,69 +97,69 @@
     },
     "brain_retrieval": {
       "total": 4,
-      "passed": 4,
-      "pass_rate": 1
+      "passed": 2,
+      "pass_rate": 0.5
     }
   },
   "stability": {
     "total": 43,
-    "infra_failures": 4,
-    "infra_failure_rate": 0.093,
+    "infra_failures": 6,
+    "infra_failure_rate": 0.1395,
     "by_reason": {
-      "timeout": 4,
+      "timeout": 6,
       "transport": 0,
       "infra": 0,
       "error": 0
     },
     "by_failure_kind": {
-      "timeout": 4,
+      "timeout": 6,
       "infra": 0,
       "heartbeat_leak": 0,
-      "judge": 4,
+      "judge": 7,
       "latency_threshold": 0,
-      "assertion": 2,
+      "assertion": 3,
       "auth": 0,
       "other": 0
     },
-    "stable_count": 31,
-    "unstable_count": 12
+    "stable_count": 29,
+    "unstable_count": 14
   },
   "scores": {
-    "legacy_pass_rate": 0.7674,
-    "legacy_passed": 33,
-    "capability_pass_rate": 0.9355,
-    "capability_passed": 29,
+    "legacy_pass_rate": 0.6279,
+    "legacy_passed": 27,
+    "capability_pass_rate": 0.6897,
+    "capability_passed": 20,
     "integration_total": 6,
     "integration_stable": 6,
     "integration_passed": 3,
     "integration_pass_rate": 0.5,
-    "stable_retrieval_judge_failures": 0
+    "stable_retrieval_judge_failures": 1
   },
   "gates": {
     "run_valid": true,
     "stability_ok": true,
-    "capability_ok": true,
+    "capability_ok": false,
     "timeout_ok": true,
     "heartbeat_ok": true,
     "auth_ok": true,
-    "retrieval_grounding_ok": true,
+    "retrieval_grounding_ok": false,
     "strict_kind_gates_enabled": true,
-    "kind_gates_ok": true,
-    "all_ok": true
+    "kind_gates_ok": false,
+    "all_ok": false
   },
   "eval_lane": "production_representative",
   "eval_lane_counts": {
     "production_representative": {
       "total": 43,
-      "passed": 33,
-      "pass_rate": 0.77
+      "passed": 27,
+      "pass_rate": 0.63
     }
   },
   "run_mode": "e2e_live_tools",
   "failure_breakdown": {
-    "timeout": 4,
-    "assertion": 2,
-    "judge": 4
+    "timeout": 6,
+    "judge": 7,
+    "assertion": 3
   },
   "eval_config": {
     "batch_size": 12,
@@ -175,9 +175,34 @@
   },
   "error_fingerprint_top": [
     {
+      "fingerprint": "75d67dfbb2be",
+      "count": 1,
+      "example_error": "Chat timeout after 45000ms (stage=await_run_final; idle_ms=43983; lifecycle_events=1; tool_events=0)"
+    },
+    {
       "fingerprint": "bd101b279bbb",
       "count": 1,
       "example_error": "Chat timeout after 30000ms (stage=await_run_final; idle_ms=29067; lifecycle_events=1; tool_events=0)"
+    },
+    {
+      "fingerprint": "929a047a3b55",
+      "count": 1,
+      "example_error": ""
+    },
+    {
+      "fingerprint": "1c46a8a00fc9",
+      "count": 1,
+      "example_error": ""
+    },
+    {
+      "fingerprint": "1e5cf5d8b42b",
+      "count": 1,
+      "example_error": "Chat timeout after 45000ms (stage=await_run_final; idle_ms=44058; lifecycle_events=1; tool_events=0)"
+    },
+    {
+      "fingerprint": "52d4d299b97e",
+      "count": 1,
+      "example_error": ""
     },
     {
       "fingerprint": "fe3d1c2ea6a5",
@@ -185,42 +210,42 @@
       "example_error": ""
     },
     {
-      "fingerprint": "e089aec88e59",
+      "fingerprint": "e054301c5077",
       "count": 1,
       "example_error": ""
     },
     {
-      "fingerprint": "acadc0a752f9",
+      "fingerprint": "c73146b7b51a",
       "count": 1,
       "example_error": ""
     },
     {
-      "fingerprint": "51bf215f34b2",
+      "fingerprint": "b38745d1067b",
       "count": 1,
       "example_error": ""
     },
     {
-      "fingerprint": "ba958e5003da",
-      "count": 1,
-      "example_error": "Chat timeout after 90000ms (stage=await_run_final; idle_ms=88718; lifecycle_events=1; tool_events=0)"
-    },
-    {
-      "fingerprint": "02668f9b08f7",
-      "count": 1,
-      "example_error": "Chat timeout after 90000ms (stage=await_run_final; idle_ms=88534; lifecycle_events=1; tool_events=0)"
-    },
-    {
-      "fingerprint": "0afe0557611a",
+      "fingerprint": "f649560c86df",
       "count": 1,
       "example_error": ""
     },
     {
-      "fingerprint": "a2413f67e476",
+      "fingerprint": "c01762b54610",
       "count": 1,
-      "example_error": "Chat timeout after 45000ms (stage=await_run_final; idle_ms=43113; lifecycle_events=1; tool_events=0)"
+      "example_error": "Chat timeout after 90000ms (stage=await_run_final; idle_ms=88782; lifecycle_events=1; tool_events=0)"
     },
     {
-      "fingerprint": "1c146def5982",
+      "fingerprint": "b8546523ffb1",
+      "count": 1,
+      "example_error": "Chat timeout after 45000ms (stage=await_run_final; idle_ms=42734; lifecycle_events=1; tool_events=0)"
+    },
+    {
+      "fingerprint": "b05832e3ca35",
+      "count": 1,
+      "example_error": ""
+    },
+    {
+      "fingerprint": "7f57f1b1291e",
       "count": 1,
       "example_error": ""
     }
