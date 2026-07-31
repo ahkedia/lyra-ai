@@ -2796,5 +2796,50 @@
       "judge": 7,
       "assertion": 1
     }
+  },
+  {
+    "date": "2026-07-31",
+    "total": 43,
+    "passed": 30,
+    "failed": 13,
+    "pass_rate": 0.7,
+    "avg_latency_ms": 26489,
+    "p95_latency_ms": 75004,
+    "by_tier": {
+      "core_capability": {
+        "total": 9,
+        "passed": 6,
+        "pass_rate": 0.67
+      },
+      "architectural": {
+        "total": 3,
+        "passed": 3,
+        "pass_rate": 1
+      },
+      "judgment": {
+        "total": 15,
+        "passed": 11,
+        "pass_rate": 0.73
+      },
+      "showcase": {
+        "total": 5,
+        "passed": 3,
+        "pass_rate": 0.6
+      },
+      "gap": {
+        "total": 11,
+        "passed": 7,
+        "pass_rate": 0.64
+      }
+    },
+    "capability_pass_rate": 0.8571,
+    "infra_failure_rate": 0.186,
+    "eval_lane": "production_representative",
+    "failure_breakdown": {
+      "timeout": 6,
+      "judge": 4,
+      "assertion": 1,
+      "infra": 2
+    }
   }
 ]
