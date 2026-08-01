@@ -109,32 +109,6 @@ The long-term knowledge capture database. See [`docs/5-second-brain.md`](../docs
 
 These are accessible to both people in a household setup.
 
-### Health & Meds
-
-Daily logs, supplements, workouts, and sleep for both people.
-
-| Property | Type | Options |
-|----------|------|---------|
-| Item | title | — |
-| Type | select | Daily Log, Supplement, Medication |
-| Person | select | [Person A name], [Person B name] |
-| Date | date | — |
-| Frequency | select | Daily, Weekly, As Needed |
-| Notes | rich_text | — |
-| Steps | number | — |
-| Active Calories | number | — |
-| Sleep Hours | number | — |
-| Sleep Quality | select | Great, Good, Average, Poor |
-| Workouts This Week | number | — |
-| Workout Duration (min) | number | — |
-| Weight (kg) | number | — |
-| Resting Heart Rate | number | — |
-| Standing Hours | number | — |
-| Refill Date | date | — |
-
-**How Lyra uses it:** "Log today's health: 8000 steps, 7 hours sleep, worked out 45 mins" → creates a Daily Log entry. "What supplements should I take this morning?" → queries entries filtered by person and frequency.
-
----
 
 ### Meal Planning
 

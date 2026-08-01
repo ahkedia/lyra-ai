@@ -31,7 +31,7 @@ This repo is a full write-up of what I built, why, and how. Every config, skill,
 **For my wife (Abhigna):**
 - Has her own access to Lyra on the same Telegram bot
 - Gets a friendly onboarding when she first messages ("I can help with reminders, meals, health, trips, shopping")
-- Can see and update the shared databases: Health & Meds, Meal Planning, Upcoming Trips, Shopping List, Shared Reminders
+- Can see and update the shared databases: Meal Planning, Upcoming Trips, Reminders - Shared, Reminders - Abhigna
 - Cannot see my professional databases (enforced by access rules, not by hoping the model behaves)
 - Can assign tasks to me via Lyra — they get added to Shared Reminders and I get a Telegram ping
 - Gets notified when I complete a task she assigned
