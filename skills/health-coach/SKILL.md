@@ -79,3 +79,7 @@ Daily Log:          53f53768-6e94-493a-9508-42cc41973ba5
 Food Log:           7072c178-d7f1-42f9-8d76-0acea82a93d2
 Workout Log:        e72572d2-f201-4cb1-9460-5b636ba07ad6
 Progress Snapshots: eee245a6-f17b-4bc9-ad70-9a79d3be4cb8
+
+## Current Supplements (as of 2026-08-01)
+- **Vitamin D3**: 2000 IU daily with breakfast. Started 2026-08-01. Baseline D: 22.6 ng/mL (insufficient). Recheck ~3 months.
+- **Vitamin B12**: 1000 mcg methylcobalamin sublingual daily. Started 2026-08-01. Baseline B12: 346 pg/mL (low-normal). Recheck ~4 months.
