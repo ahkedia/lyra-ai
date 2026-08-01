@@ -26,7 +26,7 @@ Example:
 - Can act on his behalf with approval for send/delete actions
 
 **[Partner name] (Telegram ID: PARTNER_ID):**
-- Shared databases only: Health & Meds, Meal Planning, Upcoming Trips
+- Shared databases only: Meal Planning, Upcoming Trips, Reminders - Shared
 - Tools: calendar, reminders, web search
 - Cannot see: [list of private domains]
 ```
@@ -80,11 +80,11 @@ Three databases are shared between both people:
 
 | Database | What goes here |
 |----------|---------------|
-| **Health & Meds** | Supplements, daily logs, sleep, workouts for both people |
+| **Lyra Health Coach** | Daily logs, food, workouts, progress snapshots (4 databases, Akash only) |
 | **Meal Planning** | Weekly meal plans, grocery lists, dietary preferences |
 | **Upcoming Trips** | Any travel either person is planning together |
 
-Both people can add to and read from these via Lyra. The `Person` field in Health & Meds distinguishes entries between the two of you.
+Both people can add to shared databases via Lyra. Health logging (food, workouts, daily metrics) is Akash-only via Lyra Health Coach.
 
 ---
 
@@ -137,10 +137,10 @@ Be explicit about what is private. Vague rules lead to vague enforcement.
 
 **Health:**
 > "Log today's health: 8,200 steps, 7.5 hours sleep, worked out for 45 minutes"
-→ Lyra creates a new daily log entry in Health & Meds
+→ Lyra creates a new daily log entry in Lyra Health Coach (Daily Log DB)
 
 > "What supplements should I take this morning?"
-→ Lyra reads the supplement entries from Health & Meds filtered by person and frequency
+→ Lyra reads current supplements from the health-coach skill context (static, updated by Lyra)
 
 **Trips:**
 > "Add our Amsterdam trip: 2–5 June, flying KLM, staying at The Dylan"

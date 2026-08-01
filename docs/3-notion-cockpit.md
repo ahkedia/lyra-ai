@@ -15,7 +15,7 @@ Notion is not a filing cabinet — it is the live state of everything. Lyra read
 | Topic Library | Visible pool of Lenny-derived topic candidates | Personal |
 | Weekly Shortlist | Small weekly queue selected from Topic Library | Personal |
 | Second Brain | Voice-captured thoughts, decisions, insights, patterns | Personal |
-| Health & Meds | Daily logs, supplements, sleep, workouts | Shared |
+| Lyra Health Coach | Daily logs, food, workouts, progress snapshots | 4 databases |
 | Meal Planning | Weekly meal plans and grocery lists | Shared |
 | Upcoming Trips | Travel with flights, accommodation, packing | Shared |
 
@@ -87,16 +87,6 @@ Tags (multi_select) | Notes (rich_text)
 Type options: `Insight`, `Decision`, `Idea`, `Question`, `Pattern`
 Source options: `Voice`, `Telegram`, `Manual`, `Weekly Synthesis`
 Tags: `work`, `content`, `personal`, `ai`, `health`, `finance`, `relationship` (customise to your life)
-
-### Health & Meds
-```
-Item (title) | Type (select) | Person (select) | Date (date)
-Frequency (select) | Notes (rich_text) | Steps (number) | Active Calories (number)
-Sleep Hours (number) | Sleep Quality (select) | Workouts This Week (number)
-Workout Duration (min) (number) | Weight (kg) (number) | Resting Heart Rate (number)
-Standing Hours (number) | Refill Date (date)
-```
-Type options: `Daily Log`, `Supplement`, `Medication`
 
 ### Meal Planning
 ```
