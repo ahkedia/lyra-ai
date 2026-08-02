@@ -152,6 +152,7 @@ def health_workout_add(date_str=None, workout_type=None, duration_min=None, **kw
             'cycle': 'Cycling', 'cycling': 'Cycling', 'bike': 'Cycling',
             'walk': 'Walk', 'walking': 'Walk',
             'yoga': 'Yoga',
+            'pranayam': 'Pranayama', 'pranayama': 'Pranayama', 'mobility': 'Pranayama',
         }
         normalised = type_map.get(workout_type.lower(), 'Other')
         props['Type'] = {'select': {'name': normalised}}

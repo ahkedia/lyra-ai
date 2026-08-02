@@ -335,6 +335,26 @@ def cmd_parse(args):
     print(f'Could not parse health command: {" ".join(args)}')
     sys.exit(1)
 
+def cmd_gym_card(args):
+    from health_extras import format_gym_card
+    print(format_gym_card(args[0] if args else None))
+
+def cmd_health_morning(args):
+    from health_extras import morning_message
+    print(morning_message())
+
+def cmd_health_evening(args):
+    from health_extras import evening_message
+    print(evening_message())
+
+def cmd_health_weekly_stats(args):
+    from health_extras import weekly_stats_text
+    print(weekly_stats_text())
+
+def cmd_health_quarterly_check(args):
+    from health_extras import quarterly_bloodwork_check
+    print(quarterly_bloodwork_check())
+
 def cmd_daily_summary(args):
     """Query yesterday's food log + recent workouts for morning digest."""
     import sys
@@ -545,6 +565,11 @@ COMMANDS = {
     'parse': cmd_parse,
     'brain': cmd_brain,
     'daily-summary': cmd_daily_summary,
+    'gym-card': cmd_gym_card,
+    'health-morning': cmd_health_morning,
+    'health-evening': cmd_health_evening,
+    'health-weekly-stats': cmd_health_weekly_stats,
+    'health-quarterly-check': cmd_health_quarterly_check,
     'job-application': cmd_job_application,
     'content-draft': cmd_content_draft,
     'wiki-lenny': cmd_wiki_lenny,
