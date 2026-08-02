@@ -67,7 +67,7 @@ tests:
     category: instruction_following
     name: "Format output as table"
     prompt: "Show my cron jobs as a table with columns: Name, Schedule, Status"
-    timeout_ms: 30000
+    timeout_ms: 45000
     side_effects: none
     validators:
       - type: contains

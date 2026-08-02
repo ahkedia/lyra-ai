@@ -295,6 +295,7 @@ export class OpenClawClient {
                   text,
                   latencyMs,
                   ttftMs: ttftMs || latencyMs,
+                  sessionKey: evalSessionKey,
                   payload: asstMsg,
                   timeoutMeta: {
                     timedOutStage: null,

@@ -171,6 +171,27 @@ const EVAL_DRY_RUN_PREFIX =
   '(which tool, which database, which fields). Read-only tool calls ' +
   '(list/search/query) are permitted.]\n\n';
 
+
+const SESSIONS_DIR = "/root/.openclaw/agents/main/sessions";
+
+function readModelFromSession(sessionKey) {
+  try {
+    const sessionFile = join(SESSIONS_DIR, `${sessionKey}.jsonl`);
+    if (!existsSync(sessionFile)) return { model: "unknown", provider: "unknown" };
+    const raw = readFileSync(sessionFile, "utf8").trim();
+    const lines = raw.split("\n").filter(Boolean);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const ev = JSON.parse(lines[i]);
+        if (ev.type === "model_change" && ev.modelId && ev.provider) {
+          return { model: ev.modelId, provider: ev.provider };
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return { model: "unknown", provider: "unknown" };
+}
+
 async function sendToLyra(message, timeoutMs = 30000, sessionKey = null, dryRun = false) {
   await ensureConnected(); // reconnects if gateway restarted mid-run
   const startTime = Date.now();
@@ -179,12 +200,15 @@ async function sendToLyra(message, timeoutMs = 30000, sessionKey = null, dryRun 
     if (sessionKey) opts.sessionKey = sessionKey;
     const payload = dryRun ? EVAL_DRY_RUN_PREFIX + message : message;
     const result = await wsClient.chat(payload, opts);
+    const { model: resolvedModel, provider: resolvedProvider } = result.sessionKey
+      ? readModelFromSession(result.sessionKey)
+      : { model: "unknown", provider: "unknown" };
     return {
       text: result.text,
       durationMs: result.latencyMs,
       ttftMs: result.ttftMs,
-      model: 'unknown',
-      provider: 'unknown',
+      model: resolvedModel,
+      provider: resolvedProvider,
       sessionId: null,
       error: null,
       timeoutMeta: result.timeoutMeta || null,
