@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(__file__))
 
 from news_inbox_rss import NEWS_DS, _req  # noqa: E402  (reuse Notion plumbing)
+from notion_registry import db as _rdb, ds as _rds  # noqa: E402
 
 try:
     from job_application import _get_env  # noqa: E402
@@ -35,8 +36,8 @@ except Exception:  # pragma: no cover - fallback if helper moves
         return os.environ.get(key, "")
 
 # Second Brain — the brain-synced staging DB (mirrored nightly by notion_to_brain.py).
-SB_DB = "e4027aaf-d2ff-49e1-babf-7487725e2ef4"   # database_id (page parent)
-SB_DS = "f1ce4e0f-9e0d-43da-87f8-94dae2732962"   # data_source_id (query)
+SB_DB = _rdb("second-brain")
+SB_DS = _rds("second-brain")
 
 DEFAULT_THRESHOLD = int(os.environ.get("WIKI_PROMOTE_THRESHOLD", "7"))
 DEFAULT_LIMIT = int(os.environ.get("WIKI_PROMOTE_LIMIT", "40"))

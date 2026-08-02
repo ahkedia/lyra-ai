@@ -13,15 +13,12 @@ import re
 import urllib.error
 import urllib.request
 
-# Data source IDs (for querying — Notion API 2025-09-03)
-_DS_AKASH = "32678008-9100-8171-8940-000b30243ddd"
-_DS_SHARED = "9f206d71-7b25-408b-ad20-02daf0b43da0"
+from notion_registry import db as _rdb, ds as _rds
 
-# Database IDs (for page creation — parent.database_id)
-# NOTE: Akash's write-DB differs from the ID in notion.md (95e1d0de...).
-#       The real write-target comes from data_source.parent.database_id.
-_DB_AKASH = "32678008-9100-802f-ad9f-fb48ff5f4c1d"
-_DB_SHARED = "2054e39c-3f09-431d-8821-0e6a7513913a"
+_DS_AKASH = _rds('reminders.akash')
+_DS_SHARED = _rds('reminders.shared')
+_DB_AKASH = _rdb('reminders.akash')
+_DB_SHARED = _rdb('reminders.shared')
 
 NOTION_VERSION = "2025-09-03"
 

@@ -27,8 +27,10 @@ FEED_FETCH_DELAY_SEC = float(os.environ.get("FEED_FETCH_DELAY_SEC", "3"))
 
 NOTION_KEY = os.environ.get("NOTION_API_KEY", "")
 NOTION_VERSION = "2025-09-03"
-NEWS_DB = "8a900cb7-8c0c-4be9-9634-7c5dfebec375"
-NEWS_DS = "99e5d9c6-857f-42b6-b195-8f298938c4ea"
+from notion_registry import db as _rdb, ds as _rds
+
+NEWS_DB = _rdb('news-inbox')
+NEWS_DS = _rds('news-inbox')
 
 FEEDS_PATH = os.path.join(os.path.dirname(__file__), "feeds.json")
 ATOM_NS = {"a": "http://www.w3.org/2005/Atom"}

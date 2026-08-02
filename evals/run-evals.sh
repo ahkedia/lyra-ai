@@ -140,10 +140,11 @@ if [ "$IS_FULL_EVAL_DAY" = true ]; then
   echo "Step 2: Aggregating results..."
   OUTPUT_DIR="$SCRIPT_DIR/output" node aggregate.js || echo "[warn] Aggregation failed (non-fatal)"
 
-  # Step 3: Sync to Notion
+  # Step 3: Sync to Postgres (replaced Notion sync 2026-08-02)
   echo ""
-  echo "Step 3: Syncing to Notion..."
-  node notion-sync.js || echo "[warn] Notion sync failed (non-fatal)"
+  echo "Step 3: Syncing to Postgres..."
+  node pg-sync.js || echo "[warn] Postgres sync failed (non-fatal)"
+  # node notion-sync.js  # deprecated 2026-08-02, kept for rollback
 
   # Step 4: Generate + publish dashboard (change->eval-delta timeline) to GitHub
   echo ""

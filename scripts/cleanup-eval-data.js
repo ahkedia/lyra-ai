@@ -13,6 +13,7 @@
 import https from 'https';
 import { execFileSync } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
+import { db, ds } from '../lib/notion-registry.mjs';
 
 const NOTION_VERSION = '2025-09-03';
 const DRY_RUN = !process.argv.includes('--apply');
@@ -85,32 +86,32 @@ function notionRequest(method, path, body = null) {
 const CLEANUP_TARGETS = [
   {
     name: 'Reminders - Akash',
-    database: '32678008-9100-802f-ad9f-fb48ff5f4c1d',
-    data_source: '32678008-9100-8171-8940-000b30243ddd',
+    database: db('reminders.akash'),
+    data_source: ds('reminders.akash'),
     title_properties: ['Task'],
   },
   {
     name: 'Reminders - Shared',
-    database: '2054e39c-3f09-431d-8821-0e6a7513913a',
-    data_source: '9f206d71-7b25-408b-ad20-02daf0b43da0',
+    database: db('reminders.shared'),
+    data_source: ds('reminders.shared'),
     title_properties: ['Task'],
   },
   {
     name: 'Second Brain',
-    database: 'e4027aaf-d2ff-49e1-babf-7487725e2ef4',
-    data_source: 'f1ce4e0f-9e0d-43da-87f8-94dae2732962',
+    database: db('second-brain'),
+    data_source: ds('second-brain'),
     title_properties: ['Name'],
   },
   {
     name: 'Upcoming Trips',
-    database: '64215718b5944945a7f7241a20e89eb1',
-    data_source: 'f9cfc4ff-5a74-4955-baab-144943962a99',
+    database: db('upcoming-trips'),
+    data_source: ds('upcoming-trips'),
     title_properties: ['Trip Name', 'Name'],
   },
   {
     name: 'Reminders - Abhigna',
-    database: '5d6732b1-7e30-4856-b56b-edbf9c3df229',
-    data_source: '1e74f66d-cb24-40f5-8697-84a3ad8ad1bc',
+    database: db('reminders.abhigna'),
+    data_source: ds('reminders.abhigna'),
     title_properties: ['Task'],
   },
 ];

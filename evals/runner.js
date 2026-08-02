@@ -13,6 +13,7 @@ import YAML from 'yaml';
 import { runValidators } from './validators.js';
 import { judgeResponse } from './llm-judge.js';
 import { OpenClawClient } from './ws-client.js';
+import { db, ds } from '../lib/notion-registry.mjs';
 import {
   classifyStability,
   classifyFailureKind,
@@ -349,16 +350,11 @@ async function runCleanup(cleanupConfig) {
  * Scans all known databases that could have eval test data.
  */
 const EVAL_CLEANUP_TARGETS = [
-  // Reminders - Akash
-  { database: '32678008-9100-802f-ad9f-fb48ff5f4c1d', data_source: '32678008-9100-8171-8940-000b30243ddd', title_properties: ['Task'] },
-  // Reminders - Shared (wife's shared reminders)
-  { database: '2054e39c-3f09-431d-8821-0e6a7513913a', data_source: '9f206d71-7b25-408b-ad20-02daf0b43da0', title_properties: ['Task'] },
-  // Second Brain / Personal Wiki
-  { database: 'e4027aaf-d2ff-49e1-babf-7487725e2ef4', data_source: 'f1ce4e0f-9e0d-43da-87f8-94dae2732962', title_properties: ['Name'] },
-  // Upcoming Trips - scan for Tokyo/Dubai test trips
-  { database: '64215718b5944945a7f7241a20e89eb1', data_source: 'f9cfc4ff-5a74-4955-baab-144943962a99', title_properties: ['Trip Name', 'Name'] },
-  // Reminders - Abhigna (wife's personal reminders)
-  { database: '5d6732b1-7e30-4856-b56b-edbf9c3df229', data_source: '1e74f66d-cb24-40f5-8697-84a3ad8ad1bc', title_properties: ['Task'] },
+  { database: db('reminders.akash'), data_source: ds('reminders.akash'), title_properties: ['Task'] },
+  { database: db('reminders.shared'), data_source: ds('reminders.shared'), title_properties: ['Task'] },
+  { database: db('second-brain'), data_source: ds('second-brain'), title_properties: ['Name'] },
+  { database: db('upcoming-trips'), data_source: ds('upcoming-trips'), title_properties: ['Trip Name', 'Name'] },
+  { database: db('reminders.abhigna'), data_source: ds('reminders.abhigna'), title_properties: ['Task'] },
 ];
 
 /** Query a database/data_source for pages where Source select == name. */
@@ -484,8 +480,8 @@ async function runGlobalCleanupSweep() {
  */
 async function assertNoLeakage() {
   const REMINDER_TARGETS = [
-    { name: 'Reminders - Akash', database: '32678008-9100-802f-ad9f-fb48ff5f4c1d', data_source: '32678008-9100-8171-8940-000b30243ddd' },
-    { name: 'Reminders - Shared', database: '2054e39c-3f09-431d-8821-0e6a7513913a', data_source: '9f206d71-7b25-408b-ad20-02daf0b43da0' },
+    { name: 'Reminders - Akash', database: db('reminders.akash'), data_source: ds('reminders.akash') },
+    { name: 'Reminders - Shared', database: db('reminders.shared'), data_source: ds('reminders.shared') },
   ];
   const leaks = [];
 

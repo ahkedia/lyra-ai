@@ -14,9 +14,9 @@ fi
 YESTERDAY=$(date -d "yesterday" +%Y-%m-%d 2>/dev/null || date -v-1d +%Y-%m-%d)
 
 # Notion DB IDs (from references/notion.md — Health Coach DBs)
-FOOD_DB="7072c178-d7f1-42f9-8d76-0acea82a93d2"
-WORKOUT_DB="e72572d2-f201-4cb1-9460-5b636ba07ad6"
-METRICS_DB="53f53768-6e94-493a-9508-42cc41973ba5"
+FOOD_DB=$(python3 -c "from crud.notion_registry import db; print(db('health.food-log'))")
+WORKOUT_DB=$(python3 -c "from crud.notion_registry import db; print(db('health.workout-log'))")
+METRICS_DB=$(python3 -c "from crud.notion_registry import db; print(db('health.daily-log'))")
 
 # Query food log
 FOOD=$(curl -s "https://api.notion.com/v1/databases/${FOOD_DB}/query" \

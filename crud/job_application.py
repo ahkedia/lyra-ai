@@ -29,9 +29,11 @@ PIPELINE_LOG = '/tmp/lyra-job-pipeline.log'
 ENV_FILE = '/root/.openclaw/.env'
 
 # Wiki DB IDs (Personal Wiki in Notion) — see notion/notion.md
-WIKI_DS_ID = '33d78008-9100-8197-9f0f-000b205edfe8'  # data_source_id (fallback)
-PERSONAL_WIKI_DB = '33d78008-9100-8183-850d-e7677ac46b63'  # database_id — primary query API
-RECRUITER_DB_ID = '31778008910080c09b6fec080955cf00'  # database_id for page creation
+from notion_registry import db as _rdb, ds as _rds
+
+WIKI_DS_ID = _rds('personal-wiki')
+PERSONAL_WIKI_DB = _rdb('personal-wiki')
+RECRUITER_DB_ID = _rdb('tracker-co')
 
 NOTION_VERSION = '2025-09-03'
 

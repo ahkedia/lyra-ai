@@ -11,20 +11,19 @@ import json
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
+from notion_registry import db as _rdb, ds as _rds
 
 NOTION_KEY = os.environ.get('NOTION_API_KEY', '')
 
-# Database IDs (created 2026-03-28)
-DAILY_LOG_DB     = '53f53768-6e94-493a-9508-42cc41973ba5'
-FOOD_LOG_DB      = '7072c178-d7f1-42f9-8d76-0acea82a93d2'
-WORKOUT_LOG_DB   = 'e72572d2-f201-4cb1-9460-5b636ba07ad6'
-SNAPSHOTS_DB     = 'eee245a6-f17b-4bc9-ad70-9a79d3be4cb8'
+DAILY_LOG_DB     = _rdb('health.daily-log')
+FOOD_LOG_DB      = _rdb('health.food-log')
+WORKOUT_LOG_DB   = _rdb('health.workout-log')
+SNAPSHOTS_DB     = _rdb('health.progress-snapshots')
 
-# Data source IDs (for querying — different from database_id in Notion API 2025-09-03)
-DAILY_LOG_DS   = '283145e2-9f75-4e0d-a89f-4f5af1e8c481'
-FOOD_LOG_DS    = '8ad99c8a-c677-4f6d-b9ad-493c740cbf4b'
-WORKOUT_LOG_DS = '2bcfcea7-56d8-48c3-bde9-776f037994cb'
-SNAPSHOTS_DS   = '5349c83c-3e3f-4907-8945-fe24ae09cc3b'
+DAILY_LOG_DS   = _rds('health.daily-log')
+FOOD_LOG_DS    = _rds('health.food-log')
+WORKOUT_LOG_DS = _rds('health.workout-log')
+SNAPSHOTS_DS   = _rds('health.progress-snapshots')
 
 
 def _req(method, path, data=None):

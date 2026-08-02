@@ -19,9 +19,10 @@
 
 import { execSync } from 'child_process';
 import Anthropic from '@anthropic-ai/sdk';
+import { page } from '../lib/notion-registry.mjs';
 
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
-const NOTION_DEVLOG_PAGE_ID = process.env.NOTION_DEVLOG_PAGE_ID || '3257800891008166a2c1db67b324f25e';
+const NOTION_DEVLOG_PAGE_ID = process.env.NOTION_DEVLOG_PAGE_ID || page('dev-log');
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const DRY_RUN = process.argv.includes('--dry-run');
 

@@ -227,7 +227,8 @@ def cmd_parse(args):
         if not _key:
             print("Cannot count Content Ideas: NOTION_API_KEY not set")
             return
-        _db_id = "f008d0bb-ac81-401d-889d-4e8f508ab134"
+        from notion_registry import ds as _rds
+        _db_id = _rds("content-ideas")
         _total = 0
         _cursor = None
         try:
@@ -369,7 +370,8 @@ def cmd_daily_summary(args):
     today = datetime.now().strftime('%Y-%m-%d')
 
     # --- Nutrition: yesterday's food log ---
-    FOOD_DB = '7072c178-d7f1-42f9-8d76-0acea82a93d2'
+    from notion_registry import db as _rdb
+    FOOD_DB = _rdb('health.food-log')
     food_rows = notion_query(FOOD_DB, {
         'property': 'Date', 'date': {'equals': yesterday}
     })
@@ -390,7 +392,7 @@ def cmd_daily_summary(args):
         meals.append(f'{meal_name}: {desc[:60]}' + (f' (~{int(cal)} cal, {int(protein)}g protein)' if cal else ''))
 
     # --- Workouts: last 7 days ---
-    WORKOUT_DB = 'e72572d2-f201-4cb1-9460-5b636ba07ad6'
+    WORKOUT_DB = _rdb('health.workout-log')
     workout_rows = notion_query(WORKOUT_DB)
     # Sort by date desc, take last 7
     def get_date(row):

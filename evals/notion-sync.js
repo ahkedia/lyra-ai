@@ -6,11 +6,12 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
+import { db } from '../lib/notion-registry.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = join(__dirname, 'results');
 const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
-const EVALS_DB_ID = process.env.EVALS_DB_ID || 'a028ad4e-43d2-4406-bae7-65f9b41f006f';
+const EVALS_DB_ID = process.env.EVALS_DB_ID || db('evals-dashboard');
 
 async function main() {
   if (!NOTION_API_KEY) {

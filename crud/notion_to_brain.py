@@ -24,13 +24,11 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 from wiki_notion import _req, _block_text  # noqa: E402
+from notion_registry import ds as _rds  # noqa: E402
 
 BRAIN_REPO = os.environ.get("GBRAIN_BRAIN_REPO", "/root/gbrain-brain")
 
-# --- Source registry: each Notion DB → brain namespace + how to read it ----------
-# Personal Wiki: Type select drives the subfolder (career/domain/lenny/meta/...).
-# Notion-Version 2025-09-03 uses the data_sources API (NOT databases/{id}/query).
-PERSONAL_WIKI_DS = "33d78008-9100-8197-9f0f-000b205edfe8"
+PERSONAL_WIKI_DS = _rds('personal-wiki')
 _TYPE_TO_DIR = {
     "career": "career",
     "domain": "domain",
@@ -201,25 +199,25 @@ def sync_personal_wiki(dry_run: bool = False) -> dict:
 # (rich_text/url fields appended after page blocks), and an optional include() filter.
 _GENERIC_SOURCES = {
     "twitter": {
-        "ds": "32d78008-9100-81b6-ac17-000bf4db6f2e",
+        "ds": _rds("twitter-insights"),
         "dir": "tweets",
         "type": "tweet",
         "extra_props": ["Author", "Original Tweet URL", "Original Tweet Summary"],
     },
     "content-drafts": {
-        "ds": "553cecf2-69dd-44b9-a46e-43e761407fb4",
+        "ds": _rds("content-drafts"),
         "dir": "writing",
         "type": "writing",
         "extra_props": ["Status", "blog_content", "linkedin_copy"],
     },
     "content-topics": {
-        "ds": "33f78008-9100-817b-8cee-000b816a89d4",
+        "ds": _rds("content-topic-pool"),
         "dir": "content-topics",
         "type": "content-idea",
         "extra_props": ["Domain", "Source", "Author brief", "Notes", "Status"],
     },
     "second-brain": {
-        "ds": "f1ce4e0f-9e0d-43da-87f8-94dae2732962",
+        "ds": _rds("second-brain"),
         "dir": "second-brain",
         "type": "note",
         "extra_props": [],
