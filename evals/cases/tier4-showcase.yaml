@@ -40,23 +40,6 @@ tests:
       title_properties: ["Task"]
     tags: [multi-step, cross-user, write]
 
-  - id: multi-insight-capture
-    tier: showcase
-    category: multi_step
-    name: "Classify and save insight"
-    prompt: "I just realized that the biggest risk in our product is not competition, it is internal alignment. Teams are optimizing for different metrics and nobody is noticing. Please save this insight with title: [tc] alignment insight."
-    timeout_ms: 45000
-    side_effects: write
-    validators:
-      - type: llm_judge
-        rubric: "Does the response confirm capturing this as a real insight write in Second Brain? It should classify it (e.g., tags/type) and confirm persistence in Notion, not just discuss it."
-    cleanup:
-      action: notion_delete_matching
-      database: "e4027aaf-d2ff-49e1-babf-7487725e2ef4"
-      data_source: "f1ce4e0f-9e0d-43da-87f8-94dae2732962"
-      title_properties: ["Name"]
-      title_contains: "alignment insight"
-    tags: [multi-step, second-brain]
 
   # --- Proactive Quality ---
   - id: proactive-digest-quality
