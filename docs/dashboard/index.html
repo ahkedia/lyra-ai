@@ -29,26 +29,17 @@
   .foot{color:var(--mut);font-size:11px;margin-top:28px;border-top:1px solid var(--bd);padding-top:12px}
 </style></head><body>
   <h1>Lyra Eval Dashboard</h1>
-  <div class="sub">evals-before-changes · generated 2026-08-01T04:31:41.893Z · 64 full runs</div>
+  <div class="sub">evals-before-changes · generated 2026-08-03T04:31:06.090Z · 65 full runs</div>
   
   <div class="band">
-    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-08-01</div></div>
-    <div class="metric"><div class="mlabel">Capability pass rate</div><div class="mval big">80%</div><div class="msub">24/30 core · legacy 72% · 6 infra timeouts</div></div>
+    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-08-03</div></div>
+    <div class="metric"><div class="mlabel">Capability pass rate</div><div class="mval big">85%</div><div class="msub">22/26 core · legacy 59% · 8 infra timeouts</div></div>
     <div class="metric"><div class="mlabel">Days since good run</div><div class="mval big ok">0</div><div class="msub">harness healthy</div></div>
-    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">26.2s</div></div>
-    <div class="metric"><div class="mlabel">Ship gate</div><div class="mval down">RED</div><div class="msub">blocking on real bugs</div></div>
+    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">27.8s</div></div>
+    <div class="metric"><div class="mlabel">Ship gate</div><div class="mval ok">GREEN</div><div class="msub">all_ok</div></div>
   </div>
   <h2>Pass-rate trend (last 8 runs)</h2>
   <table class="trend"><thead><tr><th>Date</th><th>Pass</th><th>Core</th><th>Judgment</th><th>Showcase</th><th>Gap</th><th>Latency</th></tr></thead><tbody>
-    <tr>
-      <td>2026-07-19</td>
-      <td class="num">67%</td>
-      <td class="num">78%</td>
-      <td class="num">93%</td>
-      <td class="num">20%</td>
-      <td class="num">64%</td>
-      <td class="num">27.8s</td>
-    </tr>
     <tr>
       <td>2026-07-21</td>
       <td class="num">60%</td>
@@ -111,10 +102,29 @@
       <td class="num">40%</td>
       <td class="num">82%</td>
       <td class="num">26.2s</td>
+    </tr>
+    <tr>
+      <td>2026-08-03</td>
+      <td class="num">59%</td>
+      <td class="num">78%</td>
+      <td class="num">67%</td>
+      <td class="num">0%</td>
+      <td class="num">60%</td>
+      <td class="num">27.8s</td>
     </tr></tbody></table>
   <h2>Change → eval-delta timeline</h2>
   <div class="sub">Each run shows its pass-rate delta and the commits that landed since the prior run. <span class="badge warn">⚠ behavior · no eval</span> = a change to Lyra's behavior that shipped without an eval (what the gate will block).</div>
   
+    <div class="run">
+      <div class="runhead">
+        <div class="rundate">2026-08-03</div>
+        <div class="runpass">59% <span class="rsub">24/41</span></div>
+        <div class="rundelta"><span class="d down">▼ -13 pts</span></div>
+      </div>
+      <div class="tierrow"><span class="tierd up">core capability 67%→78%</span><span class="tierd down">judgment 87%→67%</span><span class="tierd down">showcase 40%→0%</span><span class="tierd down">gap 82%→60%</span></div>
+      <div class="fbrow">failures: timeout:8 · judge:8 · assertion:1</div>
+      <ul class="commits"><li class="commit "><code>f7b5c5ca</code> <span class="badge eval">eval edit</span> <span class="csubj">chore(evals): remove write-verify-reminder and multi-insight-capture cases</span></li><li class="commit "><code>47f419dc</code> <span class="badge eval">eval edit</span> <span class="csubj">fix(evals): capture real model/provider per-run; raise instruct-table timeout</span></li><li class="commit flag"><code>6bf23a19</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (3)</span> <span class="csubj">fix(crud): wire health-morning/evening/quarterly commands into cli.py dispatch table</span></li><li class="commit flag"><code>65ca5663</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (9)</span> <span class="csubj">Add central Notion registry, nightly reconciler, and eval→Postgres sync</span></li><li class="commit "><code>d920f3f1</code> <span class="badge muted">infra/docs</span> <span class="csubj">Remove Topic Library + Weekly Shortlist from schemas and cockpit docs</span></li><li class="commit "><code>b754a4d9</code> <span class="badge muted">infra/docs</span> <span class="csubj">Remove Health &amp; Meds from household docs; update to Lyra Health Coach</span></li><li class="commit "><code>962e983d</code> <span class="badge muted">infra/docs</span> <span class="csubj">Remove Health &amp; Meds from docs: README, database-schemas (2 copies)</span></li><li class="commit flag"><code>e2f50c72</code> <span class="badge warn" title="behavior change, no eval">⚠ behavior · no eval (1)</span> <span class="csubj">Fix Health &amp; Meds deletion fallout: reminders skill, health-coach, seed script</span></li><li class="commit "><code>710b7eeb</code> <span class="badge muted">infra/docs</span> <span class="csubj">deploy-lyra: sync private skills from lyra-private bidirectionally</span></li><li class="commit "><code>dc04997d</code> <span class="badge muted">infra/docs</span> <span class="csubj">Revert preposition-trainer from public repo — Notion DB IDs are private infrastructure. Skill lives in lyra-private only.</span></li><li class="commit "><code>af71a53b</code> <span class="badge muted">infra/docs</span> <span class="csubj">preposition-trainer: add Preposition select field + grouped drill sort</span></li><li class="commit "><code>8f66d970</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update eval dashboard data 2026-08-01</span></li></ul>
+    </div>
     <div class="run">
       <div class="runhead">
         <div class="rundate">2026-08-01</div>
