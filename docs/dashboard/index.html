@@ -29,26 +29,17 @@
   .foot{color:var(--mut);font-size:11px;margin-top:28px;border-top:1px solid var(--bd);padding-top:12px}
 </style></head><body>
   <h1>Lyra Eval Dashboard</h1>
-  <div class="sub">evals-before-changes · generated 2026-08-03T04:31:06.090Z · 65 full runs</div>
+  <div class="sub">evals-before-changes · generated 2026-08-05T04:32:52.409Z · 66 full runs</div>
   
   <div class="band">
-    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-08-03</div></div>
-    <div class="metric"><div class="mlabel">Capability pass rate</div><div class="mval big">85%</div><div class="msub">22/26 core · legacy 59% · 8 infra timeouts</div></div>
+    <div class="metric"><div class="mlabel">Last full run</div><div class="mval">2026-08-05</div></div>
+    <div class="metric"><div class="mlabel">Capability pass rate</div><div class="mval big">81%</div><div class="msub">21/26 core · legacy 56% · 8 infra timeouts</div></div>
     <div class="metric"><div class="mlabel">Days since good run</div><div class="mval big ok">0</div><div class="msub">harness healthy</div></div>
-    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">27.8s</div></div>
+    <div class="metric"><div class="mlabel">Avg latency</div><div class="mval">30.2s</div></div>
     <div class="metric"><div class="mlabel">Ship gate</div><div class="mval ok">GREEN</div><div class="msub">all_ok</div></div>
   </div>
   <h2>Pass-rate trend (last 8 runs)</h2>
   <table class="trend"><thead><tr><th>Date</th><th>Pass</th><th>Core</th><th>Judgment</th><th>Showcase</th><th>Gap</th><th>Latency</th></tr></thead><tbody>
-    <tr>
-      <td>2026-07-21</td>
-      <td class="num">60%</td>
-      <td class="num">67%</td>
-      <td class="num">67%</td>
-      <td class="num">40%</td>
-      <td class="num">55%</td>
-      <td class="num">25.0s</td>
-    </tr>
     <tr>
       <td>2026-07-23</td>
       <td class="num">58%</td>
@@ -111,10 +102,29 @@
       <td class="num">0%</td>
       <td class="num">60%</td>
       <td class="num">27.8s</td>
+    </tr>
+    <tr>
+      <td>2026-08-05</td>
+      <td class="num">56%</td>
+      <td class="num">56%</td>
+      <td class="num">60%</td>
+      <td class="num">25%</td>
+      <td class="num">60%</td>
+      <td class="num">30.2s</td>
     </tr></tbody></table>
   <h2>Change → eval-delta timeline</h2>
   <div class="sub">Each run shows its pass-rate delta and the commits that landed since the prior run. <span class="badge warn">⚠ behavior · no eval</span> = a change to Lyra's behavior that shipped without an eval (what the gate will block).</div>
   
+    <div class="run">
+      <div class="runhead">
+        <div class="rundate">2026-08-05</div>
+        <div class="runpass">56% <span class="rsub">23/41</span></div>
+        <div class="rundelta"><span class="d down">▼ -3 pts</span></div>
+      </div>
+      <div class="tierrow"><span class="tierd down">core capability 78%→56%</span><span class="tierd up">architectural 33%→67%</span><span class="tierd down">judgment 67%→60%</span><span class="tierd up">showcase 0%→25%</span></div>
+      <div class="fbrow">failures: assertion:2 · timeout:8 · judge:7 · other:1</div>
+      <ul class="commits"><li class="commit "><code>a4759b6e</code> <span class="badge muted">infra/docs</span> <span class="csubj">Update eval dashboard data 2026-08-03</span></li></ul>
+    </div>
     <div class="run">
       <div class="runhead">
         <div class="rundate">2026-08-03</div>
