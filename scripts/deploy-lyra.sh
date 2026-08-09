@@ -141,6 +141,17 @@ if [ -d "$REPO_DIR/skills" ]; then
     fi
 fi
 
+# Overlay private skills after public skills. Private skills contain live Notion
+# infrastructure and must be deployed without ever entering the public repository.
+if [ "$HAVE_PRIVATE" = true ] && [ -d "$PRIVATE_DIR/skills" ]; then
+    DIFF=$(rsync -a --checksum --dry-run --itemize-changes "$PRIVATE_DIR/skills/" "$WORKSPACE/skills/" 2>/dev/null | grep -v '^\.' || true)
+    if [ -n "$DIFF" ]; then
+        rsync -a --checksum "$PRIVATE_DIR/skills/" "$WORKSPACE/skills/"
+        SYNCED=true
+        log "  Synced private skills"
+    fi
+fi
+
 # Sync notion references — live IDs from PRIVATE repo, schemas from public
 if [ "$HAVE_PRIVATE" = true ] && [ -f "$PRIVATE_DIR/notion/notion.md" ]; then
     mkdir -p "$WORKSPACE/references"

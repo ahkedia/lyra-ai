@@ -223,6 +223,11 @@ def morning_message():
         '',
         'Vitamin D3 (with breakfast) + B12 - take now.',
     ]
+    try:
+        parts.extend(['', format_gym_card()])
+    except Exception as error:
+        parts.extend(['', 'Workout recommendation unavailable today. Reply yes for the gym card.'])
+        print(f'[warn] could not build gym card: {error}', file=sys.stderr)
     esc = [escalation_line(p, streaks[p]) for p in PILLARS]
     esc = [e for e in esc if e]
     if esc:
