@@ -8,7 +8,10 @@
     "lyra-minions-jobs": "dist/minions/cli.js"
   },
   "scripts": {
-    "test": "node --test tests/content-machine.test.js",
+    "test": "node --test tests/content-machine.test.js tests/lyra-app.test.js tests/lyra-server.test.js",
+    "test:app": "node --test tests/lyra-app.test.js",
+    "app:preflight": "node scripts/lyra-app-preflight.js",
+    "app": "node app/server.js",
     "route": "node scripts/model-router.js",
     "route:test": "node scripts/model-router.js --test",
     "route:stats": "node scripts/model-router.js --stats",
@@ -18,9 +21,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
-    "@supermemory/tools": "^1.4.0",
-    "nodemailer": "^8.0.10",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.2",
+    "nodemailer": "^9.0.5",
     "pg": "^8.13.1",
+    "web-push": "^3.6.7",
     "ws": "^8.20.0",
     "yaml": "^2.8.2"
   },

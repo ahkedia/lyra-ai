@@ -101,6 +101,12 @@ jobs:
           fi
           echo "✓ .env.example looks clean"
 
+      - name: Run Lyra PWA boundary tests
+        run: npm test
+
+      - name: Validate Lyra development preflight
+        run: npm run app:preflight
+
   routing-eval:
     name: Router Tests
     runs-on: ubuntu-latest

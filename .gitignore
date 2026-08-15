@@ -36,6 +36,7 @@ evals/results/*.jsonl
 evals/results/*-summary.json
 evals/results/*-routing.json
 logs/
+.lyra-app/
 .gstack/
 
 # --- lyra-refactor-2026-06-20: ignore regenerated/cache/backup noise ---

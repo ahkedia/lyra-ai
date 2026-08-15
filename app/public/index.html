@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f7f2"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/styles.css"><title>Lyra</title>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar"><div class="brand"><span class="brand-mark">✦</span><strong>Lyra</strong><button id="newChat" class="new-chat" aria-label="New conversation">＋</button></div><p class="eyebrow">CONVERSATIONS</p><input id="threadSearch" class="thread-search" type="search" placeholder="Search conversations" aria-label="Search conversations"><div id="threads" class="threads"></div><div class="sidebar-foot"><button data-view="today">Today</button><button data-view="spaces">Spaces</button><button id="passkeyButton">Set up Face ID</button><button id="loginButton">Sign in with Face ID</button><button id="pushButton">Enable alerts</button><button id="testPushButton">Send test alert</button><button id="logoutButton">Sign out</button></div></aside>
+    <main class="workspace">
+      <header class="workspace-header"><button id="menu" class="menu-button">☰</button><div><p class="eyebrow" id="viewLabel">LYRA</p><h1 id="conversationTitle">New conversation</h1></div><button id="refresh" class="icon-button" aria-label="Refresh">↻</button></header>
+      <section id="chatView" class="chat-view"><div id="messages" class="messages"><div class="welcome"><span class="welcome-mark">✦</span><h2>What’s on your mind?</h2><p>Ask Lyra to think, find, organise, or act. Trusted context appears alongside the answer.</p></div></div><div id="activity" class="activity" hidden></div><form id="composer" class="composer"><textarea id="messageInput" rows="1" placeholder="Message Lyra..." autocomplete="off"></textarea><button id="send" class="send-button" aria-label="Send message">↑</button></form><p class="composer-note">Lyra checks sources before it acts. <button type="button" id="captureButton">Add voice or note</button></p></section>
+      <section id="todayView" class="today-view" hidden><div class="hero"><div><p class="eyebrow">YOUR DAY</p><h2 id="dayTitle">Loading your signal...</h2><p id="daySubtitle" class="muted">Checking trusted sources.</p></div><span id="freshness" class="status-pill">Refreshing</span></div><div id="warnings" class="warnings" hidden></div><div class="section-heading"><h3>Needs your attention</h3></div><div id="items" class="stack"></div></section>
+      <section id="spacesView" class="spaces-view" hidden><div class="hero"><div><p class="eyebrow">SPACES</p><h2>Keep context together.</h2><p class="muted">Jump into a focused area without losing Lyra’s shared memory.</p></div></div><div class="space-grid"><button class="space-card" data-space="Work"><span class="space-icon">↗</span><strong>Work</strong><small>Projects, decisions, and follow-ups</small></button><button class="space-card" data-space="Personal"><span class="space-icon">○</span><strong>Personal</strong><small>Ideas, errands, and routines</small></button><button class="space-card" data-space="Household"><span class="space-icon">⌂</span><strong>Household</strong><small>Shared plans and commitments</small></button></div></section>
+      <nav class="mobile-nav"><button class="active" data-view="chat">Lyra</button><button data-view="today">Today</button><button data-view="spaces">Spaces</button></nav>
+    </main>
+  </div>
+  <dialog id="actionDialog"><form method="dialog"><h3 id="dialogTitle">Review action</h3><p id="dialogBody" class="muted"></p><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button value="commit" class="primary">Commit</button></div></form></dialog>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

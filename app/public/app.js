@@ -1,0 +1,96 @@
+const state = { conversations: [], current: null, token: localStorage.getItem('lyra_token') || '', threadQuery: '' };
+const $ = id => document.getElementById(id);
+import { registerPasskey, loginPasskey } from './auth.js';
+const headers = () => ({ 'content-type': 'application/json', ...(state.token ? { authorization: `Bearer ${state.token}` } : {}) });
+
+async function request(path, options = {}) {
+  const response = await fetch(path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
+  if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || `Request failed (${response.status})`);
+  return response.json();
+}
+
+function escapeHtml(value = '') { return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])); }
+function safeUrl(value = '') { try { const url = new URL(value, window.location.origin); return ['http:', 'https:', 'data:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } }
+function inlineMarkdown(value = '') { let html = escapeHtml(value); html = html.replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label, url) => `<a href="${safeUrl(url)}" target="_blank" rel="noopener">${label}</a>`); return html; }
+function renderChart(raw) { try { const chart = JSON.parse(raw); const rows = Array.isArray(chart.data) ? chart.data : []; const max = Math.max(1, ...rows.map(row => Number(row.value) || 0)); return `<figure class="rich-chart"><figcaption>${escapeHtml(chart.title || 'Chart')}</figcaption><div class="chart-bars">${rows.map(row => `<div class="chart-row"><span class="chart-label">${escapeHtml(row.label || '')}</span><span class="chart-track"><span class="chart-bar" style="width:${Math.max(2, Math.round((Number(row.value) || 0) / max * 100))}%;background:${safeColor(row.color)}"></span></span><strong>${escapeHtml(row.value ?? '')}</strong></div>`).join('')}</div></figure>`; } catch { return `<pre class="rich-code"><code>${escapeHtml(raw)}</code></pre>`; } }
+function safeColor(value) { return /^#[0-9a-f]{3,8}$/i.test(String(value || '')) ? value : 'var(--accent)'; }
+function renderRichContent(value = '') { const lines = String(value).split('\n'); const blocks = []; let index = 0; while (index < lines.length) { if (!lines[index].trim()) { index += 1; continue; } if (lines[index].startsWith('```')) { const language = lines[index].slice(3).trim().toLowerCase(); index += 1; const code = []; while (index < lines.length && !lines[index].startsWith('```')) code.push(lines[index++]); index += 1; blocks.push(language === 'chart' ? renderChart(code.join('\n')) : `<div class="rich-code-wrap"><button class="copy-code" type="button">Copy</button><pre class="rich-code"><code>${escapeHtml(code.join('\n'))}</code></pre></div>`); continue; } if (/^[-*] /.test(lines[index])) { const items = []; while (index < lines.length && /^[-*] /.test(lines[index])) items.push(`<li>${inlineMarkdown(lines[index++].slice(2))}</li>`); blocks.push(`<ul class="rich-list">${items.join('')}</ul>`); continue; } if (/^\d+\. /.test(lines[index])) { const items = []; while (index < lines.length && /^\d+\. /.test(lines[index])) items.push(`<li>${inlineMarkdown(lines[index++].replace(/^\d+\. /, ''))}</li>`); blocks.push(`<ol class="rich-list">${items.join('')}</ol>`); continue; } if (lines[index].includes('|') && index + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[index + 1])) { const header = lines[index++].split('|').map(cell => cell.trim()).filter(Boolean); index += 1; const rows = []; while (index < lines.length && lines[index].includes('|')) rows.push(lines[index++].split('|').map(cell => cell.trim()).filter(Boolean)); blocks.push(`<div class="rich-table-wrap"><table class="rich-table"><thead><tr>${header.map(cell => `<th>${inlineMarkdown(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${inlineMarkdown(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`); continue; } const paragraph = []; while (index < lines.length && lines[index].trim() && !lines[index].startsWith('```') && !/^[-*] /.test(lines[index]) && !/^\d+\. /.test(lines[index])) paragraph.push(lines[index++]); blocks.push(`<p>${inlineMarkdown(paragraph.join('\n')).replace(/\n/g, '<br>')}</p>`); } return blocks.join(''); }
+function renderMedia(media = []) { return media.map(item => { const url = safeUrl(item.url || ''); if (!url) return ''; const alt = escapeHtml(item.alt || 'Lyra attachment'); if (item.type === 'image') return `<figure class="rich-media"><img src="${url}" alt="${alt}" loading="lazy"><figcaption>${alt}</figcaption></figure>`; if (item.type === 'audio') return `<div class="rich-media"><audio controls src="${url}"></audio></div>`; if (item.type === 'video') return `<div class="rich-media"><video controls preload="metadata" src="${url}"></video></div>`; return `<a class="file-card" href="${url}" target="_blank" rel="noopener">${alt}<span>Open attachment</span></a>`; }).join(''); }
+
+function renderThreads() {
+  const query = state.threadQuery.trim().toLowerCase();
+  const visible = query ? state.conversations.filter(thread => thread.title.toLowerCase().includes(query)) : state.conversations;
+  $('threads').innerHTML = visible.length ? visible.map(thread => `<button class="thread ${thread.id === state.current?.id ? 'selected' : ''}" data-id="${thread.id}">${escapeHtml(thread.title)}</button>`).join('') : '<p class="muted empty-thread">No matching conversations.</p>';
+  document.querySelectorAll('.thread').forEach(button => button.addEventListener('click', () => openConversation(button.dataset.id)));
+}
+
+function renderMessages() {
+  const messages = state.current?.messages || [];
+  $('messages').innerHTML = messages.length ? messages.map(message => `<article class="message ${message.role}"><div class="message-avatar">${message.role === 'assistant' ? '✦' : 'A'}</div><div class="message-content">${renderRichContent(message.content)}${renderMedia(message.media)}${message.sources?.length ? `<div class="sources">${message.sources.map(source => `<span title="${escapeHtml(source.asOf || '')}">${escapeHtml(source.name || source.status || 'Source')}</span>`).join('')}</div>` : ''}</div></article>`).join('') : '<div class="welcome"><span class="welcome-mark">✦</span><h2>What’s on your mind?</h2><p>Ask Lyra to think, find, organise, or act. Trusted context appears alongside the answer.</p></div>';
+  document.querySelectorAll('.copy-code').forEach(button => button.addEventListener('click', async () => { const code = button.nextElementSibling?.innerText || ''; await navigator.clipboard?.writeText(code); button.textContent = 'Copied'; setTimeout(() => { button.textContent = 'Copy'; }, 1200); }));
+  $('messages').scrollTop = $('messages').scrollHeight;
+}
+
+async function loadThreads() { const result = await request('/v1/conversations'); state.conversations = result.conversations; renderThreads(); if (!state.current && state.conversations[0]) await openConversation(state.conversations[0].id); }
+async function openConversation(id) { state.current = await request(`/v1/conversations/${id}`); $('conversationTitle').textContent = state.current.title; renderThreads(); renderMessages(); showView('chat'); }
+async function newConversation() { const conversation = await request('/v1/conversations', { method: 'POST', body: JSON.stringify({ title: 'New conversation' }) }); state.conversations.unshift(conversation); await openConversation(conversation.id); }
+
+function addActivity(text, done = false) { $('activity').hidden = false; $('activity').innerHTML = `<span class="spinner ${done ? 'done' : ''}">${done ? '✓' : '·'}</span>${escapeHtml(text)}`; }
+
+async function enablePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('Push notifications are not supported here');
+  const registration = await navigator.serviceWorker.ready; const permission = await Notification.requestPermission(); if (permission !== 'granted') throw new Error('Notification permission was not granted');
+  const { publicKey } = await request('/v1/push/public-key'); if (!publicKey) throw new Error('Push is not configured on the server');
+  const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeBase64(publicKey) });
+  await request('/v1/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription) }); addActivity('Commitment alerts enabled', true);
+}
+function decodeBase64(value) { return Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((value.length + 3) % 4)), char => char.charCodeAt(0)); }
+
+async function sendMessage(text) {
+  if (!state.current || !text.trim()) return;
+  const optimistic = { id: crypto.randomUUID(), role: 'user', content: text.trim(), createdAt: new Date().toISOString() };
+  state.current.messages.push(optimistic); renderMessages(); $('messageInput').value = ''; $('send').disabled = true; addActivity('Lyra is checking trusted context');
+  const response = await fetch(`/v1/conversations/${state.current.id}/messages`, { method: 'POST', headers: headers(), body: JSON.stringify({ text }) });
+  if (!response.ok || !response.body) { addActivity('Could not reach Lyra. Try again.', true); $('send').disabled = false; return; }
+  const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = '';
+  while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const events = buffer.split('\n\n'); buffer = events.pop(); for (const raw of events) { if (!raw.startsWith('data: ')) continue; const event = JSON.parse(raw.slice(6)); if (event.type === 'tool.started') addActivity(event.label); if (event.type === 'tool.completed') addActivity(event.label, true); if (event.type === 'message.completed') { state.current.messages.push(event.message); renderMessages(); addActivity('Response complete', true); } if (event.type === 'error') addActivity(event.message, true); } }
+  $('send').disabled = false; await loadThreads(); await openConversation(state.current.id);
+}
+
+async function reviewItemAction(targetId, title, type, source, kind) {
+  const preview = await request('/v1/actions', { method: 'POST', body: JSON.stringify({ type, targetId, idempotencyKey: `${type}:${targetId}`, payload: { source, kind } }) });
+  $('dialogTitle').textContent = `Review ${type.replaceAll('_', ' ')}`;
+  $('dialogBody').textContent = `Lyra is ready to ${type.replaceAll('_', ' ')} “${title}”. Confirm to continue.`;
+  const dialog = $('actionDialog'); dialog.showModal();
+  await new Promise(resolve => dialog.addEventListener('close', resolve, { once: true }));
+  if (dialog.returnValue !== 'commit') return;
+  await request(`/v1/actions/${preview.id}/commit`, { method: 'POST' });
+  addActivity(`${type.replaceAll('_', ' ')} committed`, true);
+  await loadToday();
+}
+
+function readCache(key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { localStorage.removeItem(key); return null; } }
+function renderToday(data, cached = false) { $('freshness').textContent = cached ? 'Cached' : data.warnings?.length ? 'Needs review' : 'Up to date'; $('dayTitle').textContent = data.items?.length ? `${data.items.length} things need your attention.` : 'A clear day starts here.'; $('daySubtitle').textContent = `${cached ? 'Cached' : 'Updated'} ${new Date(data.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`; $('warnings').hidden = !data.warnings?.length; $('warnings').textContent = data.warnings?.join(' ') || ''; $('items').innerHTML = data.items?.length ? data.items.map(item => `<article class="card"><div class="card-top"><div><h4>${escapeHtml(item.title)}</h4><p class="muted">${escapeHtml(item.detail || item.kind || 'Lyra item')}</p></div><span class="status-pill">${escapeHtml(item.status || 'open')}</span></div><p class="meta">${escapeHtml(item.source || 'Unknown source')} · ${item.asOf ? new Date(item.asOf).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'time unknown'}</p>${item.actions?.length ? `<div class="card-actions"><button class="primary item-action" data-target="${escapeHtml(item.id)}" data-title="${escapeHtml(item.title)}" data-source="${escapeHtml(item.source || '')}" data-kind="${escapeHtml(item.kind || '')}" data-action="${escapeHtml(item.actions[0])}">Review ${escapeHtml(item.actions[0])}</button></div>` : ''}</article>`).join('') : '<div class="empty">Nothing is being invented here. Connect a trusted source to populate Today.</div>'; document.querySelectorAll('.item-action').forEach(button => button.addEventListener('click', () => reviewItemAction(button.dataset.target, button.dataset.title, button.dataset.action, button.dataset.source, button.dataset.kind))); }
+async function loadToday() { const cached = readCache('lyra_today_cache'); if (cached?.generatedAt) renderToday(cached, true); else $('freshness').textContent = 'Refreshing'; try { const data = await request('/v1/today'); localStorage.setItem('lyra_today_cache', JSON.stringify(data)); renderToday(data); } catch (error) { if (!cached) { $('freshness').textContent = 'Unavailable'; $('warnings').hidden = false; $('warnings').textContent = error.message; } } }
+
+function showView(view) { $('chatView').hidden = view !== 'chat'; $('todayView').hidden = view !== 'today'; $('spacesView').hidden = view !== 'spaces'; $('viewLabel').textContent = view === 'today' ? 'TODAY' : view === 'spaces' ? 'SPACES' : 'LYRA'; document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === view)); if (view === 'today') loadToday(); }
+
+$('composer').addEventListener('submit', event => { event.preventDefault(); sendMessage($('messageInput').value); }); $('messageInput').addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); $('composer').requestSubmit(); } }); $('newChat').addEventListener('click', newConversation); $('refresh').addEventListener('click', () => state.current ? openConversation(state.current.id) : loadToday());
+$('passkeyButton').addEventListener('click', async () => { try { const result = await registerPasskey(); addActivity(result.verified ? 'Face ID passkey registered' : 'Passkey registration failed', true); } catch (error) { addActivity(error.message, true); } });
+$('loginButton').addEventListener('click', async () => { try { const result = await loginPasskey(); addActivity(result.authenticated ? 'Signed in with Face ID' : 'Face ID sign-in failed', true); await loadThreads(); } catch (error) { addActivity(error.message, true); } });
+let recorder;
+let audioChunks = [];
+$('captureButton').addEventListener('click', async () => {
+  if (recorder?.state === 'recording') { recorder.stop(); return; }
+  if (!navigator.mediaDevices?.getUserMedia) { $('messageInput').placeholder = 'Capture a thought for Lyra...'; $('messageInput').focus(); return; }
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  recorder = new MediaRecorder(stream); audioChunks = []; recorder.ondataavailable = event => audioChunks.push(event.data); recorder.onstop = async () => { stream.getTracks().forEach(track => track.stop()); $('captureButton').textContent = 'Add voice or note'; const blob = new Blob(audioChunks, { type: 'audio/webm' }); const reader = new FileReader(); reader.onloadend = async () => { const audioBase64 = String(reader.result).split(',')[1]; const payload = { kind: 'audio', audioBase64 }; try { await request('/v1/captures', { method: 'POST', body: JSON.stringify(payload) }); addActivity('Voice capture received', true); } catch (error) { const pending = JSON.parse(localStorage.getItem('lyra_capture_queue') || '[]'); pending.push(payload); localStorage.setItem('lyra_capture_queue', JSON.stringify(pending)); addActivity('Saved offline. Lyra will retry when connected.', true); } }; reader.readAsDataURL(blob); }; recorder.start(); $('captureButton').textContent = 'Stop recording';
+}); $('menu').addEventListener('click', () => document.querySelector('.sidebar').classList.toggle('open')); document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
+$('pushButton').addEventListener('click', async () => { try { await enablePush(); } catch (error) { addActivity(error.message, true); } });
+$('testPushButton').addEventListener('click', async () => { try { const result = await request('/v1/push/test', { method: 'POST', body: '{}' }); addActivity(result.delivered ? 'Test alert sent' : 'Test alert queued; configure VAPID delivery', true); } catch (error) { addActivity(error.message, true); } });
+$('logoutButton').addEventListener('click', async () => { try { await request('/v1/auth/logout', { method: 'POST', body: '{}' }); state.current = null; state.conversations = []; renderThreads(); addActivity('Signed out of Lyra', true); } catch (error) { addActivity(error.message, true); } });
+$('threadSearch').addEventListener('input', event => { state.threadQuery = event.target.value; renderThreads(); });
+document.querySelectorAll('[data-space]').forEach(button => button.addEventListener('click', async () => { await newConversation(); $('conversationTitle').textContent = `${button.dataset.space} space`; addActivity(`${button.dataset.space} context ready`, true); }));
+window.addEventListener('online', async () => { const pending = JSON.parse(localStorage.getItem('lyra_capture_queue') || '[]'); if (!pending.length) return; const remaining = []; for (const payload of pending) { try { await request('/v1/captures', { method: 'POST', body: JSON.stringify(payload) }); } catch { remaining.push(payload); } } localStorage.setItem('lyra_capture_queue', JSON.stringify(remaining)); if (!remaining.length) addActivity('Offline captures synced', true); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+try { await loadThreads(); if (!state.current) await newConversation(); } catch (error) { addActivity('Sign in with Face ID to open your Lyra conversations.', true); }

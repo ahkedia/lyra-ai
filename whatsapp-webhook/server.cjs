@@ -55,6 +55,7 @@ function runAgent(fromNoPlus, text) {
 }
 
 function invokeAgent(sessionKey, text) {
+  if (process.env.LYRA_APP_URL) return invokeSharedLyra(sessionKey, text);
   return new Promise((resolve) => {
     const args = ['agent', '--channel', 'whatsapp', '--session-key', sessionKey,
                   '-m', text, '--json', '--timeout', String(AGENT_TIMEOUT)];
@@ -65,6 +66,15 @@ function invokeAgent(sessionKey, text) {
         resolve(extractReply(stdout));
       });
   });
+}
+
+async function invokeSharedLyra(sessionKey, text) {
+  try {
+    const res = await fetch(`${process.env.LYRA_APP_URL}/v1/channels/message`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.LYRA_APP_TOKEN || ''}` }, body: JSON.stringify({ channel: 'whatsapp', senderId: sessionKey.replace(/^.*wa-/, ''), text }) });
+    if (!res.ok) return null;
+    const payload = await res.json();
+    return payload?.content || payload?.message?.content || null;
+  } catch (error) { log('shared Lyra API error:', error.message); return null; }
 }
 
 // Handles both inbound agent JSON (result.payloads[].text) and

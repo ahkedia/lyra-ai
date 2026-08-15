@@ -1,0 +1,20 @@
+[Unit]
+Description=Lyra Telegram shared API bridge
+After=network-online.target lyra-app.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lyra
+WorkingDirectory=/opt/lyra-ai
+EnvironmentFile=/etc/lyra/lyra-app.env
+ExecStart=/usr/bin/node /opt/lyra-ai/scripts/telegram-lyra-bridge.mjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lyra-app
+
+[Install]
+WantedBy=multi-user.target
