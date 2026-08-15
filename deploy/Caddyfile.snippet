@@ -11,7 +11,7 @@ wa.akashkedia.com {
       Referrer-Policy "same-origin"
     }
   }
-  handle /v1* /styles.css /app.js /auth.js /sw.js /manifest.webmanifest /icon.svg {
+  handle /health /v1* /styles.css /app.js /auth.js /sw.js /manifest.webmanifest /icon.svg {
     reverse_proxy 127.0.0.1:8787
     header {
       Strict-Transport-Security "max-age=31536000; includeSubDomains"
