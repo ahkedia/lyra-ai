@@ -1,1 +1,1 @@
-{"name":"Lyra","short_name":"Lyra","start_url":"/","display":"standalone","theme_color":"#f7f7f2","background_color":"#f7f7f2","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+{"name":"Lyra","short_name":"Lyra","start_url":"/app/","scope":"/app/","display":"standalone","theme_color":"#f7f7f2","background_color":"#f7f7f2","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}

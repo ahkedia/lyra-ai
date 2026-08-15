@@ -92,5 +92,5 @@ $('logoutButton').addEventListener('click', async () => { try { await request('/
 $('threadSearch').addEventListener('input', event => { state.threadQuery = event.target.value; renderThreads(); });
 document.querySelectorAll('[data-space]').forEach(button => button.addEventListener('click', async () => { await newConversation(); $('conversationTitle').textContent = `${button.dataset.space} space`; addActivity(`${button.dataset.space} context ready`, true); }));
 window.addEventListener('online', async () => { const pending = JSON.parse(localStorage.getItem('lyra_capture_queue') || '[]'); if (!pending.length) return; const remaining = []; for (const payload of pending) { try { await request('/v1/captures', { method: 'POST', body: JSON.stringify(payload) }); } catch { remaining.push(payload); } } localStorage.setItem('lyra_capture_queue', JSON.stringify(remaining)); if (!remaining.length) addActivity('Offline captures synced', true); });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(() => {});
 try { await loadThreads(); if (!state.current) await newConversation(); } catch (error) { addActivity('Sign in with Face ID to open your Lyra conversations.', true); }

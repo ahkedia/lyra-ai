@@ -1,10 +1,27 @@
-lyra.example.com {
+wa.akashkedia.com {
   encode gzip
-  reverse_proxy 127.0.0.1:8787
-  header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    X-Content-Type-Options "nosniff"
-    X-Frame-Options "DENY"
-    Referrer-Policy "same-origin"
+
+  # New PWA at the existing Telegram Mini App URL. Strip the public prefix so
+  # the Node server can keep its normal root/static and /v1 API contract.
+  handle /app* {
+    uri strip_prefix /app
+    reverse_proxy 127.0.0.1:8787
+    header {
+      X-Content-Type-Options "nosniff"
+      Referrer-Policy "same-origin"
+    }
   }
+  handle /v1* /styles.css /app.js /auth.js /sw.js /manifest.webmanifest /icon.svg {
+    reverse_proxy 127.0.0.1:8787
+    header {
+      Strict-Transport-Security "max-age=31536000; includeSubDomains"
+      X-Content-Type-Options "nosniff"
+      X-Frame-Options "DENY"
+      Referrer-Policy "same-origin"
+    }
+  }
+
+  # Existing WhatsApp webhook and legacy API remain untouched.
+  handle /api* { reverse_proxy 127.0.0.1:8092 }
+  handle { reverse_proxy localhost:8091 }
 }
