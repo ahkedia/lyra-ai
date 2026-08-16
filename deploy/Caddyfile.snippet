@@ -1,6 +1,8 @@
 wa.akashkedia.com {
   encode gzip
 
+  redir /app /app/ 308
+
   # New PWA at the existing Telegram Mini App URL. Strip the public prefix so
   # the Node server can keep its normal root/static and /v1 API contract.
   handle /app* {
