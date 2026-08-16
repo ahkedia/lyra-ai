@@ -86,7 +86,15 @@ $('captureButton').addEventListener('click', async () => {
   if (!navigator.mediaDevices?.getUserMedia) { $('messageInput').placeholder = 'Capture a thought for Lyra...'; $('messageInput').focus(); return; }
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   recorder = new MediaRecorder(stream); audioChunks = []; recorder.ondataavailable = event => audioChunks.push(event.data); recorder.onstop = async () => { stream.getTracks().forEach(track => track.stop()); $('captureButton').textContent = 'Add voice or note'; const blob = new Blob(audioChunks, { type: 'audio/webm' }); const reader = new FileReader(); reader.onloadend = async () => { const audioBase64 = String(reader.result).split(',')[1]; const payload = { kind: 'audio', audioBase64 }; try { await request('/v1/captures', { method: 'POST', body: JSON.stringify(payload) }); addActivity('Voice capture received', true); } catch (error) { const pending = JSON.parse(localStorage.getItem('lyra_capture_queue') || '[]'); pending.push(payload); localStorage.setItem('lyra_capture_queue', JSON.stringify(pending)); addActivity('Saved offline. Lyra will retry when connected.', true); } }; reader.readAsDataURL(blob); }; recorder.start(); $('captureButton').textContent = 'Stop recording';
-}); $('menu').addEventListener('click', () => document.querySelector('.sidebar').classList.toggle('open')); document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
+});
+const sidebar = document.querySelector('.sidebar');
+const menu = $('menu');
+const closeSidebar = () => sidebar.classList.remove('open');
+menu.addEventListener('click', event => { event.stopPropagation(); sidebar.classList.toggle('open'); });
+document.addEventListener('click', event => { if (sidebar.classList.contains('open') && !sidebar.contains(event.target)) closeSidebar(); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape') closeSidebar(); });
+document.querySelectorAll('.sidebar [data-view]').forEach(button => button.addEventListener('click', closeSidebar));
+document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
 $('pushButton').addEventListener('click', async () => { try { await enablePush(); } catch (error) { addActivity(error.message, true); } });
 $('testPushButton').addEventListener('click', async () => { try { const result = await request('/v1/push/test', { method: 'POST', body: '{}' }); addActivity(result.delivered ? 'Test alert sent' : 'Test alert queued; configure VAPID delivery', true); } catch (error) { addActivity(error.message, true); } });
 $('logoutButton').addEventListener('click', async () => { try { await request('/v1/auth/logout', { method: 'POST', body: '{}' }); state.current = null; state.conversations = []; renderThreads(); addActivity('Signed out of Lyra', true); } catch (error) { addActivity(error.message, true); } });
