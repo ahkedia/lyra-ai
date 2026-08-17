@@ -4,6 +4,7 @@ import { createSnapshotProvider, createCompositeProvider } from './providers.js'
 
 const exec = promisify(execFile);
 const now = () => new Date().toISOString();
+let reminderSchemaCache = { expiresAt: 0, value: null };
 
 export function createLiveProvider({ repoRoot = process.cwd(), snapshotPath = process.env.LYRA_TODAY_SNAPSHOT } = {}) {
   const providers = snapshotPath ? [createSnapshotProvider(snapshotPath)] : [];
@@ -22,7 +23,7 @@ export function createActionHandler({ repoRoot = process.cwd() } = {}) {
       const title = String(action.payload?.title || '').trim();
       if (!title) return { status: 'failed', error: 'A reminder needs a title' };
       try {
-        const schema = await notionDataSource(process.env.NOTION_REMINDERS_DS_ID);
+        const schema = await reminderSchema();
         const titleProperty = Object.entries(schema.properties || {}).find(([, value]) => value.type === 'title')?.[0];
         if (!titleProperty) return { status: 'failed', error: 'The configured Notion reminder source has no title property' };
         const response = await fetch('https://api.notion.com/v1/pages', {
@@ -36,16 +37,20 @@ export function createActionHandler({ repoRoot = process.cwd() } = {}) {
     }
     if (notionEnabled && action.type === 'update_reminder') {
       const payload = action.payload || {};
-      const schema = await notionDataSource(process.env.NOTION_REMINDERS_DS_ID);
+      const schema = await reminderSchema();
       const titleProperty = Object.entries(schema.properties || {}).find(([, value]) => value.type === 'title')?.[0];
-      const dueProperty = process.env.NOTION_REMINDERS_DUE_PROPERTY || 'Due';
-      const flagProperty = process.env.NOTION_REMINDERS_FLAG_PROPERTY || 'Flagged';
-      const notesProperty = process.env.NOTION_REMINDERS_NOTES_PROPERTY || 'Notes';
+      const dueProperty = configuredProperty(schema, 'NOTION_REMINDERS_DUE_PROPERTY', 'Due', 'date');
+      const flagProperty = configuredProperty(schema, 'NOTION_REMINDERS_FLAG_PROPERTY', 'Flagged', 'checkbox');
+      const notesProperty = configuredProperty(schema, 'NOTION_REMINDERS_NOTES_PROPERTY', 'Notes', 'rich_text');
+      const listProperty = configuredProperty(schema, 'NOTION_REMINDERS_LIST_PROPERTY', '', 'select');
+      const priorityProperty = configuredProperty(schema, 'NOTION_REMINDERS_PRIORITY_PROPERTY', '', 'select');
       const properties = {};
       if (payload.title !== undefined) { if (!titleProperty) return { status: 'failed', error: 'The configured Notion reminder source has no title property' }; properties[titleProperty] = { title: [{ type: 'text', text: { content: String(payload.title) } }] }; }
-      if (payload.dueAt !== undefined) properties[dueProperty] = { date: payload.dueAt ? { start: String(payload.dueAt) } : null };
-      if (payload.flagged !== undefined) properties[flagProperty] = { checkbox: Boolean(payload.flagged) };
-      if (payload.notes !== undefined) properties[notesProperty] = { rich_text: String(payload.notes) ? [{ type: 'text', text: { content: String(payload.notes) } }] : [] };
+      if (payload.dueAt !== undefined) { if (!dueProperty) return { status: 'failed', error: 'Due dates are not configured for this reminder source' }; properties[dueProperty] = { date: payload.dueAt ? { start: String(payload.dueAt) } : null }; }
+      if (payload.flagged !== undefined) { if (!flagProperty) return { status: 'failed', error: 'Flags are not configured for this reminder source' }; properties[flagProperty] = { checkbox: Boolean(payload.flagged) }; }
+      if (payload.notes !== undefined) { if (!notesProperty) return { status: 'failed', error: 'Notes are not configured for this reminder source' }; properties[notesProperty] = { rich_text: String(payload.notes) ? [{ type: 'text', text: { content: String(payload.notes) } }] : [] }; }
+      if (payload.list !== undefined) { if (!listProperty) return { status: 'failed', error: 'Lists are not configured for this reminder source' }; properties[listProperty] = { select: payload.list ? { name: String(payload.list) } : null }; }
+      if (payload.priority !== undefined) { if (!priorityProperty) return { status: 'failed', error: 'Priority is not configured for this reminder source' }; properties[priorityProperty] = { select: payload.priority ? { name: String(payload.priority) } : null }; }
       if (!Object.keys(properties).length) return { status: 'failed', error: 'No reminder changes were supplied' };
       try {
         const response = await fetch(`https://api.notion.com/v1/pages/${action.targetId}`, { method: 'PATCH', headers: notionHeaders(), body: JSON.stringify({ properties }) });
@@ -54,14 +59,17 @@ export function createActionHandler({ repoRoot = process.cwd() } = {}) {
       } catch (error) { return { status: 'failed', error: error.message || 'Notion reminder update failed' }; }
     }
     if ((source.toLowerCase().includes('notion') || source === 'reminder') && notionEnabled && ['complete', 'dismiss', 'reopen'].includes(action.type)) {
-      const doneProperty = process.env.NOTION_REMINDERS_DONE_PROPERTY || 'Done';
-      const response = await fetch(`https://api.notion.com/v1/pages/${action.targetId}`, {
-        method: 'PATCH',
-        headers: notionHeaders(),
-        body: JSON.stringify({ properties: { [doneProperty]: { checkbox: action.type !== 'reopen' } } }),
-      });
-      if (!response.ok) return { status: 'failed', error: `Notion API ${response.status}` };
-      return { status: 'completed', provider: 'Notion' };
+      try {
+        const doneProperty = configuredProperty(await reminderSchema(), 'NOTION_REMINDERS_DONE_PROPERTY', 'Done', 'checkbox');
+        if (!doneProperty) return { status: 'failed', error: 'Completion is not configured for this reminder source' };
+        const response = await fetch(`https://api.notion.com/v1/pages/${action.targetId}`, {
+          method: 'PATCH',
+          headers: notionHeaders(),
+          body: JSON.stringify({ properties: { [doneProperty]: { checkbox: action.type !== 'reopen' } } }),
+        });
+        if (!response.ok) return { status: 'failed', error: `Notion API ${response.status}` };
+        return { status: 'completed', provider: 'Notion' };
+      } catch (error) { return { status: 'failed', error: error.message || 'Notion reminder update failed' }; }
     }
     if (source.toLowerCase().includes('calendar') && action.type === 'schedule') {
       const payload = action.payload || {};
@@ -81,6 +89,23 @@ async function notionDataSource(id) {
   if (!response.ok) throw new Error(`Notion API ${response.status}`);
   return response.json();
 }
+async function reminderSchema() {
+  if (reminderSchemaCache.value && reminderSchemaCache.expiresAt > Date.now()) return reminderSchemaCache.value;
+  const schema = await notionDataSource(process.env.NOTION_REMINDERS_DS_ID);
+  reminderSchemaCache = { value: schema, expiresAt: Date.now() + 5 * 60_000 };
+  return schema;
+}
+function configuredProperty(schema, envKey, fallback, type) {
+  const name = process.env[envKey] || fallback;
+  return name && schema.properties?.[name]?.type === type ? name : null;
+}
+function reminderCapabilities(schema) {
+  const property = (envKey, fallback, type) => configuredProperty(schema, envKey, fallback, type);
+  const options = name => (schema.properties?.[name]?.select?.options || []).map(option => option.name).filter(Boolean);
+  const list = property('NOTION_REMINDERS_LIST_PROPERTY', '', 'select');
+  const priority = property('NOTION_REMINDERS_PRIORITY_PROPERTY', '', 'select');
+  return { title: true, notes: Boolean(property('NOTION_REMINDERS_NOTES_PROPERTY', 'Notes', 'rich_text')), dueAt: Boolean(property('NOTION_REMINDERS_DUE_PROPERTY', 'Due', 'date')), flagged: Boolean(property('NOTION_REMINDERS_FLAG_PROPERTY', 'Flagged', 'checkbox')), list: { supported: Boolean(list), options: list ? options(list) : [] }, priority: { supported: Boolean(priority), options: priority ? options(priority) : [] }, recurrence: false, delete: false };
+}
 
 export function createNotionReminderProvider() {
   return async () => {
@@ -94,17 +119,22 @@ export function createNotionReminderProvider() {
       });
       if (!response.ok) throw new Error(`Notion API ${response.status}`);
       const payload = await response.json();
+      let schema = { properties: {} };
+      try { schema = await reminderSchema(); } catch { /* Reminders remain readable when the schema endpoint is temporarily unavailable. */ }
+      const capabilities = reminderCapabilities(schema);
       const items = (payload.results || []).map(page => {
         const property = Object.values(page.properties || {}).find(value => value.type === 'title');
-        const doneProperty = process.env.NOTION_REMINDERS_DONE_PROPERTY || 'Done';
-        const dateProperty = process.env.NOTION_REMINDERS_DUE_PROPERTY || 'Due';
-        const flagProperty = process.env.NOTION_REMINDERS_FLAG_PROPERTY || 'Flagged';
-        const notesProperty = process.env.NOTION_REMINDERS_NOTES_PROPERTY || 'Notes';
+        const doneProperty = configuredProperty(schema, 'NOTION_REMINDERS_DONE_PROPERTY', 'Done', 'checkbox');
+        const dateProperty = configuredProperty(schema, 'NOTION_REMINDERS_DUE_PROPERTY', 'Due', 'date');
+        const flagProperty = configuredProperty(schema, 'NOTION_REMINDERS_FLAG_PROPERTY', 'Flagged', 'checkbox');
+        const notesProperty = configuredProperty(schema, 'NOTION_REMINDERS_NOTES_PROPERTY', 'Notes', 'rich_text');
+        const listProperty = configuredProperty(schema, 'NOTION_REMINDERS_LIST_PROPERTY', '', 'select');
+        const priorityProperty = configuredProperty(schema, 'NOTION_REMINDERS_PRIORITY_PROPERTY', '', 'select');
         const title = property?.title?.map(part => part.plain_text || '').join('') || '(untitled)';
-        const notes = page.properties?.[notesProperty]?.rich_text?.map(part => part.plain_text || '').join('') || '';
-        return { id: page.id, sourceId: page.id, title, kind: 'reminder', status: page.properties?.[doneProperty]?.checkbox ? 'done' : 'open', source: 'Notion reminders', asOf: now(), confidence: 'verified', notes, detail: notes || 'Reminder', dueAt: page.properties?.[dateProperty]?.date?.start, flagged: Boolean(page.properties?.[flagProperty]?.checkbox), actions: page.properties?.[doneProperty]?.checkbox ? [] : ['complete'] };
+        const notes = notesProperty ? page.properties?.[notesProperty]?.rich_text?.map(part => part.plain_text || '').join('') || '' : '';
+        return { id: page.id, sourceId: page.id, title, kind: 'reminder', status: doneProperty && page.properties?.[doneProperty]?.checkbox ? 'done' : 'open', source: 'Notion reminders', asOf: now(), confidence: 'verified', notes, detail: notes || 'Reminder', dueAt: dateProperty ? page.properties?.[dateProperty]?.date?.start : undefined, flagged: flagProperty ? Boolean(page.properties?.[flagProperty]?.checkbox) : false, list: listProperty ? page.properties?.[listProperty]?.select?.name || '' : '', priority: priorityProperty ? page.properties?.[priorityProperty]?.select?.name || '' : '', actions: doneProperty && page.properties?.[doneProperty]?.checkbox ? [] : ['complete'] };
       }).filter(item => item.status !== 'done');
-      return { items, sources: [{ name: 'Notion reminders', status: 'current', asOf: now() }], warnings: [] };
+      return { items, capabilities: { reminders: capabilities }, sources: [{ name: 'Notion reminders', status: 'current', asOf: now() }], warnings: [] };
     } catch (error) { return { items: [], sources: [{ name: 'Notion reminders', status: 'unavailable', asOf: now() }], warnings: [`Notion reminders unavailable: ${error.message}`] }; }
   };
 }

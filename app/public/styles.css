@@ -60,5 +60,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .send-button { width: 44px; height: 44px; flex-basis: 44px; }
 .composer-tools { min-height: 44px; align-items: center; }
 .composer-tools button { min-height: 44px; padding-inline: 0; }
+.task-editor select { width: 100%; min-height: 42px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); color: var(--ink); }
 @media (max-width: 390px) { .main-content { padding: 0 14px; }.composer-wrap { left: 10px; right: 10px; }.user-message { margin-left: 40px; }.composer-tools span { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 1ms !important; animation-duration: 1ms !important; } }

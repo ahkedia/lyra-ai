@@ -7,7 +7,7 @@ import { createLyraApi, evidence } from '../app/api.js';
 import { createCompositeProvider } from '../app/providers.js';
 import { createChannelAdapter } from '../app/channels.js';
 import { createPasskeyAuth } from '../app/auth.js';
-import { createActionHandler } from '../app/integrations.js';
+import { createActionHandler, createNotionReminderProvider } from '../app/integrations.js';
 import { extractText, senderId } from '../scripts/telegram-lyra-bridge.mjs';
 import { assertLyraEnvelope, formatEnvelopeForFallback, normalizeAgentOutput } from '../app/schemas.js';
 import { normaliseNewsBrief } from '../app/news.js';
@@ -35,6 +35,25 @@ test('a populated live source feed has an honest lead state before the morning b
   assert.equal(news.brief.title, 'Latest for you');
   assert.equal(news.brief.kind, 'live_feed');
   assert.equal(news.items[0].headline, 'Source item');
+});
+
+test('Notion reminder capabilities expose only mapped writable fields', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = { key: process.env.NOTION_API_KEY, source: process.env.NOTION_REMINDERS_DS_ID, list: process.env.NOTION_REMINDERS_LIST_PROPERTY, priority: process.env.NOTION_REMINDERS_PRIORITY_PROPERTY };
+  process.env.NOTION_API_KEY = 'test-key'; process.env.NOTION_REMINDERS_DS_ID = 'test-reminders'; process.env.NOTION_REMINDERS_LIST_PROPERTY = 'List'; process.env.NOTION_REMINDERS_PRIORITY_PROPERTY = 'Priority';
+  globalThis.fetch = async url => {
+    if (String(url).includes('/data_sources/test-reminders/query')) return new Response(JSON.stringify({ results: [{ id: 'task-1', properties: { Name: { type: 'title', title: [{ plain_text: 'Pay rent' }] }, Done: { type: 'checkbox', checkbox: false }, Due: { type: 'date', date: { start: '2026-08-18' } }, Notes: { type: 'rich_text', rich_text: [] }, Flagged: { type: 'checkbox', checkbox: true }, List: { type: 'select', select: { name: 'Home' } }, Priority: { type: 'select', select: { name: 'High' } } } }] }));
+    return new Response(JSON.stringify({ properties: { Name: { type: 'title' }, Done: { type: 'checkbox' }, Due: { type: 'date' }, Notes: { type: 'rich_text' }, Flagged: { type: 'checkbox' }, List: { type: 'select', select: { options: [{ name: 'Home' }, { name: 'Work' }] } }, Priority: { type: 'select', select: { options: [{ name: 'High' }, { name: 'Low' }] } } } }));
+  };
+  try {
+    const result = await createNotionReminderProvider()();
+    assert.equal(result.capabilities.reminders.list.supported, true);
+    assert.deepEqual(result.capabilities.reminders.list.options, ['Home', 'Work']);
+    assert.equal(result.items[0].priority, 'High');
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries(originalEnv)) { const envKey = key === 'key' ? 'NOTION_API_KEY' : key === 'source' ? 'NOTION_REMINDERS_DS_ID' : key === 'list' ? 'NOTION_REMINDERS_LIST_PROPERTY' : 'NOTION_REMINDERS_PRIORITY_PROPERTY'; if (value === undefined) delete process.env[envKey]; else process.env[envKey] = value; }
+  }
 });
 
 test('a scheduled rich morning brief updates the Lyra stream and News from one canonical event', async () => {

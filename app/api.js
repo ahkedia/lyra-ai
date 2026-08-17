@@ -336,7 +336,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
 
   async function tasks() {
     const data = await dataProvider();
-    return { items: (data.items || []).filter(item => ['reminder', 'task'].includes(item.kind) || item.source?.toLowerCase().includes('notion')).map(item => ({ ...item, completed: item.status === 'done' })), sources: data.sources || [], warnings: data.warnings || [], generatedAt: now() };
+    return { items: (data.items || []).filter(item => ['reminder', 'task'].includes(item.kind) || item.source?.toLowerCase().includes('notion')).map(item => ({ ...item, completed: item.status === 'done' })), capabilities: data.capabilities?.reminders || {}, sources: data.sources || [], warnings: data.warnings || [], generatedAt: now() };
   }
 
   async function refreshNews() {

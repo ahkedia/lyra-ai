@@ -17,17 +17,19 @@ export function createSnapshotProvider(snapshotPath) {
 export function createCompositeProvider(providers) {
   return async () => {
     const results = await Promise.allSettled(providers.map(provider => provider()));
-    const items = [];
-    const sources = [];
-    const warnings = [];
+  const items = [];
+  const sources = [];
+  const warnings = [];
+  const capabilities = {};
     for (const result of results) {
       if (result.status === 'fulfilled') {
         items.push(...(result.value.items || []));
         sources.push(...(result.value.sources || []));
         warnings.push(...(result.value.warnings || []));
+        Object.assign(capabilities, result.value.capabilities || {});
       } else warnings.push(`A Lyra source failed: ${result.reason?.message || 'unknown error'}`);
     }
-    return { items, sources, warnings };
+  return { items, sources, warnings, capabilities };
   };
 }
 
