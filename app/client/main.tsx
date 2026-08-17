@@ -2,7 +2,7 @@ import { render } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { loginPasskey, registerPasskey } from './passkey.js';
 import { BlockList, envelopeText, type LyraAction, type LyraEnvelope } from './renderers.js';
-import { pendingMutations, queueMutation, removeMutation, updateMutation, readCached, writeCached } from './offline.js';
+import { pendingIncomingShares, pendingMutations, queueMutation, removeIncomingShare, removeMutation, updateMutation, readCached, writeCached } from './offline.js';
 import { shareLyraContent } from './share.js';
 
 type Tab = 'lyra' | 'todo' | 'news';
@@ -94,12 +94,32 @@ function App() {
         if (mutation.kind === 'message') { const response = await fetch('/v1/messages', { method: 'POST', credentials: 'include', headers: authHeaders({ 'content-type': 'application/json' }), body: JSON.stringify(mutation.payload) }); if (!response.ok) throw new Error('Queued message was rejected'); await response.text(); }
         if (mutation.kind === 'action') { const preview = await request<{ id: string }>('/v1/actions', { method: 'POST', body: JSON.stringify(mutation.payload) }); await request(`/v1/actions/${preview.id}/commit`, { method: 'POST', body: '{}' }); }
         if (mutation.kind === 'news') { const payload = mutation.payload as { id: string; operation: 'read' | 'save' | 'unsave' }; await request(`/v1/news/items/${encodeURIComponent(payload.id)}/${payload.operation === 'read' ? 'read' : 'save'}`, { method: payload.operation === 'unsave' ? 'DELETE' : 'POST', body: '{}' }); }
+        if (mutation.kind === 'capture') await request('/v1/captures', { method: 'POST', body: JSON.stringify(mutation.payload) });
         await removeMutation(mutation.id);
       } catch (error) { await updateMutation(mutation.id, { attempts: mutation.attempts + 1, error: error instanceof Error ? error.message : 'Retry failed' }); break; }
     }
     refreshPending(); void feed.load(); void tasks.load(); void news.load();
   };
   useEffect(() => { refreshPending(); void flushPending(); const online = () => { void flushPending(); }; window.addEventListener('online', online); return () => window.removeEventListener('online', online); }, []);
+  useEffect(() => {
+    const receiveShares = async () => {
+      for (const share of await pendingIncomingShares()) {
+        const payload = { kind: 'share', source: 'share-target', title: share.title, text: share.text, url: share.url, idempotencyKey: `share:${share.id}` };
+        try {
+          await request('/v1/captures', { method: 'POST', body: JSON.stringify(payload) });
+          await removeIncomingShare(share.id);
+          setTab('lyra'); setToast({ text: 'Saved to Lyra' }); void feed.load();
+        } catch (error) {
+          if (!navigator.onLine || error instanceof TypeError) {
+            await queueMutation({ id: payload.idempotencyKey, kind: 'capture', payload });
+            await removeIncomingShare(share.id);
+            refreshPending(); setTab('lyra'); setToast({ text: 'Saved to Lyra. It will sync when you reconnect.' });
+          }
+        }
+      }
+    };
+    void receiveShares();
+  }, []);
   useEffect(() => {
     if (!window.EventSource) return;
     const stream = new EventSource('/v1/feed/stream');

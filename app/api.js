@@ -14,6 +14,12 @@ const DEFAULT_STORE = path.resolve(process.env.LYRA_APP_DATA_DIR || '.lyra-app')
 const now = () => new Date().toISOString();
 const runFile = promisify(execFile);
 const ACTION_TYPES = new Set(['complete', 'reopen', 'dismiss', 'snooze', 'reply', 'create_reminder', 'update_reminder', 'schedule', 'open', 'retry', 'undo', 'submit_answer']);
+const safeCaptureUrl = value => {
+  try {
+    const url = new URL(String(value || ''));
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : '';
+  } catch { return ''; }
+};
 
 function evidence({ id, title, kind, status = 'open', dueAt, source = 'Lyra', asOf = now(), confidence = 'verified', detail, actions = [] }) {
   return { id, title, kind, status, dueAt, source, asOf, confidence, detail, actions };
@@ -479,7 +485,20 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
   }
 
   async function capture(input) {
-    const capture = { id: randomUUID(), kind: input.kind || 'text', text: input.text || '', createdAt: now(), status: 'received', source: 'pwa' };
+    const idempotencyKey = String(input.idempotencyKey || '').trim() || undefined;
+    const existing = idempotencyKey ? captures.find(item => item.idempotencyKey === idempotencyKey) : undefined;
+    if (existing) return existing;
+    const capture = {
+      id: randomUUID(),
+      kind: ['text', 'audio', 'share'].includes(input.kind) ? input.kind : 'text',
+      title: String(input.title || '').slice(0, 500),
+      text: String(input.text || '').slice(0, 8000),
+      url: safeCaptureUrl(input.url),
+      idempotencyKey,
+      createdAt: now(),
+      status: 'received',
+      source: input.source === 'share-target' ? 'share-target' : 'pwa',
+    };
     if (input.audioBase64) {
       if (input.audioBase64.length > 15_000_000) throw new Error('Audio capture is too large');
       await mkdir(path.join(storeDir, 'captures'), { recursive: true });
@@ -494,6 +513,16 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     captures.push(capture);
     persist();
     await audit({ type: 'capture.received', captureId: capture.id, kind: capture.kind });
+    if (capture.kind === 'share') {
+      addEvent({
+        id: `capture:${capture.idempotencyKey || capture.id}`,
+        eventType: 'capture.received',
+        actor: 'user',
+        title: 'Shared item',
+        envelope: safeTextEnvelope('Saved a shared item to Lyra.', { eventId: capture.id, source: 'Share sheet' }),
+        metadata: { captureId: capture.id, kind: capture.kind },
+      });
+    }
     return capture;
   }
 

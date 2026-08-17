@@ -337,6 +337,18 @@ test('database hydration replaces local fallback state instead of duplicating de
   assert.equal(second._state.captures.length, 1);
 });
 
+test('a shared item is idempotently captured and receives a safe Lyra stream receipt', async () => {
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')) });
+  const first = await api.capture({ kind: 'share', title: 'A shared page', text: 'Untrusted shared text', url: 'https://example.com/a', idempotencyKey: 'share:device-1' });
+  const second = await api.capture({ kind: 'share', title: 'Duplicate', idempotencyKey: 'share:device-1' });
+  assert.equal(second.id, first.id);
+  assert.equal(first.url, 'https://example.com/a');
+  assert.equal(api._state.captures.length, 1);
+  const receipt = api.listFeed({ limit: 10 }).events.find(event => event.id === 'capture:share:device-1');
+  assert.ok(receipt);
+  assert.equal(receipt.envelope.blocks[0].markdown, 'Saved a shared item to Lyra.');
+});
+
 test('channel adapter routes a message into a stable Lyra conversation', async () => {
   const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), agentRunner: async ({ fallback }) => fallback });
   const adapter = createChannelAdapter({ api });

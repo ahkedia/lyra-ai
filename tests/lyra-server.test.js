@@ -54,12 +54,17 @@ test('server exposes health and protects API behind a session', async () => {
     const signIn = await fetch(`http://127.0.0.1:${port}/v1/auth/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: 'test-token' }) });
     assert.equal(signIn.status, 201);
     const cookie = signIn.headers.get('set-cookie');
+    const shared = await fetch(`http://127.0.0.1:${port}/app/share`, { method: 'POST', headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' }, body: 'title=Shared+page&text=Notes&url=https%3A%2F%2Fexample.com%2Fshared', redirect: 'manual' });
+    assert.equal(shared.status, 303);
+    assert.equal(shared.headers.get('location'), '/app/?incoming-share=received');
     const today = await fetch(`http://127.0.0.1:${port}/v1/today`, { headers: { cookie } });
     assert.equal(today.status, 200);
     assert.ok(Array.isArray((await today.json()).warnings));
     const feed = await fetch(`http://127.0.0.1:${port}/v1/feed`, { headers: { cookie } });
     assert.equal(feed.status, 200);
-    assert.ok(Array.isArray((await feed.json()).events));
+    const feedBody = await feed.json();
+    assert.ok(Array.isArray(feedBody.events));
+    assert.ok(feedBody.events.some(event => event.eventType === 'capture.received'));
     const tasks = await fetch(`http://127.0.0.1:${port}/v1/tasks`, { headers: { cookie } });
     assert.equal(tasks.status, 200);
     const metrics = await fetch(`http://127.0.0.1:${port}/v1/metrics`, { headers: { cookie } });

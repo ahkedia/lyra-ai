@@ -1,10 +1,11 @@
 const DB_NAME = 'lyra-pwa';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 type StoredValue<T> = { key: string; value: T; updatedAt: string };
+export type IncomingShare = { id: string; title: string; text: string; url: string; createdAt: string };
 export type PendingMutation = {
   id: string;
-  kind: 'message' | 'action' | 'news';
+  kind: 'message' | 'action' | 'news' | 'capture';
   payload: Record<string, unknown>;
   createdAt: string;
   attempts: number;
@@ -18,6 +19,7 @@ function openDb(): Promise<IDBDatabase> {
       const db = request.result;
       if (!db.objectStoreNames.contains('resources')) db.createObjectStore('resources', { keyPath: 'key' });
       if (!db.objectStoreNames.contains('mutations')) db.createObjectStore('mutations', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('incoming-shares')) db.createObjectStore('incoming-shares', { keyPath: 'id' });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -80,6 +82,25 @@ export async function updateMutation(id: string, patch: Partial<PendingMutation>
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const request = db.transaction('mutations', 'readwrite').objectStore('mutations').put({ ...current, ...patch });
+    request.onsuccess = () => resolve(); request.onerror = () => reject(request.error);
+  });
+}
+
+export async function pendingIncomingShares(): Promise<IncomingShare[]> {
+  if (!('indexedDB' in window)) return [];
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction('incoming-shares', 'readonly').objectStore('incoming-shares').getAll();
+    request.onsuccess = () => resolve((request.result as IncomingShare[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function removeIncomingShare(id: string) {
+  if (!('indexedDB' in window)) return;
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const request = db.transaction('incoming-shares', 'readwrite').objectStore('incoming-shares').delete(id);
     request.onsuccess = () => resolve(); request.onerror = () => reject(request.error);
   });
 }

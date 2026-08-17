@@ -1,4 +1,5 @@
 import { createReadStream, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { stat } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
@@ -56,6 +57,19 @@ function body(req, maxBytes = MAX_BODY_BYTES) {
   });
 }
 
+function formBody(req, maxBytes = 16 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let total = 0;
+    req.on('data', chunk => { total += chunk.length; if (total > maxBytes) { req.destroy(); reject(new Error('Share is too large')); } else chunks.push(chunk); });
+    req.on('end', () => {
+      const fields = new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
+      resolve({ title: fields.get('title') || '', text: fields.get('text') || '', url: fields.get('url') || '' });
+    });
+    req.on('error', reject);
+  });
+}
+
 function authAllowed(req) {
   const key = req.socket.remoteAddress || 'unknown';
   const now = Date.now();
@@ -89,6 +103,17 @@ const server = http.createServer(async (req, res) => {
   try {
     await Promise.all([api.ready, sessions.ready]);
     if (req.url === '/health') return json(res, 200, { ok: true, service: 'lyra-app', at: new Date().toISOString() });
+    if (req.method === 'POST' && req.url === '/app/share') {
+      if (!await authorised(req)) {
+        res.writeHead(303, { location: '/app/?incoming-share=sign-in' });
+        return res.end();
+      }
+      const input = await formBody(req);
+      const fingerprint = createHash('sha256').update(`${input.title}\n${input.text}\n${input.url}`).digest('hex');
+      await api.capture({ ...input, kind: 'share', source: 'share-target', idempotencyKey: `share:${fingerprint}` });
+      res.writeHead(303, { location: '/app/?incoming-share=received' });
+      return res.end();
+    }
     if (!req.url.startsWith('/v1/')) return serveStatic(req, res);
     if (req.method === 'GET' && req.url === '/v1/dev/components') return process.env.NODE_ENV !== 'production' ? json(res, 200, JSON.parse(readFileSync(componentFixturePath, 'utf8'))) : json(res, 404, { error: 'Not found' });
     if (req.method === 'POST' && req.url === '/v1/auth/session') {
