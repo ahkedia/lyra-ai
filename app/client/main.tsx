@@ -201,17 +201,19 @@ function NewsScreen({ data, status, refresh, setData, onAsk, onToast }: { data: 
   const topics = ['For you', ...(data.topics || [])];
   const items = data.items.filter(item => topic === 'For you' || item.topic === topic);
   const update = (id: string, patch: Partial<NewsItem>) => setData({ ...data, items: data.items.map(item => item.id === id ? { ...item, ...patch } : item) });
+  const persistRead = (item: NewsItem) => { update(item.id, { read: true }); void request(`/v1/news/items/${encodeURIComponent(item.id)}/read`, { method: 'POST', body: '{}' }).catch(() => onToast({ text: 'Read state will retry when you reconnect.' })); };
+  const toggleSaved = (item: NewsItem) => { const saved = !item.saved; update(item.id, { saved }); void request(`/v1/news/items/${encodeURIComponent(item.id)}/save`, { method: saved ? 'POST' : 'DELETE', body: '{}' }).catch(() => onToast({ text: 'Saved state will retry when you reconnect.' })); };
   return <div class="news-screen">
     <header class="screen-heading"><div><h1>News</h1><p>{data.refreshedAt ? `Updated ${clock(data.refreshedAt)}` : 'Your focused briefing'}</p></div><button class="text-button" onClick={() => void refresh(true)}>Refresh</button></header>
     {data.brief && <article class="news-lead"><p class="block-eyebrow">{data.brief.date || 'Morning brief'}</p><h2>{data.brief.title || 'Your briefing'}</h2><p>{data.brief.summary}</p>{data.brief.themes?.length ? <div class="topic-row">{data.brief.themes.map(theme => <span>{theme}</span>)}</div> : null}</article>}
     <div class="smart-lists news-topics">{topics.map(value => <button class={topic === value ? 'active' : ''} onClick={() => setTopic(value)}>{value}</button>)}</div>
     {(status === 'offline' || data.stale) && <div class="state-banner">Showing the last available brief.</div>}
     <div class="news-feed">{items.length ? items.map(item => <article class={`news-card ${item.read ? 'read' : ''}`}>
-      <button class="news-main" onClick={() => { update(item.id, { read: true }); setSelected(item); }}>
+      <button class="news-main" onClick={() => { persistRead(item); setSelected({ ...item, read: true }); }}>
         {item.imageUrl && <img src={safeUrl(item.imageUrl)} alt="" loading="lazy" onError={event => { (event.currentTarget as HTMLImageElement).style.display = 'none'; }}/>}
         <div><p class="news-meta">{item.topic || 'Briefing'} · {item.source || 'Lyra'} · {clock(item.publishedAt)}</p><h2>{item.headline}</h2><p>{item.summary}</p>{item.whyItMatters && <p class="why"><strong>Why it matters</strong>{item.whyItMatters}</p>}</div>
       </button>
-      <footer><button onClick={() => update(item.id, { saved: !item.saved })}>{item.saved ? 'Saved' : 'Save'}</button><button onClick={() => void shareLyraContent({ title: item.headline, text: item.summary || '', url: item.sourceUrl }).then(() => onToast({ text: 'Shared' })).catch(() => undefined)}>Share</button>{item.sourceUrl && <a href={safeUrl(item.sourceUrl)} target="_blank" rel="noreferrer">Source ↗</a>}</footer>
+      <footer><button onClick={() => toggleSaved(item)}>{item.saved ? 'Saved' : 'Save'}</button><button onClick={() => void shareLyraContent({ title: item.headline, text: item.summary || '', url: item.sourceUrl }).then(() => onToast({ text: 'Shared' })).catch(() => undefined)}>Share</button>{item.sourceUrl && <a href={safeUrl(item.sourceUrl)} target="_blank" rel="noreferrer">Source ↗</a>}</footer>
     </article>) : <Empty title="Your brief is on its way" detail="No stories are available yet. Lyra will keep the last valid briefing here."/>}</div>
     {selected && <StorySheet item={selected} onClose={() => setSelected(null)} onAsk={() => { onAsk(selected); setSelected(null); }} onToast={onToast}/>}</div>;
 }

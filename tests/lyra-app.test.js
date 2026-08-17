@@ -42,6 +42,19 @@ test('a scheduled rich morning brief updates the Lyra stream and News from one c
   assert.equal((await api.news()).items[0].headline, 'Payment rails change');
 });
 
+test('News read and saved states persist through an API restart', async () => {
+  const storeDir = await mkdtemp(path.join(os.tmpdir(), 'lyra-app-'));
+  const first = createLyraApi({ storeDir });
+  await first.ingestScheduled({ id: 'brief-state', envelope: { schemaVersion: 1, blocks: [{ id: 'news', type: 'news_brief', date: '2026-08-17', title: 'News', summary: 'Summary', themes: [], items: [{ id: 'news-state', headline: 'Persistent news', summary: 'Summary', sourceUrl: 'https://example.com/story' }] }], actions: [], provenance: [] } });
+  await first.updateNewsItem('news-state', { read: true });
+  await first.updateNewsItem('news-state', { saved: true });
+  const restarted = createLyraApi({ storeDir });
+  await restarted.ready;
+  const [item] = (await restarted.news()).items;
+  assert.equal(item.read, true);
+  assert.equal(item.saved, true);
+});
+
 test('Ask Lyra news context resolves by stable item id, not copied page text', async () => {
   let suppliedContext;
   const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), agentRunner: async ({ context, fallback }) => { suppliedContext = context.selectedNews; return fallback; } });

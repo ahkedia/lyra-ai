@@ -221,6 +221,19 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     return { items: newsItems, brief: newsBrief, topics, generatedAt: now(), refreshedAt: newsRefreshedAt, stale: !newsRefreshedAt || Date.now() - Date.parse(newsRefreshedAt) > 4 * 60 * 60_000 };
   }
 
+  async function updateNewsItem(id, patch) {
+    const index = newsItems.findIndex(item => item.id === id);
+    if (index < 0) throw new Error('News item not found');
+    const current = newsItems[index];
+    const next = { ...current, ...patch };
+    if ('read' in patch) next.readAt = patch.read ? now() : null;
+    if ('saved' in patch) next.savedAt = patch.saved ? now() : null;
+    newsItems[index] = next;
+    persist();
+    await audit({ type: patch.saved === undefined ? 'news.read' : patch.saved ? 'news.saved' : 'news.unsaved', newsItemId: id });
+    return next;
+  }
+
   async function today() {
     const data = await dataProvider();
     return {
@@ -407,6 +420,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     ingestScheduled,
     tasks,
     news,
+    updateNewsItem,
     refreshNews,
     subscribePush(subscription) {
       pushSubscriptions.push({ subscription, createdAt: now() });

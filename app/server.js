@@ -137,6 +137,9 @@ const server = http.createServer(async (req, res) => {
       const parsed = new URL(req.url, 'http://lyra.local');
       return json(res, 200, await api.news({ refresh: parsed.searchParams.get('refresh') === '1' }));
     }
+    if (req.method === 'POST' && /^\/v1\/news\/items\/[^/]+\/read$/.test(req.url)) return json(res, 200, await api.updateNewsItem(req.url.split('/')[4], { read: true }));
+    if (req.method === 'POST' && /^\/v1\/news\/items\/[^/]+\/save$/.test(req.url)) return json(res, 200, await api.updateNewsItem(req.url.split('/')[4], { saved: true }));
+    if (req.method === 'DELETE' && /^\/v1\/news\/items\/[^/]+\/save$/.test(req.url)) return json(res, 200, await api.updateNewsItem(req.url.split('/')[4], { saved: false }));
     if (req.method === 'GET' && /^\/v1\/questions\/[^/]+$/.test(req.url)) {
       const question = api._state.questions.get(req.url.split('/')[3]);
       return question ? json(res, 200, question) : json(res, 404, { error: 'Question not found' });
