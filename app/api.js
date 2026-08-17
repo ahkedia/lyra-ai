@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { createDurableAuditStore } from './storage.js';
 import { createPushSender } from './push.js';
 import { normalizeAgentOutput, safeTextEnvelope, assertLyraEnvelope } from './schemas.js';
+import { fetchNewsSources, normaliseNewsBrief } from './news.js';
 
 const DEFAULT_STORE = path.resolve(process.env.LYRA_APP_DATA_DIR || '.lyra-app');
 
@@ -26,6 +27,8 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
   const events = new Map();
   const questions = new Map();
   let newsBrief = null;
+  let newsItems = [];
+  let newsRefreshedAt = null;
   const stateFile = path.join(storeDir, 'state.json');
 
   if (existsSync(stateFile)) {
@@ -37,11 +40,13 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
       for (const event of saved.events || []) events.set(event.id, event);
       for (const question of saved.questions || []) questions.set(question.questionId, question);
       newsBrief = saved.newsBrief || null;
+      newsItems = saved.newsItems || normaliseNewsBrief(newsBrief);
+      newsRefreshedAt = saved.newsRefreshedAt || null;
     } catch { /* Corrupt local state is ignored; source data remains authoritative. */ }
   }
 
   function persist() {
-    const state = { conversations: [...conversations.values()], actions: [...actions.values()], captures, events: [...events.values()], questions: [...questions.values()], newsBrief };
+    const state = { conversations: [...conversations.values()], actions: [...actions.values()], captures, events: [...events.values()], questions: [...questions.values()], newsBrief, newsItems, newsRefreshedAt };
     mkdir(storeDir, { recursive: true }).then(() => writeFileSync(stateFile, JSON.stringify(state, null, 2), { mode: 0o600 })).catch(() => {});
     const stateWrite = durableStore.writeState?.(state);
     stateWrite?.catch(() => {});
@@ -55,6 +60,8 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     for (const event of saved.events || []) events.set(event.id, event);
     for (const question of saved.questions || []) questions.set(question.questionId, question);
     newsBrief = saved.newsBrief || null;
+    newsItems = saved.newsItems || normaliseNewsBrief(newsBrief);
+    newsRefreshedAt = saved.newsRefreshedAt || null;
   }).catch(() => {});
 
   async function audit(event) {
@@ -166,7 +173,15 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     if (existing) return existing;
     const envelope = normalizeAgentOutput(input.envelope || input.output || input.text || input.message || input.summary || '', { eventId: String(id), source: 'OpenClaw' });
     const event = addEvent({ id: String(id), eventType: input.status === 'failed' ? 'scheduled.failure' : 'scheduled', actor: 'automation', title: input.title || input.jobId || 'Lyra update', status: input.status || 'completed', envelope, metadata: { jobId: input.jobId, runId: input.runId } });
-    if (input.newsBrief) { newsBrief = input.newsBrief; persist(); }
+    if (input.newsBrief) {
+      newsBrief = input.newsBrief;
+      const incoming = normaliseNewsBrief(newsBrief);
+      const byId = new Map(newsItems.map(item => [item.id, item]));
+      for (const item of incoming) byId.set(item.id, { ...byId.get(item.id), ...item });
+      newsItems = [...byId.values()].slice(0, 80);
+      newsRefreshedAt = now();
+      persist();
+    }
     await queuePush({ type: 'feed.event', eventId: event.id, title: event.title });
     return event;
   }
@@ -176,8 +191,23 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     return { items: (data.items || []).filter(item => ['reminder', 'task'].includes(item.kind) || item.source?.toLowerCase().includes('notion')).map(item => ({ ...item, completed: item.status === 'done' })), sources: data.sources || [], warnings: data.warnings || [], generatedAt: now() };
   }
 
-  async function news() {
-    return { brief: newsBrief, generatedAt: now(), stale: Boolean(newsBrief && Date.now() - Date.parse(newsBrief.generatedAt || newsBrief.date || now()) > 86_400_000) };
+  async function refreshNews() {
+    const fetched = await fetchNewsSources();
+    if (fetched.length) {
+      const byId = new Map(newsItems.map(item => [item.id, item]));
+      for (const item of fetched) byId.set(item.id, { ...byId.get(item.id), ...item });
+      newsItems = [...byId.values()].sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || ''))).slice(0, 80);
+      newsRefreshedAt = now();
+      persist();
+    }
+    return newsItems;
+  }
+
+  async function news({ refresh = false } = {}) {
+    const due = !newsRefreshedAt || Date.now() - Date.parse(newsRefreshedAt) > 30 * 60_000;
+    if (refresh || (due && newsItems.length < 12)) await refreshNews().catch(() => {});
+    const topics = [...new Set(newsItems.map(item => item.topic).filter(Boolean))];
+    return { items: newsItems, brief: newsBrief, topics, generatedAt: now(), refreshedAt: newsRefreshedAt, stale: !newsRefreshedAt || Date.now() - Date.parse(newsRefreshedAt) > 4 * 60 * 60_000 };
   }
 
   async function today() {
@@ -305,25 +335,28 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
   async function sendMessage(id, text, onEvent = () => {}) {
     const conversation = getConversation(id);
     const userMessage = { id: randomUUID(), role: 'user', content: text, createdAt: now() };
+    const assistantMessageId = randomUUID();
+    let sequence = 0;
+    const emit = async (type, payload = {}) => onEvent({ type, messageId: assistantMessageId, sequence: ++sequence, occurredAt: now(), ...payload });
     conversation.messages.push(userMessage);
     conversation.updatedAt = now();
     persist();
     addEvent({ id: userMessage.id, eventType: 'message', actor: 'user', title: 'You', envelope: safeTextEnvelope(text, { eventId: userMessage.id, source: 'User' }) });
-    await onEvent({ type: 'message.started', message: userMessage });
-    await onEvent({ type: 'tool.started', name: 'lyra-context', label: 'Checking trusted context' });
+    await emit('message.started', { message: userMessage });
+    await emit('tool.started', { name: 'lyra-context', label: 'Checking trusted context' });
     const data = await dataProvider();
-    await onEvent({ type: 'tool.completed', name: 'lyra-context', label: 'Context ready', sourceCount: (data.sources || []).length });
+    await emit('tool.completed', { name: 'lyra-context', label: 'Context ready', sourceCount: (data.sources || []).length });
     const fallback = data.warnings?.length
       ? `I’m here. ${data.warnings.join(' ')}`
       : `I found ${data.items?.length || 0} items in your current Lyra context. Ask me to prioritise, explain, or act on one of them.`;
     const content = await agentRunner({ conversation, text, context: data, fallback });
-    const assistantMessage = { id: randomUUID(), role: 'assistant', content, createdAt: now(), sources: data.sources || [], envelope: normalizeAgentOutput(content, { eventId: id, source: 'OpenClaw' }) };
+    const assistantMessage = { id: assistantMessageId, role: 'assistant', content, createdAt: now(), sources: data.sources || [], envelope: normalizeAgentOutput(content, { eventId: id, source: 'OpenClaw' }) };
     conversation.messages.push(assistantMessage);
     conversation.updatedAt = now();
     persist();
     addEvent({ id: assistantMessage.id, eventType: 'message', actor: 'assistant', title: 'Lyra', envelope: assistantMessage.envelope, metadata: { conversationId: id } });
-    await onEvent({ type: 'message.delta', content });
-    await onEvent({ type: 'message.completed', message: assistantMessage });
+    for (const chunk of String(content).match(/.{1,180}(?:\s|$)/gs) || [String(content)]) await emit('message.delta', { content: chunk });
+    await emit('message.completed', { message: assistantMessage });
     return assistantMessage;
   }
 
@@ -345,6 +378,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     ingestScheduled,
     tasks,
     news,
+    refreshNews,
     subscribePush(subscription) {
       pushSubscriptions.push({ subscription, createdAt: now() });
       persist();

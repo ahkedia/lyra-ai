@@ -12,23 +12,7 @@
   <title>Lyra</title>
 </head>
 <body>
-  <div id="app" class="app-shell">
-    <header class="topbar">
-      <div class="topbar-title"><span class="lyra-mark">✦</span><strong id="pageTitle">Lyra</strong><span id="connectionState" class="connection-state" hidden></span></div>
-      <button id="settingsButton" class="round-button" aria-label="Open settings">⚙</button>
-    </header>
-    <main id="main" class="main-content">
-      <section id="lyraTab" class="tab-panel" aria-labelledby="pageTitle"></section>
-      <section id="todoTab" class="tab-panel" hidden></section>
-      <section id="newsTab" class="tab-panel" hidden></section>
-    </main>
-    <nav class="tabbar" aria-label="Primary navigation">
-      <button class="tab-button active" data-tab="lyra"><span>✦</span><small>Lyra</small></button>
-      <button class="tab-button" data-tab="todo"><span>□</span><small>To Do</small></button>
-      <button class="tab-button" data-tab="news"><span>◌</span><small>News</small></button>
-    </nav>
-  </div>
-  <dialog id="settingsDialog"><form method="dialog" class="settings-sheet"><div class="sheet-handle"></div><h2>Lyra settings</h2><p class="muted">Private controls for this device.</p><div class="settings-actions"><button id="passkeyButton" type="button" class="secondary-button">Set up Face ID</button><button id="loginButton" type="button" class="secondary-button">Sign in with Face ID</button><button id="pushButton" type="button" class="secondary-button">Enable alerts</button><button id="testPushButton" type="button" class="secondary-button">Send test alert</button><button id="logoutButton" type="button" class="secondary-button">Sign out</button></div><p id="settingsStatus" class="muted"></p><button value="cancel" class="primary-button close-sheet">Done</button></form></dialog>
-  <script type="module" src="/app.js"></script>
+  <div id="app" class="app-shell"></div>
+  <script type="module" src="/app/assets/main.js"></script>
 </body>
 </html>

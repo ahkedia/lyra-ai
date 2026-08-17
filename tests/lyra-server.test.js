@@ -23,7 +23,7 @@ test('server exposes health and protects API behind a session', async () => {
     assert.equal(health.status, 200);
     const shell = await fetch(`http://127.0.0.1:${port}/app/`);
     assert.equal(shell.status, 200);
-    assert.match(await shell.text(), /To Do/);
+    assert.match(await shell.text(), /assets\/main\.js/);
     const denied = await fetch(`http://127.0.0.1:${port}/v1/today`);
     assert.equal(denied.status, 401);
     const signIn = await fetch(`http://127.0.0.1:${port}/v1/auth/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: 'test-token' }) });

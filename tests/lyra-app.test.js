@@ -10,10 +10,18 @@ import { createPasskeyAuth } from '../app/auth.js';
 import { createActionHandler } from '../app/integrations.js';
 import { extractText, senderId } from '../scripts/telegram-lyra-bridge.mjs';
 import { assertLyraEnvelope, normalizeAgentOutput } from '../app/schemas.js';
+import { normaliseNewsBrief } from '../app/news.js';
 
 test('golden rich UI fixture conforms to the canonical envelope', async () => {
   const fixture = JSON.parse(await readFile(new URL('../docs/fixtures/lyra-ui-v1.golden.json', import.meta.url), 'utf8'));
   for (const item of fixture.cases) assert.doesNotThrow(() => assertLyraEnvelope(item.envelope));
+});
+
+test('morning briefs become stable rich News items', () => {
+  const [item] = normaliseNewsBrief({ date: '2026-08-17', items: [{ headline: 'Payment rails change', summary: 'A concise update.', topic: 'Fintech', sourceUrl: 'https://example.com/news' }] });
+  assert.equal(item.headline, 'Payment rails change');
+  assert.equal(item.topic, 'Fintech');
+  assert.match(item.id, /^[a-f0-9]{24}$/);
 });
 
 test('structured content rejects unknown references and falls back safely', () => {
@@ -127,6 +135,8 @@ test('conversation streams tool progress and a grounded assistant response', asy
   const events = [];
   await api.sendMessage(conversation.id, 'What should I focus on?', event => events.push(event));
   assert.deepEqual(events.map(event => event.type), ['message.started', 'tool.started', 'tool.completed', 'message.delta', 'message.completed']);
+  assert.ok(events.every(event => event.messageId));
+  assert.deepEqual(events.map(event => event.sequence), [1, 2, 3, 4, 5]);
   assert.match(events.at(-1).message.content, /found 0 items/);
   assert.equal(api.getConversation(conversation.id).messages.length, 2);
 });
