@@ -24,6 +24,7 @@ wa.akashkedia.com {
     }
   }
 
-  handle /api* { reverse_proxy 127.0.0.1:8092 }
-  handle { reverse_proxy localhost:8091 }
+  # The legacy Telegram Mini App and WhatsApp webhook are retired.
+  # Keep unknown paths closed rather than proxying them to dormant services.
+  handle { respond "Not found" 404 }
 }
