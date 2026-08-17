@@ -9,10 +9,35 @@ export function createDurableAuditStore() {
   let ready;
   const ensure = () => { ready ||= pool.query('CREATE TABLE IF NOT EXISTS lyra_app_audit (id BIGSERIAL PRIMARY KEY, occurred_at TIMESTAMPTZ NOT NULL, event JSONB NOT NULL)').catch(() => {}); return ready; };
   const stateReady = () => { ready ||= pool.query('CREATE TABLE IF NOT EXISTS lyra_app_state (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())').catch(() => {}); return ready; };
+  const entityKinds = ['conversations', 'actions', 'captures', 'pushSubscriptions', 'deliveries', 'events', 'questions', 'cronRuns'];
+  const fromEntities = async () => {
+    await pool.query('CREATE TABLE IF NOT EXISTS lyra_state_entities (kind TEXT NOT NULL, id TEXT NOT NULL, value JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (kind, id))');
+    const rows = (await pool.query('SELECT kind, id, value FROM lyra_state_entities')).rows;
+    if (!rows.length) return null;
+    const state = Object.fromEntries(entityKinds.map(kind => [kind, []]));
+    for (const row of rows) if (state[row.kind]) state[row.kind].push(row.value);
+    const meta = state.cronRuns.find(item => item?.id === '__news__');
+    state.cronRuns = state.cronRuns.filter(item => item?.id !== '__news__');
+    state.newsBrief = meta?.newsBrief || null; state.newsItems = meta?.newsItems || []; state.newsRefreshedAt = meta?.newsRefreshedAt || null;
+    return state;
+  };
+  const writeEntities = async state => {
+    await pool.query('CREATE TABLE IF NOT EXISTS lyra_state_entities (kind TEXT NOT NULL, id TEXT NOT NULL, value JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (kind, id))');
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const kind of entityKinds) {
+        await client.query('DELETE FROM lyra_state_entities WHERE kind = $1', [kind]);
+        for (const [index, value] of (state[kind] || []).entries()) await client.query('INSERT INTO lyra_state_entities (kind, id, value) VALUES ($1, $2, $3)', [kind, String(value?.id || value?.questionId || index), value]);
+      }
+      await client.query('INSERT INTO lyra_state_entities (kind, id, value) VALUES ($1, $2, $3) ON CONFLICT (kind, id) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()', ['cronRuns', '__news__', { id: '__news__', newsBrief: state.newsBrief || null, newsItems: state.newsItems || [], newsRefreshedAt: state.newsRefreshedAt || null }]);
+      await client.query('COMMIT');
+    } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+  };
   return {
     write: async event => { await ensure(); await pool.query('INSERT INTO lyra_app_audit (occurred_at, event) VALUES ($1, $2)', [event.at, event]); },
-    loadState: async () => { await stateReady(); const result = await pool.query("SELECT value FROM lyra_app_state WHERE key = 'main'"); return result.rows[0]?.value || null; },
-    writeState: async state => { await stateReady(); await pool.query("INSERT INTO lyra_app_state (key, value, updated_at) VALUES ('main', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()", [state]); },
+    loadState: async () => { const entities = await fromEntities(); if (entities) return entities; await stateReady(); const result = await pool.query("SELECT value FROM lyra_app_state WHERE key = 'main'"); return result.rows[0]?.value || null; },
+    writeState: async state => { await writeEntities(state); await stateReady(); await pool.query("INSERT INTO lyra_app_state (key, value, updated_at) VALUES ('main', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()", [state]); },
   };
 }
 
