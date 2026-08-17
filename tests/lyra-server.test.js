@@ -4,6 +4,22 @@ import { mkdtemp } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { createSessionStore } from '../app/storage.js';
+
+test('sessions survive a service restart and logout revokes them', async () => {
+  const storeDir = await mkdtemp(path.join(os.tmpdir(), 'lyra-sessions-'));
+  const first = createSessionStore({ storeDir });
+  await first.ready;
+  const session = await first.create('akash', 60);
+  assert.equal(await first.has(session), true);
+  const restarted = createSessionStore({ storeDir });
+  await restarted.ready;
+  assert.equal(await restarted.has(session), true);
+  await restarted.revoke(session);
+  const afterLogout = createSessionStore({ storeDir });
+  await afterLogout.ready;
+  assert.equal(await afterLogout.has(session), false);
+});
 
 async function startServer() {
   const port = 19000 + Math.floor(Math.random() * 1000);
