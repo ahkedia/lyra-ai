@@ -1,7 +1,7 @@
 # Lyra PWA v2: product and technical specification
 
 **Status:** Build-ready  
-**Version:** 1.0  
+**Version:** 1.1
 **Date:** 2026-08-17  
 **Primary user:** Akash  
 **Implementation target:** `https://wa.akashkedia.com/app/`  
@@ -21,6 +21,8 @@ OpenClaw remains the agent and scheduler. Notion remains the primary domain data
 
 This is an incremental replacement of the current app shell. It is not a rewrite of OpenClaw, the source integrations, or the deployment platform.
 
+The current Telegram Mini App is a separate legacy shell, not the foundation of v2. Its useful structured-question semantics are migrated into the canonical API and PWA. Its Telegram Web App menu, automatic app-link injection, message-preview rewriting, Telegram `initData` authentication, duplicate SQLite conversation store, FastAPI service, and `/api*` reverse-proxy route are retired through the staged cutover in section 20.
+
 ## 2. Product outcomes
 
 ### 2.1 Goals
@@ -32,6 +34,7 @@ This is an incremental replacement of the current app shell. It is not a rewrite
 - Turn the morning brief into a readable news product rather than a pasted text blob.
 - Preserve provenance, freshness, confidence, and action state whenever Lyra presents external information.
 - Keep Telegram and WhatsApp available as temporary fallback channels during migration.
+- Make each fallback message self-contained; never replace useful content with a preview or require an “Open Lyra”/Telegram Mini App link to understand or answer it.
 - Never present fabricated, silently failed, or stale data as current.
 
 ### 2.2 Non-goals
@@ -44,6 +47,7 @@ This is an incremental replacement of the current app shell. It is not a rewrite
 - No chat-history sidebar, Spaces, or multiple user-managed conversation threads.
 - No direct Apple Reminders synchronization from Hetzner. The To Do interface copies the useful interaction model, while Notion remains the initial source. Native Apple Reminders sync would require a separately secured Mac relay.
 - No automatic retirement of Telegram or WhatsApp. Retirement is a later acceptance decision.
+- No Telegram-hosted or Telegram-framed PWA. The installed PWA and its push notifications are the primary app surface.
 - No copying of OpenAI, Apple, or Perplexity trademarks, logos, proprietary icons, or assets. The app may use familiar interaction patterns and comparable polish.
 
 ## 3. Personas and success
@@ -75,6 +79,7 @@ This is an incremental replacement of the current app shell. It is not a rewrite
 |---|---|---|---|
 | Launch | Tap Home Screen icon → cached shell opens on Lyra → cached feed renders → current feed refreshes | Signed-in session valid? Network available? | Show Face ID sheet if expired; retain cached read-only content offline; never open in browser chrome when launched from Home Screen |
 | Converse | Type or record → send → user event appears → Lyra progress appears → structured response streams in → sources/actions render | Response contains valid structured blocks? Action requires confirmation? | Invalid blocks fall back to escaped rich text; agent failure creates retryable error event |
+| Answer Lyra | Lyra persists a typed question → `question_form` renders inline → Akash answers → server validates and settles it once → OpenClaw resumes with stored context → follow-up appears in the same stream | Single, form, or sequential? Still pending? Conditional field applicable? | Expired answers are rejected visibly; ambiguous Telegram fallback replies are never guessed; retries reuse one idempotency key |
 | Receive cron | OpenClaw completes job → authenticated webhook reaches app → event is persisted → push/fallback delivery is queued → event appears in Lyra → deep link opens it | Is output `SKIP`? Does it contain a news brief? Is push permitted? | Failure is persisted; malformed output is shown as safe text; delivery retries without duplicating the event |
 | Manage task | Open To Do → select smart list → add/edit/complete → optimistic local update → server validates → provider commits → state reconciles | Online? Provider available? Conflict with newer source version? | Queue safe offline changes; roll back and explain rejected changes; never mark complete if provider commit failed |
 | Read news | Open News → latest brief appears → open story → inspect sources → Ask Lyra or save/read | No current brief? Image unavailable? Source stale? | Show last successful brief with age; replace broken image with text layout; state why refresh failed |
@@ -88,7 +93,7 @@ This is an incremental replacement of the current app shell. It is not a rewrite
                          └────────────┬─────────────┘
                                       │ authenticated result
                                       ▼
-┌──────────────┐    message     ┌──────────────────────────┐
+┌──────────────┐ message/answer ┌──────────────────────────┐
 │ Installed PWA├───────────────►│ Lyra API                 │
 │              │◄───────────────┤ validate → persist → act │
 │ Lyra         │  feed / stream └────────────┬─────────────┘
@@ -122,6 +127,9 @@ flows:
   interactive_message:
     steps: [capture_input, persist_user_event, run_agent, normalize_blocks, persist_reply, stream_reply]
     terminal_states: [completed, failed]
+  structured_question:
+    steps: [persist_question, render_applicable_fields, validate_answer, settle_once, resume_agent, persist_follow_up]
+    terminal_states: [answered, expired, cancelled, failed]
   scheduled_message:
     steps: [receive_webhook, authenticate, deduplicate, normalize_blocks, persist_event, enqueue_deliveries]
     deliveries: [pwa_feed, web_push, telegram_optional, whatsapp_optional]
@@ -135,6 +143,8 @@ invariants:
   - malformed_rich_content_falls_back_to_safe_text
   - provider_failure_is_never_rendered_as_success
   - every_retryable_write_has_an_idempotency_key
+  - fallback_messages_never_require_an_app_link
+  - question_answers_are_never_guessed
 ```
 
 ## 5. Information architecture
@@ -383,6 +393,7 @@ All Lyra output is represented as validated content blocks. The PWA renders the 
 | `briefing` | `title,sections[]` | Scheduled briefing container | Sectioned text |
 | `news_brief` | `date,title,summary,themes[],items[]` | Lyra summary plus News read-model input | Headline digest |
 | `task_snapshot` | `title,tasks[]` | Read-only embedded task list | Checklist text |
+| `question_form` | `questionId,preview,mode,status,questions[],expiresAt,submitActionId` | Inline single, form, or conditional sequential answer UI | Full numbered questions, options, and reply instruction; never an app link |
 | `code` | `language,code` | Escaped code with copy button | Fenced code |
 
 ### 8.2 Validation limits
@@ -407,13 +418,13 @@ All Lyra output is represented as validated content blocks. The PWA renders the 
 
 The component contract is executable and versioned in two files:
 
-- [`docs/fixtures/lyra-ui-v1.schema.json`](fixtures/lyra-ui-v1.schema.json) is the normative JSON Schema for the complete response envelope and all 16 block types.
+- [`docs/fixtures/lyra-ui-v1.schema.json`](fixtures/lyra-ui-v1.schema.json) is the normative JSON Schema for the complete response envelope and all 17 block types.
 - [`docs/fixtures/lyra-ui-v1.golden.json`](fixtures/lyra-ui-v1.golden.json) contains one validated golden case per component, including component variants, exact DOM assertions, required text, interaction sizing, error states, network mocks, screenshot names, and exact Telegram/WhatsApp fallback text.
 
 Every block has a stable `id` and `type`. Every reference is by stable ID:
 
 - `sourceRefs` and `sourceRef` resolve against envelope `provenance`.
-- `actionRefs` and item-level `actionId` resolve against envelope `actions`.
+- `actionRefs`, item-level `actionId`, and `question_form.submitActionId` resolve against envelope `actions`.
 - Missing or duplicate references invalidate structured rendering and trigger safe-text fallback.
 - Nested briefing blocks may be at most two levels deep at runtime, even though the recursive schema permits composition.
 
@@ -488,7 +499,97 @@ formatBlocksForFallback(envelope, { channel: "telegram" | "whatsapp" }): string;
 
 No component may fetch source or action data independently. This keeps the rendered PWA and fallback text tied to the same canonical event.
 
-### 8.6 Golden rendering rules
+### 8.6 Structured-question compatibility contract
+
+The legacy private `ask_user` contract is valuable and must be migrated, not discarded. Its v2 payload maps into `question_form` as follows:
+
+| Legacy field | Canonical PWA field/state | Rule |
+|---|---|---|
+| `question_id` | `questionId` and `lyra_questions.id` | Preserve the original ID during import and deduplication |
+| `preview` | `preview` | Required notification/stream title |
+| `composite` | `mode` | Exact values: `single`, `form`, `sequential` |
+| `questions[].type` | `questions[].inputType` | Exact values: `single_select`, `multi_select`, `free_text` |
+| `questions[].question` | `questions[].label` | Escaped user-visible label |
+| `options[]` | `options[{id,label}]` | Normalize string options to stable slug IDs without changing labels |
+| `optional` / `allow_other` | `optional` / `allowOther` | Preserve behavior exactly |
+| `when: "q==value"` | `when{questionId,operator,value}` | Only earlier questions may be referenced; `==` → `equals`, `!=` → `not_equals` |
+| `ttl_seconds` + `created_at` | `expiresAt` | Server computes a fixed timestamp; the client does not extend it |
+| `resume_context` | private `lyra_questions.resume_context` | Never emit it into blocks, notifications, metrics, or fallback text |
+| `target` / `blind` | private question policy | First release renders only questions eligible for the signed-in primary user; household behavior remains server-side |
+
+`question_form.questions` is capped at four. A sequential field is rendered only after its dependency has an answer and its condition evaluates true. Required applicable fields must be present before submit. A submission uses the referenced `submit_answer` action and `POST /v1/questions/:id/answer`; both share the same idempotency key and expected question version.
+
+The server, not the model or browser, validates option membership, `allowOther`, applicability, expiry, recipient policy, duplicate answers, and settlement. The answer transaction settles the question and creates one durable continuation claim with idempotency key `question:<questionId>:resume`. The continuation worker invokes OpenClaw cold with the stored `resume_context`; the resulting event uses the same stable key. A crash-safe compare-and-set prevents a second active claim. An ambiguous dispatch outcome is reconciled before retrying. If OpenClaw follow-up fails, the answer remains recorded and the feed shows a retryable follow-up failure; it never asks the user to submit the answer again.
+
+Telegram fallback remains usable during migration: it receives the complete preview, all currently applicable questions and options, and the reply-to instruction. The reply adapter may deterministically match exact labels and numbered answers. Anything ambiguous is left unresolved for confirmation and is never guessed. Telegram must not append `t.me/.../app`, `web_app`, `MINIAPP_LINK`, an inline “Open Lyra” button, or the PWA URL.
+
+Exact canonical example (the fuller DOM/fallback contract is the `question-form` case in the golden fixture):
+
+```json
+{
+  "schemaVersion": 1,
+  "blocks": [
+    {
+      "id": "storage-form",
+      "type": "question_form",
+      "questionId": "question-storage-plan",
+      "preview": "Storage: confirm plan",
+      "mode": "sequential",
+      "status": "pending",
+      "questions": [
+        {
+          "id": "keep",
+          "inputType": "single_select",
+          "label": "Keep the storage unit?",
+          "optional": false,
+          "allowOther": false,
+          "options": [
+            { "id": "yes", "label": "Yes" },
+            { "id": "no", "label": "No" }
+          ]
+        },
+        {
+          "id": "how-long",
+          "inputType": "free_text",
+          "label": "For how long?",
+          "optional": false,
+          "allowOther": false,
+          "when": { "questionId": "keep", "operator": "equals", "value": "yes" }
+        }
+      ],
+      "answers": { "keep": "yes" },
+      "expiresAt": "2026-08-18T07:00:00.000Z",
+      "submitActionId": "submit-storage"
+    }
+  ],
+  "actions": [
+    {
+      "id": "submit-storage",
+      "label": "Send answer",
+      "actionType": "submit_answer",
+      "targetId": "question-storage-plan",
+      "status": "available",
+      "requiresConfirmation": false
+    }
+  ],
+  "provenance": []
+}
+```
+
+Exact answer request:
+
+```json
+{
+  "idempotencyKey": "client-generated-uuid",
+  "expectedVersion": 3,
+  "answers": {
+    "keep": "yes",
+    "how-long": "three months"
+  }
+}
+```
+
+### 8.7 Golden rendering rules
 
 The golden fixture fixes the following test contract:
 
@@ -499,6 +600,7 @@ The golden fixture fixes the following test contract:
 - Required checks before screenshot comparison: schema validation, reference integrity, DOM selector counts, text assertions, accessible names/roles, and 44 px interactive targets.
 - Exact fallback text in each case is a channel-formatter golden, not illustrative copy.
 - Broken image state, disabled action state, stale task state, chart data table, nested briefing blocks, and escaped hostile HTML are mandatory fixture assertions.
+- Question-form pending/answered/expired states, conditional fields, exact fallback questions, and absence of automatic app links are mandatory fixture assertions.
 - A screenshot baseline may be created only after design review approves the component gallery. Future differences require intentional review; the test command must never overwrite baselines automatically.
 
 Fixture fields are evaluated as follows:
@@ -678,6 +780,30 @@ CREATE TABLE lyra_actions (
   undone_at TIMESTAMPTZ
 );
 
+CREATE TABLE lyra_questions (
+  id UUID PRIMARY KEY,
+  event_id UUID NOT NULL REFERENCES lyra_events(id),
+  status TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  definition JSONB NOT NULL,
+  answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+  recipient_policy JSONB NOT NULL DEFAULT '{}'::jsonb,
+  resume_context JSONB NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  answered_at TIMESTAMPTZ,
+  continuation_status TEXT NOT NULL DEFAULT 'not_ready',
+  continuation_idempotency_key TEXT UNIQUE,
+  continuation_attempts INTEGER NOT NULL DEFAULT 0,
+  next_resume_at TIMESTAMPTZ,
+  resumed_at TIMESTAMPTZ,
+  legacy_question_id TEXT UNIQUE
+);
+
+CREATE INDEX lyra_questions_pending_expiry_idx
+  ON lyra_questions (status, expires_at);
+
 CREATE TABLE lyra_tasks (
   id UUID PRIMARY KEY,
   source TEXT NOT NULL,
@@ -752,6 +878,8 @@ CREATE TABLE lyra_push_subscriptions (
 
 Do not delete `lyra_app_audit` or `lyra_app_state` during the first migration. Import existing conversations into `lyra_events` once, mark the import version, and retain the old tables for rollback until v2 has run successfully for 30 days.
 
+The private legacy Mini App databases are migration inputs, not continuing sources of truth. Before disabling the old service, produce a redacted inventory of message counts, media references, pending/answered/expired questions, and unmatched reply bindings. Import pending unexpired `ask_user` rows and any explicitly selected recent conversation history idempotently. Preserve original question IDs in `legacy_question_id`. Back up the legacy SQLite files with owner-only permissions, make them read-only during the shadow period, and retain them for 30 stable days; do not blindly merge the old rolling message log into live state twice.
+
 ## 11. Backend architecture
 
 Keep the existing Node HTTP service and ES module runtime. Do not introduce a frontend build system in this release. Add `zod` for request, response, and block validation. The current JavaScript codebase remains JavaScript for this migration; a TypeScript conversion is a separate project and must not delay the user-facing fix.
@@ -771,6 +899,7 @@ app/
 ├── feed-service.js            # canonical event stream
 ├── task-service.js            # task read model and provider writes
 ├── news-service.js            # dated news read model
+├── question-service.js        # structured questions, expiry, answer/resume
 ├── delivery-service.js        # durable delivery queue and retry worker
 ├── cron-ingest.js             # OpenClaw webhook normalization
 ├── migrate.js                 # migration runner
@@ -848,9 +977,18 @@ SSE event names are `user.accepted`, `agent.started`, `tool.started`, `tool.comp
 
 `GET /v1/feed/stream` emits only completed database events, sends a heartbeat every 20 seconds, and supports `Last-Event-ID`. On reconnect, the server queries Postgres after the last event before subscribing to the in-process notifier. This makes a scheduled event appear in an already-open PWA without relying on a page reload or foreground push delivery.
 
-The old `/v1/conversations*` routes remain behind a compatibility layer for channel bridges during the migration, then are removed after 30 stable days.
+The old Node `/v1/conversations*` routes remain behind a compatibility layer for channel bridges during the migration, then are removed after 30 stable days. This does not preserve the legacy FastAPI `/api*` Mini App route; that route is quarantined and removed by Phase 7.
 
-### 12.2 Tasks
+### 12.2 Structured questions
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/v1/questions/:id` | Resolve the current typed definition and answer state for an eligible question |
+| `POST` | `/v1/questions/:id/answer` | Validate, record, settle, and enqueue one OpenClaw continuation |
+
+Answer requests contain `idempotencyKey`, `expectedVersion`, and an `answers` object keyed by question field ID. The endpoint returns the updated event/action/question state. It returns `409 question_conflict` for a stale version or already-settled question, `410 question_expired` after expiry, `403 question_not_eligible` for a recipient mismatch, and `422 invalid_question_answer` for missing, inapplicable, or invalid values. A repeated request with the same idempotency key returns the original outcome and never resumes OpenClaw twice.
+
+### 12.3 Tasks
 
 | Method | Route | Purpose |
 |---|---|---|
@@ -863,7 +1001,7 @@ The old `/v1/conversations*` routes remain behind a compatibility layer for chan
 
 Mutation requests include `idempotencyKey` and `expectedVersion`. A source conflict returns `409 task_conflict` with the current task. Provider unavailability returns `503 provider_unavailable`; the client preserves its queued intent and does not show completion.
 
-### 12.3 News
+### 12.4 News
 
 | Method | Route | Purpose |
 |---|---|---|
@@ -872,7 +1010,7 @@ Mutation requests include `idempotencyKey` and `expectedVersion`. A source confl
 | `POST` | `/v1/news/items/:id/save` | Set saved state |
 | `DELETE` | `/v1/news/items/:id/save` | Clear saved state |
 
-### 12.4 Scheduled ingestion
+### 12.5 Scheduled ingestion
 
 | Method | Route | Purpose |
 |---|---|---|
@@ -886,7 +1024,7 @@ Request deduplication uses `cron:<jobId>:<runId>`. If no run ID is present, deri
 
 OpenClaw may fail before invoking a completion webhook. A root-side reconciliation script therefore reads recent OpenClaw run status and posts only sanitized job/run/status/error metadata to `/v1/internal/cron-status`. It must run through the existing cron/health mechanism at least every two minutes. It must not grant the restricted `lyra-app` service user access to root's OpenClaw workspace. The status endpoint creates a visible `scheduled.failure` event only when a failed run has no event with the same cron idempotency key.
 
-### 12.5 Actions and operations
+### 12.6 Actions and operations
 
 Retain `/v1/actions`, `/commit`, and `/undo`, but persist actions in `lyra_actions`. `GET /v1/metrics` adds scheduled event counts, delivery success, feed latency, task sync failures, and push delivery outcomes without storing message content in metrics.
 
@@ -954,6 +1092,7 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 - A startup sweep returns stranded `delivering` rows older than five minutes to `pending`.
 - Disable an expired Web Push subscription on HTTP 404 or 410.
 - Fallback formatting is generated from canonical blocks at send time.
+- Telegram and WhatsApp fallback payloads contain the complete useful content. They must not contain a Telegram `web_app` button, an automatic PWA/Mini App link, or a one-line preview substituted for the event body.
 
 ### 14.4 Notification policy
 
@@ -971,6 +1110,38 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 - Reconciliation is repeatable and uses the same `cron:<jobId>:<runId>` key as normal delivery.
 - A run that is still active is not treated as failed until its configured timeout plus a two-minute grace period has passed.
 - A late successful delivery may update the existing failure event to completed and attach the valid output, but it must not create a second visible feed item.
+
+### 14.6 Legacy Telegram Mini App cutover
+
+The following production topology was verified read-only on 2026-08-17:
+
+- `lyra-app` serves the new Node PWA/API on loopback port 8787.
+- `lyra-miniapp` still serves the old FastAPI Telegram Mini App on loopback port 8092.
+- Caddy sends `/app/*` and `/v1*` to the new service but still sends `/api*` to the old service.
+- The Telegram bot's default menu button is a `web_app` pointing at the PWA path.
+- The private `lyra-askuser` plugin has Mini App preview mode implicitly enabled and rewrites eligible long/proactive Telegram sends to a short preview plus `MINIAPP_LINK`.
+- The private `ask-user/notify.py` can send a Telegram inline `web_app` button labeled “Open Lyra”.
+- The old service uses Telegram `initData`, its own short-lived sessions, a duplicate SQLite conversation/timeline store, and the earlier structured-question store.
+
+That split is the cause of the current hyperlink behavior and must not survive as a hidden parallel architecture. The PWA URL and `/app/` manifest start path remain unchanged to avoid breaking installations and passkey scope; only Telegram embedding and coupling are removed.
+
+Cutover is staged and reversible:
+
+1. **Inventory and backup:** Record service/routes/menu/plugin settings without values; back up the legacy SQLite stores with owner-only permissions; report pending/unexpired question counts and unmatched bindings. Do not print chat IDs, bot tokens, recipients, or message contents.
+2. **Stop link rewriting first:** Explicitly disable Mini App preview rewriting in private configuration and verify a synthetic long Telegram fallback arrives in full with no appended URL. Reset the bot menu to `commands`, preserving registered slash commands. Disable the direct `notify.py` Web App button path. Keep the old service temporarily available for rollback.
+3. **Migrate semantics/state:** Implement `question_form`, `lyra_questions`, answer API, expiry sweep, deterministic Telegram reply adapter, and cold OpenClaw continuation. Import pending unexpired legacy questions idempotently; reconcile selected message history once.
+4. **Simplify the plugin:** Remove `MINIAPP_LINK`, preview-chat defaults, preview rewriting, swapped-message bookkeeping, duplicate Mini App message logging, and Web App notification hooks. Retain only channel-agnostic multi-question linting plus Telegram reply correlation while Telegram fallback remains enabled.
+5. **Retire the shell:** After question parity and rollback evidence pass, remove the Caddy `/api*` route, stop and disable `lyra-miniapp.service`, remove its FastAPI/Telegram-auth deployment from active configuration, and add `Content-Security-Policy: frame-ancestors 'none'` plus `X-Frame-Options: DENY` to `/app/*` responses.
+6. **Delete after retention:** Keep the encrypted/owner-only legacy database backup and recoverable Git history for 30 stable days. Then delete the backup and obsolete private runtime files through an explicit audited cleanup; do not keep an unmonitored service or writable database “just in case”.
+
+Telegram cutover acceptance is exact:
+
+- Bot menu inspection returns `commands` (not `web_app`).
+- No outgoing Telegram payload contains `web_app`, an inline “Open Lyra” button, `t.me/.../app`, `MINIAPP_LINK`, or an automatically appended PWA URL.
+- A long scheduled event and a rich interactive response remain readable and actionable entirely inside Telegram.
+- A structured question can be answered from both the PWA and Telegram fallback, settles once, and resumes the same stored context.
+- No production request reaches port 8092; the old service is disabled; `/api*` returns the intended v2 response or 404 rather than proxying to FastAPI.
+- The installed PWA still launches standalone from `/app/`, passkeys still work, push deep links still open the correct canonical event, and the PWA refuses third-party framing.
 
 ## 15. Frontend state and offline behavior
 
@@ -1043,6 +1214,9 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 | Push denied | Browser permission | App continues; settings explains alerts are off | Denied state does not retry permission prompt |
 | Push endpoint expired | 404/410 from push service | Subscription disabled; in-app feed remains authoritative | Endpoint disabled after one terminal response |
 | Telegram/WhatsApp rejection | Adapter error | PWA unaffected; fallback delivery marked failed | Retry does not duplicate PWA event |
+| Legacy Mini App rewrite reappears | Outbound payload/menu conformance check | Block deployment; keep full fallback content | No fixture or live synthetic send contains `web_app`, Mini App/PWA URL, or shortened body |
+| Structured question expires | Server timestamp check | Keep the question visible as expired; do not accept or silently drop the answer | Boundary and late-answer tests return deterministic `410 question_expired` |
+| Duplicate/stale question answer | Idempotency key and expected version | Return the settled state; resume OpenClaw at most once | Concurrent PWA/Telegram answers create one settlement and one continuation |
 | Offline send | Fetch failure before acknowledgement | Local pending event remains and retries | Relaunch preserves pending queue |
 | Session expired during queued sync | 401 | Pause queue; Face ID; resume same idempotency keys | Login resumes without duplicate action |
 | Broken image | Image error | Remove image area; retain headline/caption | Card reflows without empty box |
@@ -1053,7 +1227,7 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 ### 19.1 Unit tests
 
 - Compile `docs/fixtures/lyra-ui-v1.schema.json` in strict JSON Schema 2020-12 mode.
-- Validate all 16 envelopes in `docs/fixtures/lyra-ui-v1.golden.json` against JSON Schema and Zod; both validators must agree.
+- Validate all 17 envelopes in `docs/fixtures/lyra-ui-v1.golden.json` against JSON Schema and Zod; both validators must agree.
 - Every Zod schema: valid case, missing required field, extra field, duplicate ID, broken source/action reference, unknown block, nesting overflow, and size-limit overflow.
 - Markdown-to-block normalization and structured-output fallback.
 - Safe URL handling and HTML escaping.
@@ -1065,6 +1239,8 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 - Idempotency-key derivation and duplicate detection.
 - Delivery eligibility, push suppression, retry schedule, and terminal subscription errors.
 - Telegram and WhatsApp block formatters must equal every fixture's exact `fallbackText`.
+- Structured-question mapping, option normalization, sequential `when` evaluation, required/optional fields, allow-other behavior, expiry boundary, recipient policy, and deterministic fallback parsing.
+- Outbound Telegram conformance rejects automatic `web_app`, Mini App/PWA links, and preview-only substitution.
 - Session hashing and expiry.
 
 ### 19.2 API integration tests
@@ -1080,6 +1256,7 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 - Malformed morning brief preserves safe feed output but not invalid News data.
 - Task create/update/complete/reopen with provider success, timeout, conflict, and retry.
 - Preview/commit/undo remains auditable and retry-safe.
+- Question answer success, validation failure, expiry, stale version, concurrent PWA/Telegram settlement, and exactly-once OpenClaw continuation.
 - Push subscription persists across restart.
 - Delivery worker recovers stranded claims.
 - Compatibility channel input reaches the same primary stream/action handlers.
@@ -1093,11 +1270,12 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 - Cached launch works offline.
 - Send text, observe progress, receive rich response, inspect sources.
 - Render the fixture gallery at every `viewportMatrix` entry and assert each case's exact DOM selectors and text before visual comparison.
-- Compare all 48 component screenshots: 16 cases × three viewports. Baselines cannot update in the ordinary test command.
+- Compare all 51 component screenshots: 17 cases × three viewports. Baselines cannot update in the ordinary test command.
 - Verify every fixture's accessible role/name, keyboard focus behavior, and declared 44 px minimum target.
 - Run fixture-declared error states and network mocks, including failed image layout.
 - Voice permission, record, stop, upload, transcription failure, and retry.
 - Scheduled event appears without page reload; push deep link scrolls to it.
+- Inline single/form/sequential questions render only applicable fields, survive relaunch, submit once, and show answered/expired states.
 - To Do add, edit, complete, reopen, offline queue, provider failure, and conflict.
 - News latest brief, stale brief, story detail, read/save, broken image, Ask Lyra.
 - Keyboard, safe areas, scroll retention, outside-tap sheet close, Escape/focus behavior.
@@ -1114,6 +1292,7 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 - Malicious source text cannot inject a new system instruction or executable HTML.
 - At least 30 representative interactive and scheduled responses either validate as `lyra-ui` v1 or produce the specified safe-text fallback; no response may disappear because structured parsing failed.
 - The morning brief, task summary, metric/chart response, source-heavy research answer, media response, and action response each select the intended block type rather than flattening everything into `rich_text`.
+- Two or more independent questions or one fixed-choice question use `question_form`; a single open-ended conversational question remains ordinary text.
 
 ### 19.5 Physical iPhone acceptance
 
@@ -1139,14 +1318,16 @@ The implementation should be sequential in one goal. The backend contracts must 
 1. Pull the canonical production/GitHub line according to `CLAUDE.md` and `docs/GIT-WORKFLOW.md`; stop on divergence.
 2. Record current tests, production `/health`, cron status, PWA screenshot, and current source availability.
 3. Preserve unrelated local files and private configuration.
-4. Add feature switches defaulting off:
+4. Inventory the live legacy Mini App service, Caddy `/api*` route, Telegram menu, link-rewrite plugin, notification hook, and SQLite stores using redacted output; create owner-only backups and a pending-question migration report.
+5. Explicitly disable legacy Mini App preview/link rewriting, reset the Telegram menu to `commands`, and disable direct “Open Lyra” Web App buttons. Verify a synthetic long fallback remains complete before proceeding.
+6. Add feature switches defaulting off:
    - `LYRA_PWA_V2`
    - `LYRA_CRON_INGEST_V2`
    - `LYRA_DELIVERY_WORKER`
    - `LYRA_FALLBACK_TELEGRAM`
    - `LYRA_FALLBACK_WHATSAPP`
 
-**Gate:** Existing tests pass and rollback commit/version is recorded.
+**Gate:** Existing tests pass, rollback commit/version is recorded, Telegram slash commands remain available, and a synthetic fallback contains its complete body with no automatic app link or `web_app` control.
 
 ### Phase 1: Persistence and schemas
 
@@ -1155,9 +1336,10 @@ The implementation should be sequential in one goal. The backend contracts must 
 3. Add migration runner and v2 tables.
 4. Add repository, event feed, persistent sessions, and persistent push subscriptions.
 5. Import legacy conversations once into the primary stream.
-6. Add feed APIs and compatibility wrappers.
+6. Add `lyra_questions`, import pending unexpired legacy questions, and implement validated answer/expiry/exactly-once continuation behavior.
+7. Add feed, question, and compatibility APIs.
 
-**Gate:** All 16 golden envelopes pass JSON Schema, Zod, ID uniqueness, reference integrity, and nesting-limit tests. Integration tests prove restart persistence, pagination, idempotency, and rollback-safe migration.
+**Gate:** All 17 golden envelopes pass JSON Schema, Zod, ID uniqueness, reference integrity, and nesting-limit tests. Integration tests prove restart persistence, pagination, idempotency, question settlement/expiry, exactly-once continuation, and rollback-safe migration.
 
 ### Phase 2: Scheduled-event ingestion and delivery
 
@@ -1176,9 +1358,9 @@ The implementation should be sequential in one goal. The backend contracts must 
 1. Replace index/sidebar shell with Lyra, To Do, News tabs.
 2. Add native-module frontend structure and IndexedDB cache.
 3. Build `/app/dev/components` from `docs/fixtures/lyra-ui-v1.golden.json`; return 404 in production.
-4. Add all 16 rich block renderers and exact Telegram/WhatsApp formatters.
+4. Add all 17 rich block renderers and exact Telegram/WhatsApp formatters, including the inline structured-question form.
 5. Pass fixture DOM, accessibility, error-state, target-size, and fallback-text assertions.
-6. Run design review on the complete gallery, then create the 48 approved screenshot baselines.
+6. Run design review on the complete gallery, then create the 51 approved screenshot baselines.
 7. Add settings sheet and operational controls.
 8. Remove current Today and Spaces UI while keeping compatibility APIs temporarily.
 
@@ -1190,6 +1372,7 @@ The implementation should be sequential in one goal. The backend contracts must 
 2. Add pagination, unread marker, scroll retention, message grouping, progress, and inline action state.
 3. Add offline send/capture queue.
 4. Add streaming-safe block finalization.
+5. Connect pending question events, answer submission, conditional fields, expiry, and answered-state updates to the same stream.
 
 **Gate:** Interactive and scheduled events coexist in one ordered stream; refresh/relaunch creates no duplicates.
 
@@ -1216,10 +1399,12 @@ The implementation should be sequential in one goal. The backend contracts must 
 1. Run full unit, integration, browser E2E, agent eval, security, and visual review.
 2. Deploy with v2 feature switch off, run migrations, then enable for the primary user.
 3. Verify service health, logs, source status, scheduled ingest, push, and fallback delivery.
-4. Run the physical iPhone checklist.
-5. Begin 14-day PWA-first shadow period.
+4. Simplify the private `lyra-askuser` plugin to lint/reply-correlation only; remove preview rewriting, Mini App link/button hooks, swapped-message bookkeeping, and duplicate conversation logging.
+5. Remove the Caddy legacy `/api*` proxy, stop/disable `lyra-miniapp.service`, retire Telegram `initData` auth from active deployment, and deny framing on `/app/*`.
+6. Run the physical iPhone checklist and the exact Telegram cutover acceptance checks in section 14.6.
+7. Begin 14-day PWA-first shadow period; retain only the owner-only legacy database backup for the 30-day recovery window.
 
-**Gate:** No critical fabricated/silent failures; release metrics are met for 14 consecutive days before messaging becomes emergency-only.
+**Gate:** No critical fabricated/silent failures; no traffic reaches the legacy service; no Telegram fallback contains an automatic app link; question parity passes; and release metrics are met for 14 consecutive days before messaging becomes emergency-only.
 
 ## 21. Deployment and rollback
 
@@ -1240,6 +1425,7 @@ The Caddy `/app*` routing remains. Static route tests must prevent the previous 
 
 - Disable `LYRA_PWA_V2` to restore the v1 shell without rolling back data.
 - Disable cron ingest v2 and restore the previous private webhook target if scheduled delivery is unhealthy.
+- Re-enable the stopped legacy service only for an explicit, time-bounded rollback while preserving full Telegram messages and the `commands` menu; never restore preview truncation or automatic Mini App links.
 - Revert the service checkout to the recorded prior commit through a normal deploy, never destructive reset.
 - Do not drop v2 tables during rollback.
 - Reconcile any events/actions through idempotency keys and the audit ledger.
@@ -1259,6 +1445,9 @@ The implementation goal is complete only when all statements are true:
 - Passkeys, sessions, push subscriptions, feed, actions, tasks, news, and deliveries survive a service restart.
 - Offline launch and queued safe mutations work on a physical iPhone.
 - Telegram/WhatsApp use canonical events/actions when enabled and remain fallback only.
+- Structured questions render and settle through the canonical PWA/API, preserve expiry and cold-resume behavior, and remain answerable through self-contained Telegram fallback during migration.
+- The Telegram bot menu is command-based, no outgoing message contains an automatic Mini App/PWA link or Web App button, and the PWA is not framed inside Telegram.
+- The legacy FastAPI Mini App, port-8092 proxy route, Telegram-only auth/session path, and duplicate writable message store are absent from active production architecture.
 - Unit, integration, browser E2E, agent eval, security, visual review, and physical iPhone acceptance pass.
 - Deployment documentation and migration runbook reflect the v2 behavior.
 - No secrets or personal identifiers are committed.
@@ -1294,6 +1483,8 @@ Work autonomously and token-efficiently:
 - make small coherent patches;
 - use Zod validation and parameterized SQL;
 - make Zod, JSON Schema, the PWA renderer, and fallback formatters pass every golden fixture;
+- migrate the private legacy ask_user semantics into question_form/lyra_questions before retiring the old Mini App;
+- remove automatic Telegram Mini App/PWA links, Web App buttons, preview truncation, the legacy /api proxy, and the active lyra-miniapp service exactly as specified in section 14.6;
 - do not change fixture expectations or screenshot baselines merely to make a failing implementation pass;
 - preserve unrelated user changes and all private configuration;
 - never print or commit secrets, recipients, phone numbers, or live source IDs;
@@ -1327,4 +1518,7 @@ Reasoning: medium
 | Persist before fan-out | PWA becomes authoritative and cannot miss a message received by fallback channels |
 | Notion-backed To Do first | Fits the current server and data boundary; direct Apple Reminders needs a separate Mac relay |
 | Morning brief seeds News | Fastest path to a useful feed with existing content generation |
+| Migrate `ask_user`, retire the Mini App shell | Typed questions, expiry, reply correlation, and cold resume are valuable; Telegram framing, link rewriting, duplicate storage, and Telegram-only auth are not |
+| Keep `/app/` URL, deny framing | Preserves installed PWA/passkey continuity while ending Telegram Web App coupling |
+| Full-text messaging fallback | Telegram remains independently usable during migration and never becomes a link launcher for the PWA |
 | Terra medium for implementation | Enough agentic reliability for the whole dependency chain without Sol cost |

@@ -77,7 +77,7 @@
         "id": { "$ref": "#/$defs/id" },
         "label": { "$ref": "#/$defs/shortText" },
         "actionType": {
-          "enum": ["complete", "reopen", "dismiss", "snooze", "reply", "create_reminder", "schedule", "open", "retry", "undo"]
+          "enum": ["complete", "reopen", "dismiss", "snooze", "reply", "create_reminder", "schedule", "open", "retry", "undo", "submit_answer"]
         },
         "targetId": { "$ref": "#/$defs/id" },
         "status": { "enum": ["available", "preview", "pending", "completed", "failed", "undone", "disabled"] },
@@ -465,6 +465,103 @@
         "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
       }
     },
+    "questionOption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/shortText" },
+        "description": { "$ref": "#/$defs/shortText" }
+      }
+    },
+    "questionCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["questionId", "operator", "value"],
+      "properties": {
+        "questionId": { "$ref": "#/$defs/id" },
+        "operator": { "enum": ["equals", "not_equals"] },
+        "value": { "$ref": "#/$defs/shortText" }
+      }
+    },
+    "questionField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "inputType", "label", "optional", "allowOther"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "inputType": { "enum": ["single_select", "multi_select", "free_text"] },
+        "label": { "$ref": "#/$defs/shortText" },
+        "optional": { "type": "boolean" },
+        "allowOther": { "type": "boolean" },
+        "placeholder": { "$ref": "#/$defs/shortText" },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/questionOption" }
+        },
+        "when": { "$ref": "#/$defs/questionCondition" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "inputType": { "enum": ["single_select", "multi_select"] } },
+            "required": ["inputType"]
+          },
+          "then": {
+            "properties": { "options": true },
+            "required": ["options"]
+          },
+          "else": {
+            "not": {
+              "properties": { "options": true },
+              "required": ["options"]
+            }
+          }
+        }
+      ]
+    },
+    "questionAnswer": {
+      "oneOf": [
+        { "$ref": "#/$defs/shortText" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/shortText" }
+        }
+      ]
+    },
+    "questionFormBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "questionId", "preview", "mode", "status", "questions", "expiresAt", "submitActionId"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "question_form" },
+        "questionId": { "$ref": "#/$defs/id" },
+        "preview": { "$ref": "#/$defs/shortText" },
+        "mode": { "enum": ["single", "form", "sequential"] },
+        "status": { "enum": ["pending", "answered", "expired", "cancelled", "failed"] },
+        "questions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/questionField" }
+        },
+        "answers": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/id" },
+          "additionalProperties": { "$ref": "#/$defs/questionAnswer" }
+        },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "submitActionId": { "$ref": "#/$defs/id" },
+        "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
     "codeBlock": {
       "type": "object",
       "additionalProperties": false,
@@ -494,6 +591,7 @@
         { "$ref": "#/$defs/briefingBlock" },
         { "$ref": "#/$defs/newsBriefBlock" },
         { "$ref": "#/$defs/taskSnapshotBlock" },
+        { "$ref": "#/$defs/questionFormBlock" },
         { "$ref": "#/$defs/codeBlock" }
       ]
     }

@@ -756,6 +756,80 @@
       }
     },
     {
+      "id": "question-form",
+      "component": "QuestionFormBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-question-form",
+            "type": "question_form",
+            "questionId": "question-storage-plan",
+            "preview": "Storage: confirm plan",
+            "mode": "sequential",
+            "status": "pending",
+            "questions": [
+              {
+                "id": "keep",
+                "inputType": "single_select",
+                "label": "Keep the storage unit?",
+                "optional": false,
+                "allowOther": false,
+                "options": [
+                  { "id": "yes", "label": "Yes" },
+                  { "id": "no", "label": "No" }
+                ]
+              },
+              {
+                "id": "how-long",
+                "inputType": "free_text",
+                "label": "For how long?",
+                "optional": false,
+                "allowOther": false,
+                "placeholder": "For example, three months",
+                "when": { "questionId": "keep", "operator": "equals", "value": "yes" }
+              }
+            ],
+            "answers": { "keep": "yes" },
+            "expiresAt": "2026-08-18T07:00:00.000Z",
+            "submitActionId": "action-submit-storage"
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-submit-storage",
+            "label": "Send answer",
+            "actionType": "submit_answer",
+            "targetId": "question-storage-plan",
+            "status": "available",
+            "requiresConfirmation": false
+          }
+        ],
+        "provenance": []
+      },
+      "expected": {
+        "root": "[data-block-id='gold-question-form'][data-block-type='question_form'][data-question-status='pending']",
+        "selectors": [
+          { "selector": "form[data-question-id='question-storage-plan']", "count": 1 },
+          { "selector": "fieldset[data-question-field='keep']", "count": 1 },
+          { "selector": "input[type='radio'][name='keep']", "count": 2 },
+          { "selector": "input[type='radio'][name='keep'][value='yes']:checked", "count": 1 },
+          { "selector": "[data-question-field='how-long'] textarea", "count": 1 },
+          { "selector": "button[data-action-id='action-submit-storage'][type='submit']", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "heading", "name": "Storage: confirm plan", "count": 1 },
+          { "role": "radiogroup", "name": "Keep the storage unit?", "count": 1 },
+          { "role": "radio", "name": "Yes", "checked": true, "count": 1 },
+          { "role": "textbox", "name": "For how long?", "count": 1 },
+          { "role": "button", "name": "Send answer", "count": 1 }
+        ],
+        "minimumInteractiveSize": 44,
+        "textIncludes": ["Storage: confirm plan", "Keep the storage unit?", "For how long?", "Send answer"],
+        "fallbackText": "Storage: confirm plan\n\n1. Keep the storage unit?\n   - Yes\n   - No\n\n2. For how long?\n\nReply to this message with your answer."
+      }
+    },
+    {
       "id": "code",
       "component": "CodeBlock",
       "envelope": {
