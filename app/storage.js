@@ -11,7 +11,6 @@ export function createDurableAuditStore() {
   const stateReady = () => { ready ||= pool.query('CREATE TABLE IF NOT EXISTS lyra_app_state (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())').catch(() => {}); return ready; };
   const entityKinds = ['conversations', 'actions', 'captures', 'pushSubscriptions', 'deliveries', 'events', 'questions', 'cronRuns'];
   const fromEntities = async () => {
-    await pool.query('CREATE TABLE IF NOT EXISTS lyra_state_entities (kind TEXT NOT NULL, id TEXT NOT NULL, value JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (kind, id))');
     const rows = (await pool.query('SELECT kind, id, value FROM lyra_state_entities')).rows;
     if (!rows.length) return null;
     const state = Object.fromEntries(entityKinds.map(kind => [kind, []]));
@@ -22,7 +21,6 @@ export function createDurableAuditStore() {
     return state;
   };
   const writeEntities = async state => {
-    await pool.query('CREATE TABLE IF NOT EXISTS lyra_state_entities (kind TEXT NOT NULL, id TEXT NOT NULL, value JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (kind, id))');
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
