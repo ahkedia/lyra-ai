@@ -248,6 +248,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
           text: prompt,
           context: { question: { questionId: question.questionId, answers: question.answers, resumeContext: question.resumeContext || {} } },
           fallback: 'I recorded your answer. I could not continue this update yet, so I will not invent a result.',
+          strict: true,
         });
         const envelope = normalizeAgentOutput(content, { eventId: continuationEventId, source: 'OpenClaw' });
         const existing = events.get(continuationEventId);
@@ -624,15 +625,19 @@ async function defaultDataProvider() {
   }
 }
 
-async function defaultAgentRunner({ conversation, text, context, fallback }) {
-  if (process.env.LYRA_DISABLE_OPENCLAW === '1') return fallback;
+async function defaultAgentRunner({ conversation, text, context, fallback, strict = false }) {
+  if (process.env.LYRA_DISABLE_OPENCLAW === '1') {
+    if (strict) throw new Error('Lyra continuation is unavailable');
+    return fallback;
+  }
   try {
     const args = ['agent', '--channel', 'pwa', '--session-key', `agent:main:pwa-${conversation.id}`, '-m', text, '--json', '--timeout', String(process.env.LYRA_AGENT_TIMEOUT || 120)];
     const { stdout } = await runFile(process.env.OPENCLAW_BIN || 'openclaw', args, { timeout: (Number(process.env.LYRA_AGENT_TIMEOUT || 120) + 15) * 1000, maxBuffer: 16 * 1024 * 1024 });
     const payload = JSON.parse(stdout);
     const texts = payload?.result?.payloads?.map(item => item?.text).filter(Boolean) || [];
     return texts.join('\n\n').trim() || fallback;
-  } catch {
+  } catch (error) {
+    if (strict) throw error;
     return fallback;
   }
 }

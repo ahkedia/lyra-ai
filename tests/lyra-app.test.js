@@ -139,6 +139,20 @@ test('a failed question continuation records a safe failed event instead of a fa
   assert.doesNotMatch(event.envelope.blocks[0].markdown, /credentials expired/i);
 });
 
+test('strict question continuation does not turn an unavailable default agent into a completed reply', async () => {
+  const previous = process.env.LYRA_DISABLE_OPENCLAW;
+  process.env.LYRA_DISABLE_OPENCLAW = '1';
+  try {
+    const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')) });
+    const question = await api.createQuestion({ preview: 'Choose a day', questions: [{ id: 'day', type: 'single_select', question: 'Which day?', options: ['Tue', 'Wed'] }] });
+    await api.answerQuestion(question.questionId, { expectedVersion: 1, idempotencyKey: 'strict-answer', answers: { day: 'tue' } });
+    assert.deepEqual(await api.processQuestionContinuations(), { claimed: 1, completed: 0, failed: 1 });
+  } finally {
+    if (previous === undefined) delete process.env.LYRA_DISABLE_OPENCLAW;
+    else process.env.LYRA_DISABLE_OPENCLAW = previous;
+  }
+});
+
 test('a retried message idempotency key creates one user and one assistant event', async () => {
   const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), agentRunner: async ({ fallback }) => fallback });
   api.createConversation('Lyra', 'primary');
