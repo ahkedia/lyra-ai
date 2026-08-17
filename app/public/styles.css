@@ -54,5 +54,8 @@ a { color: inherit; } [hidden] { display: none !important; }
 .toast { position: fixed; z-index: 40; left: 16px; right: 16px; bottom: calc(82px + env(safe-area-inset-bottom)); display: flex; justify-content: space-between; align-items: center; max-width: 648px; margin: auto; padding: 12px 14px; border-radius: 12px; background: #242424; color: #fff; box-shadow: 0 9px 26px #0004; font-size: 14px; }.toast button { border: 0; background: transparent; color: #9ccaff; font-weight: 650; }
 .component-gallery { min-height: 100dvh; max-width: 720px; margin: 0 auto; padding: calc(24px + env(safe-area-inset-top)) 16px calc(32px + env(safe-area-inset-bottom)); background: var(--canvas); color: var(--ink); }.component-gallery > header { margin-bottom: 28px; }.component-gallery h1 { margin: 4px 0 8px; font-size: 28px; letter-spacing: -.04em; }.gallery-case { padding: 16px 0; border-top: 1px solid var(--line); }.gallery-case > header { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px; color: var(--secondary); }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* Mobile controls are never smaller than the iPhone touch-target contract. */
+.icon-button, .text-button, .share-button { min-width: 44px; min-height: 44px; }
+.smart-lists button { min-height: 44px; padding-inline: 14px; }
 @media (max-width: 390px) { .main-content { padding: 0 14px; }.composer-wrap { left: 10px; right: 10px; }.user-message { margin-left: 40px; }.composer-tools span { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 1ms !important; animation-duration: 1ms !important; } }
