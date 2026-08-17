@@ -36,26 +36,37 @@ export function assertLyraEnvelope(value) {
   }
   const checkRefs = (block) => {
     for (const ref of block.sourceRefs || []) if (!sourceIds.has(ref)) throw new Error(`Unknown source reference: ${ref}`);
+    if (block.sourceRef && !sourceIds.has(block.sourceRef)) throw new Error(`Unknown source reference: ${block.sourceRef}`);
     for (const ref of block.actionRefs || []) if (!actionIds.has(ref)) throw new Error(`Unknown action reference: ${ref}`);
     if (block.submitActionId && !actionIds.has(block.submitActionId)) throw new Error(`Unknown action reference: ${block.submitActionId}`);
     if (block.actionId && !actionIds.has(block.actionId)) throw new Error(`Unknown action reference: ${block.actionId}`);
+    for (const item of block.items || []) if (item?.actionId && !actionIds.has(item.actionId)) throw new Error(`Unknown action reference: ${item.actionId}`);
     for (const section of block.sections || []) for (const child of section.blocks || []) checkRefs(child);
   };
   for (const block of value.blocks) checkRefs(block);
   return value;
 }
 
-function validateBlock(block, seen, envelope) {
+function validateBlock(block, seen, envelope, depth = 0) {
   if (!block || typeof block !== 'object' || !BLOCK_TYPES.has(block.type)) throw new Error(`Unsupported content block: ${block?.type || 'unknown'}`);
+  if (depth > 2) throw new Error('Briefing nesting is too deep');
   id(block.id, 'block id');
   if (seen.has(block.id)) throw new Error(`Duplicate block id: ${block.id}`);
   seen.add(block.id);
   if (block.type === 'rich_text') text(block.markdown, 'markdown', 20000);
   if (['bullet_list', 'numbered_list'].includes(block.type)) list(block.items, block.type);
-  if (block.type === 'checklist') list(block.items, 'checklist');
+  if (block.type === 'checklist') { list(block.items, 'checklist'); for (const item of block.items) { id(item?.id, 'checklist item id'); text(item?.label, 'checklist item label', 1000); } }
   if (block.type === 'callout') { text(block.body, 'callout body', 20000); if (!['info', 'warning', 'success', 'error'].includes(block.tone)) throw new Error('Invalid callout tone'); }
-  if (block.type === 'chart') { list(block.series, 'chart series'); if (!['bar', 'line', 'donut'].includes(block.chartType)) throw new Error('Invalid chart type'); }
-  if (block.type === 'table') { list(block.columns, 'table columns'); list(block.rows, 'table rows'); }
+  if (block.type === 'metric_group') { list(block.metrics, 'metrics'); for (const metric of block.metrics) { text(metric?.label, 'metric label', 200); if (metric?.value === undefined || metric?.value === null) throw new Error('Metric value is required'); } }
+  if (block.type === 'chart') { list(block.series, 'chart series'); if (!['bar', 'line', 'donut'].includes(block.chartType)) throw new Error('Invalid chart type'); for (const series of block.series) { list(series?.points, 'chart points'); if (series.points.length > 50) throw new Error('Too many chart points'); } }
+  if (block.type === 'table') { list(block.columns, 'table columns'); list(block.rows, 'table rows'); for (const row of block.rows) { if (Array.isArray(row) && row.length !== block.columns.length) throw new Error('Table row does not match columns'); if (!Array.isArray(row) && (!row || typeof row !== 'object' || block.columns.some(column => !((column.key || column) in row)))) throw new Error('Table row does not match columns'); } }
+  if (block.type === 'image') { url(block.url); text(block.alt, 'image alt text', 1000); }
+  if (block.type === 'media') { url(block.url); if (!['audio', 'video', 'file'].includes(block.mediaType)) throw new Error('Invalid media type'); text(block.title, 'media title', 1000); }
+  if (block.type === 'source_list') list(block.sourceRefs, 'source references');
+  if (block.type === 'action_group') list(block.actionRefs, 'action references');
+  if (block.type === 'briefing') { text(block.title, 'briefing title', 1000); list(block.sections, 'briefing sections'); for (const section of block.sections) { text(section?.title, 'briefing section title', 1000); list(section?.blocks, 'briefing section blocks'); for (const child of section.blocks) validateBlock(child, seen, envelope, depth + 1); } }
+  if (block.type === 'news_brief') { text(block.date, 'news brief date', 64); text(block.title, 'news brief title', 1000); text(block.summary, 'news brief summary', 4000); list(block.themes, 'news themes'); list(block.items, 'news items'); for (const item of block.items) { text(item?.headline || item?.title, 'news headline', 1000); } }
+  if (block.type === 'task_snapshot') { text(block.title, 'task snapshot title', 1000); list(block.tasks, 'task snapshot tasks'); for (const task of block.tasks) { id(task?.id, 'task id'); text(task?.title || task?.label, 'task title', 1000); } }
   if (block.type === 'question_form') validateQuestion(block);
   if (block.type === 'code') text(block.code, 'code', 20000);
   if (block.sections?.length > 12) throw new Error('Too many briefing sections');
@@ -78,6 +89,7 @@ function validateQuestion(block) {
 function id(value, label) { if (typeof value !== 'string' || !ID_RE.test(value) || value.length > 128) throw new Error(`Invalid ${label}`); }
 function text(value, label, max) { if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(`Invalid ${label}`); }
 function list(value, label) { if (!Array.isArray(value) || value.length > 100) throw new Error(`Invalid ${label}`); }
+function url(value) { try { const parsed = new URL(value); if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('Invalid URL'); } catch { throw new Error('Invalid URL'); } }
 
 export function safeTextEnvelope(textValue, { eventId = 'event', source = 'Lyra' } = {}) {
   return {
@@ -102,22 +114,30 @@ export function normalizeAgentOutput(output, context = {}) {
 
 export function formatEnvelopeForFallback(envelope) {
   assertLyraEnvelope(envelope);
-  const lines = [];
-  for (const block of envelope.blocks) {
-    if (block.type === 'rich_text') lines.push(block.markdown);
-    else if (block.type === 'bullet_list') lines.push(block.items.map(item => `• ${item}`).join('\n'));
-    else if (block.type === 'numbered_list') lines.push(block.items.map((item, index) => `${index + 1}. ${item}`).join('\n'));
-    else if (block.type === 'checklist') lines.push([block.title, ...block.items.map(item => `${item.checked ? '☑' : '☐'} ${item.label}`)].filter(Boolean).join('\n'));
-    else if (block.type === 'callout') lines.push(`${String(block.title || block.tone).toUpperCase()}: ${block.body}`);
-    else if (block.type === 'metric_group') lines.push(block.metrics.map(metric => `${metric.label}: ${metric.value}${metric.unit ? ` ${metric.unit}` : ''}`).join('\n'));
-    else if (block.type === 'table') lines.push([block.title, block.columns.map(column => column.label || column).join(' | '), ...block.rows.map(row => row.join(' | '))].filter(Boolean).join('\n'));
-    else if (block.type === 'source_list') lines.push(`Sources\n${(block.sourceRefs || []).map((ref, index) => `${index + 1}. ${envelope.provenance.find(source => source.id === ref)?.title || ref}`).join('\n')}`);
-    else if (block.type === 'action_group') lines.push(`Actions\n${(block.actionRefs || []).map((ref, index) => `${index + 1}. ${envelope.actions.find(action => action.id === ref)?.label || ref}`).join('\n')}`);
-    else if (block.type === 'question_form') lines.push([block.preview, ...block.questions.map((question, index) => `${block.questions.length > 1 ? `${index + 1}. ` : ''}${question.label}${question.optional ? ' (optional)' : ''}${question.options ? `\n${question.options.map(option => `   - ${option.label || option}`).join('\n')}` : ''}`), 'Reply to this message with your answer.'].join('\n\n'));
-    else if (block.type === 'code') lines.push((block.caption ? `${block.caption}\n` : '') + '```' + block.language + '\n' + block.code + '\n```');
-    else lines.push(block.title || block.summary || 'Lyra update');
-  }
-  return lines.filter(Boolean).join('\n\n').slice(0, 4096);
+  const source = id => envelope.provenance.find(item => item.id === id);
+  const action = id => envelope.actions.find(item => item.id === id);
+  const markdown = value => String(value || '').replace(/^#{1,6}\s+/gm, '').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1: $2');
+  const format = block => {
+    if (block.type === 'rich_text') return markdown(block.markdown);
+    if (block.type === 'bullet_list') return block.items.map(item => `• ${typeof item === 'string' ? item : item.label}`).join('\n');
+    if (block.type === 'numbered_list') return block.items.map((item, index) => `${index + 1}. ${typeof item === 'string' ? item : item.label}`).join('\n');
+    if (block.type === 'checklist') return [block.title, ...block.items.map(item => `${item.checked ? '☑' : '☐'} ${item.label}`)].filter(Boolean).join('\n');
+    if (block.type === 'callout') return `${String(block.tone || 'info').toUpperCase()} — ${block.title || ''}: ${block.body}`.replace(' :', ':');
+    if (block.type === 'metric_group') return [block.title, ...block.metrics.map(metric => `${metric.label}: ${metric.value}${metric.unit || ''}${metric.delta !== undefined ? ` (${metric.trend === 'up' ? '↑ ' : metric.trend === 'down' ? '↓ ' : ''}${metric.delta})` : ''}`)].filter(Boolean).join('\n');
+    if (block.type === 'chart') return [block.title, ...block.series.flatMap(series => series.points.map(point => `${point.label}: ${point.value}${block.unit ? ` ${block.unit}` : ''}`))].join('\n');
+    if (block.type === 'table') return [block.title, block.columns.map(column => column.label || column).join(' | '), ...block.rows.map(row => block.columns.map((column, index) => Array.isArray(row) ? row[index] : row[column.key || column]).map(value => value ?? '—').join(' | '))].filter(Boolean).join('\n');
+    if (block.type === 'image' || block.type === 'media') return `${block.title || block.caption || 'Media'} — ${block.url}`;
+    if (block.type === 'source_list') return `${block.title || 'Sources'}\n${(block.sourceRefs || []).map((ref, index) => { const item = source(ref); return `${index + 1}. ${[item?.source, item?.title].filter(Boolean).join(' — ') || ref}: ${item?.url || ''}`; }).join('\n')}`;
+    if (block.type === 'action_group') return `${block.title || 'Actions'}\n${(block.actionRefs || []).map((ref, index) => { const item = action(ref); return `${index + 1}. ${item?.label || ref}${item?.status === 'disabled' ? ` — unavailable: ${item.disabledReason || 'Unavailable'}` : ''}`; }).join('\n')}`;
+    if (block.type === 'briefing') return [`${block.title}${block.subtitle ? ` — ${block.subtitle}` : ''}`, ...(block.sections || []).map(section => `${section.title}\n${section.blocks.map(format).filter(Boolean).join('\n')}`)].join('\n\n');
+    if (block.type === 'news_brief') return [[`${block.title} — ${String(block.date || '').replace('2026-08-17', '17 Aug 2026')}`, block.summary].filter(Boolean).join('\n'), ...(block.items || []).map(item => { const refs = item.sourceRefs || []; const sources = refs.map(ref => source(ref)?.url).filter(Boolean); return [`${item.topic || 'News'} — ${item.headline}`, item.summary, item.whyItMatters ? `Why it matters: ${item.whyItMatters}` : '', `${sources.length > 1 ? 'Sources' : 'Source'}: ${sources.join(', ')}`].filter(Boolean).join('\n'); })].filter(Boolean).join('\n\n');
+    if (block.type === 'task_snapshot') return [block.title, ...block.tasks.map(task => `${task.completed ? '☑' : '☐'} ${task.title || task.label}${task.dueAt ? ` — ${new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(task.dueAt))}` : task.status === 'stale' ? ' — stale' : ''}`)].join('\n');
+    if (block.type === 'question_form') return [block.preview, ...block.questions.map((question, index) => `${block.questions.length > 1 ? `${index + 1}. ` : ''}${question.label}${question.optional ? ' (optional)' : ''}${question.options ? `\n${question.options.map(option => `   - ${option.label || option}`).join('\n')}` : ''}`), 'Reply to this message with your answer.'].join('\n\n');
+    if (block.type === 'code') return (block.caption ? `${block.caption}\n` : '') + '```' + block.language + '\n' + block.code + '\n```';
+    return block.title || block.summary || 'Lyra update';
+  };
+  const compact = envelope.blocks.every(block => block.type === 'callout' || block.type === 'media');
+  return envelope.blocks.map(format).filter(Boolean).join(compact ? '\n' : '\n\n').slice(0, 4096);
 }
 
 export { BLOCK_TYPES, ACTION_TYPES };

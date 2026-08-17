@@ -1,150 +1,177 @@
 import { render } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { ComponentChildren } from 'preact';
 import { loginPasskey, registerPasskey } from './passkey.js';
+import { BlockList, envelopeText, type LyraAction, type LyraEnvelope } from './renderers.js';
+import { pendingMutations, queueMutation, removeMutation, updateMutation, readCached, writeCached } from './offline.js';
+import { shareLyraContent } from './share.js';
 
 type Tab = 'lyra' | 'todo' | 'news';
 type Status = 'fresh' | 'refreshing' | 'stale' | 'offline' | 'sign-in';
-type Action = { id: string; status: string; label?: string; actionType?: string; targetId?: string };
-type Source = { id: string; title?: string; source?: string; url?: string; asOf?: string };
-type Block = Record<string, any>;
-type Envelope = { blocks: Block[]; actions: Action[]; provenance: Source[] };
-type FeedEvent = { id: string; actor: string; title?: string; occurredAt: string; status?: string; envelope: Envelope };
-type Task = { id: string; title: string; detail?: string; dueAt?: string; source?: string; completed?: boolean; pending?: boolean };
-type NewsItem = { id: string; headline: string; summary?: string; whyItMatters?: string; topic?: string; source?: string; sourceUrl?: string; imageUrl?: string; publishedAt?: string; read?: boolean; saved?: boolean };
-type News = { items: NewsItem[]; generatedAt?: string; stale?: boolean; topics?: string[] };
-type Setter<T> = (next: T | ((current: T) => T)) => void;
+type Toast = { text: string; undo?: () => void };
+type FeedEvent = { id: string; actor: 'user' | 'assistant' | 'automation'; title?: string; occurredAt: string; status?: string; envelope: LyraEnvelope };
+type Task = { id: string; title: string; detail?: string; notes?: string; dueAt?: string; source?: string; list?: string; completed?: boolean; flagged?: boolean; pending?: boolean };
+type NewsItem = { id: string; headline: string; summary?: string; whyItMatters?: string; topic?: string; source?: string; sourceUrl?: string; imageUrl?: string; publishedAt?: string; read?: boolean; saved?: boolean; sources?: Array<{ title?: string; source?: string; url?: string }> };
+type News = { items: NewsItem[]; brief?: { title?: string; summary?: string; date?: string; themes?: string[] }; refreshedAt?: string; stale?: boolean; topics?: string[] };
 
-const CACHE_PREFIX = 'lyra.v3.';
-const legacyToken = () => localStorage.getItem('lyra_token') || '';
-const apiHeaders = (headers: HeadersInit = {}) => ({ ...(legacyToken() ? { authorization: `Bearer ${legacyToken()}` } : {}), ...headers });
-const getCached = <T,>(key: string): T | null => { try { return JSON.parse(localStorage.getItem(CACHE_PREFIX + key) || 'null') as T | null; } catch { return null; } };
-const cache = (key: string, value: unknown) => localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(value));
-const escape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
-const safeUrl = (value?: string) => { try { const parsed = new URL(value || ''); return ['https:', 'http:'].includes(parsed.protocol) ? parsed.href : undefined; } catch { return undefined; } };
-const relativeTime = (value?: string) => value ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : '';
+const token = () => localStorage.getItem('lyra_token') || '';
+const authHeaders = (base: HeadersInit = {}) => ({ ...(token() ? { authorization: `Bearer ${token()}` } : {}), ...base });
+const clock = (value?: string) => value ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : '';
+const date = (value?: string) => value ? new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(value)) : '';
+const safeUrl = (value?: string) => { try { const url = new URL(value || ''); return ['https:', 'http:'].includes(url.protocol) ? url.href : undefined; } catch { return undefined; } };
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, { credentials: 'include', ...options, headers: apiHeaders({ 'content-type': 'application/json', ...(options.headers || {}) }) });
-  if (!response.ok) { const detail = await response.json().catch(() => ({})); const error = Object.assign(new Error(detail.error?.message || detail.error || `Request failed (${response.status})`), { status: response.status }); throw error; }
+  const response = await fetch(path, { credentials: 'include', ...options, headers: authHeaders({ 'content-type': 'application/json', ...(options.headers || {}) }) });
+  if (!response.ok) { const detail = await response.json().catch(() => ({})); throw Object.assign(new Error(detail.error || `Request failed (${response.status})`), { status: response.status }); }
   return response.json() as Promise<T>;
 }
 
 function useResource<T>(key: string, path: string, empty: T) {
-  const [value, setValue] = useState<T>(() => getCached<T>(key) || empty);
-  const [status, setStatus] = useState<Status>(() => getCached<T>(key) ? 'stale' : 'refreshing');
+  const [value, setValue] = useState<T>(empty); const [status, setStatus] = useState<Status>('refreshing');
   const load = async (force = false) => {
     setStatus(current => current === 'fresh' ? 'refreshing' : current);
-    try { const next = await request<T>(force ? `${path}${path.includes('?') ? '&' : '?'}refresh=1` : path); setValue(next); cache(key, next); setStatus('fresh'); return next; }
+    try { const next = await request<T>(force ? `${path}${path.includes('?') ? '&' : '?'}refresh=1` : path); setValue(next); void writeCached(key, next); setStatus('fresh'); return next; }
     catch (error) { setStatus((error as { status?: number }).status === 401 ? 'sign-in' : 'offline'); return null; }
   };
-  useEffect(() => { void load(); }, [path]);
+  useEffect(() => { void readCached<T>(key).then(cached => { if (cached) { setValue(cached); setStatus('stale'); } }).finally(() => { void load(); }); }, [key, path]);
   return { value, setValue, status, load };
 }
 
 function App() {
-  const initialTab = new URLSearchParams(location.search).get('tab');
-  const [tab, setTab] = useState<Tab>(initialTab === 'todo' || initialTab === 'news' ? initialTab : 'lyra');
+  const query = new URLSearchParams(location.search); const initial = query.get('tab');
+  const [tab, setTab] = useState<Tab>(initial === 'todo' || initial === 'news' ? initial : 'lyra'); const [seed, setSeed] = useState(''); const [storyContext, setStoryContext] = useState<string | null>(null);
   const feed = useResource<{ events: FeedEvent[] }>('feed', '/v1/feed', { events: [] });
-  const tasks = useResource<{ items: Task[]; warnings?: string[] }>('tasks', '/v1/tasks', { items: [] });
+  const tasks = useResource<{ items: Task[] }>('tasks', '/v1/tasks', { items: [] });
   const news = useResource<News>('news', '/v1/news', { items: [] });
-  const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const scrolls = useRef<Record<Tab, number>>({ lyra: 0, todo: 0, news: 0 });
-
-  useEffect(() => {
-    const warm = window.setTimeout(() => { void tasks.load(); void news.load(); }, 350);
-    return () => window.clearTimeout(warm);
-  }, []);
-  useEffect(() => { document.title = tab === 'lyra' ? 'Lyra' : tab === 'todo' ? 'To Do · Lyra' : 'News · Lyra'; history.replaceState({}, '', `/app/?tab=${tab}`); }, [tab]);
-  useEffect(() => { if (!toast) return; const id = window.setTimeout(() => setToast(null), 5500); return () => window.clearTimeout(id); }, [toast]);
-  const changeTab = (next: Tab) => { scrolls.current[tab] = window.scrollY; setTab(next); requestAnimationFrame(() => window.scrollTo({ top: scrolls.current[next], behavior: 'instant' as ScrollBehavior })); };
-
-  return <div class="app-shell v3-shell">
-    <header class="topbar"><div class="topbar-title"><span class="lyra-mark">✦</span><strong>{tab === 'lyra' ? 'Lyra' : tab === 'todo' ? 'To Do' : 'News'}</strong></div><div class="topbar-actions"><StatusPill status={tab === 'lyra' ? feed.status : tab === 'todo' ? tasks.status : news.status}/><button class="round-button" aria-label="Open settings" onClick={() => setSettingsOpen(true)}>⚙</button></div></header>
-    <main class="main-content">
-      <section hidden={tab !== 'lyra'} aria-label="Lyra conversation"><LyraStream events={feed.value.events} reload={feed.load} onToast={setToast} /></section>
-      <section hidden={tab !== 'todo'} aria-label="To Do"><TodoScreen data={tasks.value} status={tasks.status} refresh={tasks.load} setData={tasks.setValue} onToast={setToast} /></section>
-      <section hidden={tab !== 'news'} aria-label="News"><NewsScreen data={news.value} status={news.status} refresh={news.load} setData={news.setValue} /></section>
-    </main>
-    <nav class="tabbar" aria-label="Primary navigation"><TabButton active={tab === 'lyra'} onClick={() => changeTab('lyra')} icon="✦" label="Lyra"/><TabButton active={tab === 'todo'} onClick={() => changeTab('todo')} icon="✓" label="To Do"/><TabButton active={tab === 'news'} onClick={() => changeTab('news')} icon="◌" label="News"/></nav>
-    {toast && <div class="toast" role="status"><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null); }}>Undo</button>}</div>}
-    {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} onToast={setToast}/>} 
-  </div>;
+  const [toast, setToast] = useState<Toast | null>(null); const [settings, setSettings] = useState(false); const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => { document.title = tab === 'lyra' ? 'Lyra' : `${tab === 'todo' ? 'To Do' : 'News'} · Lyra`; history.replaceState({}, '', `/app/?tab=${tab}`); }, [tab]);
+  useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 4800); return () => clearTimeout(id); }, [toast]);
+  const refreshPending = () => void pendingMutations().then(items => setPendingCount(items.length));
+  const flushPending = async () => {
+    if (!navigator.onLine) return;
+    for (const mutation of await pendingMutations()) {
+      try {
+        if (mutation.kind === 'message') { const response = await fetch('/v1/messages', { method: 'POST', credentials: 'include', headers: authHeaders({ 'content-type': 'application/json' }), body: JSON.stringify(mutation.payload) }); if (!response.ok) throw new Error('Queued message was rejected'); await response.text(); }
+        if (mutation.kind === 'action') { const preview = await request<{ id: string }>('/v1/actions', { method: 'POST', body: JSON.stringify(mutation.payload) }); await request(`/v1/actions/${preview.id}/commit`, { method: 'POST', body: '{}' }); }
+        await removeMutation(mutation.id);
+      } catch (error) { await updateMutation(mutation.id, { attempts: mutation.attempts + 1, error: error instanceof Error ? error.message : 'Retry failed' }); break; }
+    }
+    refreshPending(); void feed.load(); void tasks.load();
+  };
+  useEffect(() => { refreshPending(); void flushPending(); const online = () => { void flushPending(); }; window.addEventListener('online', online); return () => window.removeEventListener('online', online); }, []);
+  return <div class="app-shell app-next"><header class="topbar"><strong class="topbar-title">{tab === 'lyra' ? 'Lyra' : tab === 'todo' ? 'To Do' : 'News'}</strong><div class="topbar-actions"><Connection status={tab === 'lyra' ? feed.status : tab === 'todo' ? tasks.status : news.status}/><button class="icon-button" aria-label="Open settings" onClick={() => setSettings(true)}>•••</button></div></header><main class="main-content"><section hidden={tab !== 'lyra'}><LyraStream events={feed.value.events} reload={feed.load} seed={seed} storyContext={storyContext} clearSeed={() => setSeed('')} clearStoryContext={() => setStoryContext(null)} onToast={setToast}/></section><section hidden={tab !== 'todo'}><TodoScreen data={tasks.value} status={tasks.status} refresh={tasks.load} setData={tasks.setValue} onToast={setToast}/></section><section hidden={tab !== 'news'}><NewsScreen data={news.value} status={news.status} refresh={news.load} setData={news.setValue} onAsk={item => { setSeed('What matters about this story, and what should I do next?'); setStoryContext(item.id); setTab('lyra'); }} onToast={setToast}/></section></main><nav class="tabbar" aria-label="Primary navigation"><Tab label="Lyra" icon="✦" active={tab === 'lyra'} onClick={() => setTab('lyra')}/><Tab label="To Do" icon="✓" active={tab === 'todo'} onClick={() => setTab('todo')}/><Tab label="News" icon="◌" active={tab === 'news'} onClick={() => setTab('news')}/></nav>{toast && <div class="toast" role="status"><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null); }}>Undo</button>}</div>}{settings && <SettingsSheet onClose={() => setSettings(false)} pendingCount={pendingCount} onRetry={() => void flushPending()}/>}</div>;
 }
 
-function StatusPill({ status }: { status: Status }) { return status === 'offline' ? <span class="connection-state">Offline, showing saved data</span> : status === 'sign-in' ? <span class="connection-state">Sign in required</span> : status === 'refreshing' ? <span class="quiet-status">Updating</span> : null; }
-function SettingsSheet({ onClose, onToast }: { onClose: () => void; onToast: (value: { text: string } | null) => void }) {
-  const [message, setMessage] = useState('Private controls for this device.');
+function Connection({ status }: { status: Status }) { return status === 'offline' ? <span class="connection-state">Offline</span> : status === 'sign-in' ? <span class="connection-state">Sign in required</span> : status === 'refreshing' ? <span class="quiet-status">Updating</span> : null; }
+function Tab({ label, icon, active, onClick }: { label: string; icon: string; active: boolean; onClick: () => void }) { return <button class={`tab-button ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={onClick}><span>{icon}</span><small>{label}</small></button>; }
+function Empty({ title, detail }: { title: string; detail: string }) { return <div class="empty-state"><h2>{title}</h2><p>{detail}</p></div>; }
+
+function SettingsSheet({ onClose, pendingCount, onRetry }: { onClose: () => void; pendingCount: number; onRetry: () => void }) {
+  const [theme, setTheme] = useState(localStorage.getItem('lyra.theme') || 'system'); const [message, setMessage] = useState('Private controls for this device.');
+  const [health, setHealth] = useState<{ sources?: Array<{ name: string; status: string }> } | null>(null);
+  useEffect(() => { void request<{ sources?: Array<{ name: string; status: string }> }>('/v1/app-health').then(setHealth).catch(() => setHealth(null)); }, []);
   const run = async (work: () => Promise<unknown>, success: string) => { try { await work(); setMessage(success); } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not update settings'); } };
-  return <div class="settings-backdrop" role="presentation" onClick={onClose}><section class="settings-sheet v3-settings" role="dialog" aria-modal="true" aria-label="Lyra settings" onClick={event => event.stopPropagation()}><div class="sheet-handle"/><h2>Lyra settings</h2><p class="muted">{message}</p><div class="settings-actions"><button class="secondary-button" onClick={() => void run(registerPasskey, 'Face ID is ready on this device.')}>Set up Face ID</button><button class="secondary-button" onClick={() => void run(loginPasskey, 'Signed in with Face ID.')}>Sign in with Face ID</button><button class="secondary-button" onClick={() => void run(async () => { await request('/v1/push/test', { method: 'POST', body: '{}' }); }, 'Test alert sent.')}>Send test alert</button></div><button class="primary-button close-sheet" onClick={onClose}>Done</button></section></div>;
+  const changeTheme = (next: string) => { localStorage.setItem('lyra.theme', next); document.documentElement.dataset.theme = next; setTheme(next); };
+  return <div class="sheet-backdrop" role="presentation" onClick={onClose}><section class="sheet settings-sheet" role="dialog" aria-modal="true" aria-label="Lyra settings" onClick={event => event.stopPropagation()}><div class="sheet-handle"/><header><h2>Settings</h2><button class="text-button" onClick={onClose}>Done</button></header><p class="settings-status">{message}</p><section><h3>Account</h3><button class="setting-row" onClick={() => void run(registerPasskey, 'Face ID is ready on this device.')}><span>Face ID</span><small>Set up</small></button><button class="setting-row" onClick={() => void run(loginPasskey, 'Signed in with Face ID.')}><span>Sign in</span><small>Use Face ID</small></button></section><section><h3>Notifications</h3><button class="setting-row" onClick={() => void run(() => request('/v1/push/test', { method: 'POST', body: '{}' }), 'A test notification was sent.')}><span>Test alert</span><small>Send</small></button></section><section><h3>Appearance</h3><div class="theme-picker">{['system', 'light', 'dark'].map(choice => <button class={theme === choice ? 'active' : ''} onClick={() => changeTheme(choice)}>{choice}</button>)}</div></section><section><h3>Connection</h3><button class="setting-row" onClick={onRetry}><span>Offline changes</span><small>{pendingCount ? `${pendingCount} pending · Retry` : 'Up to date'}</small></button>{health?.sources?.map(source => <div class="setting-row static"><span>{source.name}</span><small>{source.status}</small></div>)}<div class="setting-row static"><span>Version</span><small>Next</small></div></section></section></div>;
 }
-function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: string; label: string }) { return <button class={`tab-button ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} onClick={onClick}><span aria-hidden="true">{icon}</span><small>{label}</small></button>; }
 
-function LyraStream({ events, reload, onToast }: { events: FeedEvent[]; reload: () => Promise<unknown>; onToast: (value: { text: string; undo?: () => void } | null) => void }) {
-  const [draft, setDraft] = useState(''); const [sending, setSending] = useState(false); const [localEvents, setLocalEvents] = useState<FeedEvent[]>([]); const bottom = useRef<HTMLDivElement>(null);
-  const allEvents = useMemo(() => [...events, ...localEvents].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt)), [events, localEvents]);
+function LyraStream({ events, reload, seed, storyContext, clearSeed, clearStoryContext, onToast }: { events: FeedEvent[]; reload: () => Promise<unknown>; seed: string; storyContext: string | null; clearSeed: () => void; clearStoryContext: () => void; onToast: (next: Toast) => void }) {
+  const [draft, setDraft] = useState(''); const [sending, setSending] = useState(false); const [local, setLocal] = useState<FeedEvent[]>([]); const bottom = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (seed) { setDraft(seed); clearSeed(); } }, [seed]);
+  const all = useMemo(() => [...events, ...local].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt)), [events, local]);
+  const onAction = async (action: LyraAction) => { const preview = await request<{ id: string }>('/v1/actions', { method: 'POST', body: JSON.stringify({ type: action.actionType, targetId: action.targetId || action.id, payload: action.payload || {}, idempotencyKey: `block:${action.id}:${crypto.randomUUID()}` }) }); const result = await request<{ status: string }>(`/v1/actions/${preview.id}/commit`, { method: 'POST', body: '{}' }); if (result.status === 'failed') throw new Error('Lyra could not complete that action.'); onToast({ text: 'Action completed' }); void reload(); };
+  const onAnswer = async (block: Record<string, any>, answers: Record<string, string | string[]>) => { await request(`/v1/questions/${block.questionId}/answer`, { method: 'POST', body: JSON.stringify({ answers, idempotencyKey: crypto.randomUUID() }) }); onToast({ text: 'Answer sent' }); void reload(); };
   const send = async (event: Event) => {
-    event.preventDefault(); const text = draft.trim(); if (!text || sending) return; setDraft(''); setSending(true);
-    const userId = crypto.randomUUID(); const assistantId = crypto.randomUUID();
-    setLocalEvents(current => [...current, { id: userId, actor: 'user', title: 'You', occurredAt: new Date().toISOString(), envelope: { blocks: [{ id: `${userId}-text`, type: 'rich_text', markdown: text }], actions: [], provenance: [] } }, { id: assistantId, actor: 'assistant', title: 'Lyra', occurredAt: new Date().toISOString(), status: 'pending', envelope: { blocks: [{ id: `${assistantId}-text`, type: 'rich_text', markdown: '' }], actions: [], provenance: [] } }]);
+    event.preventDefault(); const text = draft.trim(); if (!text || sending) return;
+    setSending(true); setDraft(''); const userId = crypto.randomUUID(); const assistantId = crypto.randomUUID(); const contextId = storyContext; clearStoryContext();
+    setLocal(current => [...current, { id: userId, actor: 'user', occurredAt: new Date().toISOString(), envelope: { blocks: [{ id: `${userId}-text`, type: 'rich_text', markdown: text }], actions: [], provenance: [] } }, { id: assistantId, actor: 'assistant', occurredAt: new Date().toISOString(), status: 'pending', envelope: { blocks: [{ id: `${assistantId}-text`, type: 'rich_text', markdown: '' }], actions: [], provenance: [] } }]);
     requestAnimationFrame(() => bottom.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }));
     try {
-      const response = await fetch('/v1/messages', { method: 'POST', credentials: 'include', headers: apiHeaders({ 'content-type': 'application/json' }), body: JSON.stringify({ text, idempotencyKey: userId }) });
+      const response = await fetch('/v1/messages', { method: 'POST', credentials: 'include', headers: authHeaders({ 'content-type': 'application/json' }), body: JSON.stringify({ text, idempotencyKey: userId, ...(contextId ? { context: { newsItemId: contextId } } : {}) }) });
       if (!response.ok || !response.body) throw new Error('Lyra could not be reached');
       const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = '';
-      while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const frames = buffer.split('\n\n'); buffer = frames.pop() || ''; for (const frame of frames) { if (!frame.startsWith('data: ')) continue; const message = JSON.parse(frame.slice(6)); if (message.type === 'error' || message.type === 'message.failed') throw new Error(message.message || 'Lyra could not finish'); if (message.type === 'message.delta') setLocalEvents(current => current.map(item => item.id === assistantId ? { ...item, envelope: { ...item.envelope, blocks: [{ ...item.envelope.blocks[0], markdown: String(item.envelope.blocks[0].markdown || '') + String(message.content || '') }] } } : item)); if (message.type === 'tool.started') setLocalEvents(current => current.map(item => item.id === assistantId ? { ...item, status: message.label || 'Thinking' } : item)); } }
-      setLocalEvents([]); await reload();
-    } catch (error) { setLocalEvents(current => current.map(item => item.id === assistantId ? { ...item, status: 'failed', envelope: { ...item.envelope, blocks: [{ ...item.envelope.blocks[0], markdown: 'I could not finish that response. Please try again.' }] } } : item)); onToast({ text: error instanceof Error ? error.message : 'Message failed' }); } finally { setSending(false); }
+      while (true) { const frame = await reader.read(); if (frame.done) break; buffer += decoder.decode(frame.value, { stream: true }); const messages = buffer.split('\n\n'); buffer = messages.pop() || ''; for (const message of messages) { if (!message.startsWith('data: ')) continue; const next = JSON.parse(message.slice(6)); if (next.type === 'error') throw new Error('Lyra could not finish that response.'); if (next.type === 'message.delta') setLocal(current => current.map(item => item.id === assistantId ? { ...item, envelope: { ...item.envelope, blocks: [{ ...item.envelope.blocks[0], markdown: `${item.envelope.blocks[0].markdown || ''}${next.content || ''}` }] } } : item)); } }
+      setLocal([]); await reload();
+    } catch (error) {
+      if (!navigator.onLine || error instanceof TypeError) {
+        await queueMutation({ id: userId, kind: 'message', payload: { text, idempotencyKey: userId, ...(contextId ? { context: { newsItemId: contextId } } : {}) } });
+        setLocal(current => current.map(item => item.id === assistantId ? { ...item, status: 'pending', envelope: { ...item.envelope, blocks: [{ ...item.envelope.blocks[0], markdown: 'Queued until Lyra reconnects.' }] } } : item));
+        onToast({ text: 'Message queued for delivery' });
+      } else {
+        setLocal(current => current.map(item => item.id === assistantId ? { ...item, status: 'failed', envelope: { ...item.envelope, blocks: [{ ...item.envelope.blocks[0], markdown: 'I could not finish that response. Please try again.' }] } } : item));
+        onToast({ text: error instanceof Error ? error.message : 'Message failed' });
+      }
+    } finally { setSending(false); }
   };
-  return <div class="lyra-stream conversation-screen"><div class="conversation-toolbar"><span>{allEvents.length ? 'Today' : 'Lyra'}</span><button class="refresh-button" onClick={() => void reload()}>Refresh</button></div><div class="event-stream">{allEvents.length ? allEvents.map(item => <Message key={item.id} event={item}/>) : <Empty title="Start wherever you are" detail="Ask Lyra to think, find, organise, or act."/>}</div><div ref={bottom}/><form class="composer-wrap" onSubmit={send}><div class="composer"><textarea value={draft} onInput={event => setDraft((event.target as HTMLTextAreaElement).value)} rows={1} placeholder="Message Lyra…" aria-label="Message Lyra"/><button class="send-button" type="submit" disabled={sending} aria-label="Send message">↑</button></div><div class="composer-tools"><span>{sending ? 'Lyra is working…' : 'Lyra uses trusted context when it matters.'}</span><button type="button" onClick={() => onToast({ text: 'Voice capture is available from Lyra settings.' })}>Add voice or note</button></div></form></div>;
+  return <div class="conversation-screen"><div class="stream-context">{all.length ? 'Today' : 'Lyra'}</div><div class="event-stream">{all.length ? all.map(event => <Message event={event} onAction={onAction} onAnswer={onAnswer} onToast={onToast}/>) : <Empty title="Lyra is ready" detail="Your reminders, briefings, and conversations will live here."/>}</div><div ref={bottom}/><form class="composer-wrap" onSubmit={send}><div class="composer"><textarea value={draft} onInput={event => setDraft((event.target as HTMLTextAreaElement).value)} rows={1} placeholder="Message Lyra…" aria-label="Message Lyra"/><button class="send-button" type="submit" disabled={sending} aria-label="Send message">↑</button></div><div class="composer-tools"><button type="button" onClick={() => onToast({ text: 'Voice capture is coming next.' })}>Add voice or note</button><span>{sending ? 'Lyra is working…' : 'Trusted context appears with every answer.'}</span></div></form></div>;
 }
 
-function ScreenHeader({ eyebrow, title, onRefresh }: { eyebrow: string; title: string; onRefresh: () => void }) { return <div class="stream-header"><div><p class="eyebrow">{eyebrow}</p><h1>{title}</h1></div><button class="refresh-button" onClick={onRefresh}>Refresh</button></div>; }
-function Empty({ title, detail }: { title: string; detail: string }) { return <div class="empty-state"><span class="lyra-mark">✦</span><h2>{title}</h2><p class="muted">{detail}</p></div>; }
-
-const CRON_TITLES: Record<string, string> = { 'preposition-drill': 'Evening practice', 'health-evening-checkin': 'Health check-in', 'health-morning-bundle': 'Morning health', 'reading-nudge': 'Reading reminder', 'morning-digest-news': 'Morning news', 'morning-digest-combine': 'Morning digest', 'weekly-review': 'Weekly review', 'morning-weight-nudge': 'Weight check-in', 'move-checklist-digest': 'Move checklist' };
-const technical = (value: string) => /(?:anthropic|credit balance|error:|cannot prompt|not a tty|\/root\/|himalaya|all models failed)/i.test(value);
-function Message({ event }: { event: FeedEvent }) {
-  const scheduled = event.actor === 'automation' || event.id.startsWith('openclaw-cron:');
-  const raw = event.envelope.blocks.map(block => String(block.markdown || block.body || '')).join('\n');
-  const title = CRON_TITLES[event.title || ''] || (scheduled ? 'Lyra update' : event.title || (event.actor === 'user' ? 'You' : 'Lyra'));
-  if (event.status === 'failed' || technical(raw)) return null;
-  return <article class={`event-card ${event.actor === 'user' ? 'user' : ''} ${scheduled ? 'scheduled' : ''} ${event.status === 'pending' ? 'pending' : ''}`}><div class="event-avatar">{event.actor === 'user' ? 'A' : '✦'}</div><div class="event-body"><div class="event-meta"><span class="event-title">{event.actor === 'user' ? 'You' : 'Lyra'}</span><time>{relativeTime(event.occurredAt)}</time></div>{scheduled && <div class="cron-label">{title}</div>}{event.envelope.blocks.map(block => <BlockView key={block.id} block={block} envelope={event.envelope}/>)}</div></article>;
+function Message({ event, onAction, onAnswer, onToast }: { event: FeedEvent; onAction: (action: LyraAction) => Promise<void>; onAnswer: (block: Record<string, any>, answers: Record<string, string | string[]>) => Promise<void>; onToast: (next: Toast) => void }) {
+  const scheduled = event.actor === 'automation'; const title = scheduled ? friendlyTitle(event.title) : event.actor === 'user' ? 'You' : 'Lyra'; const share = async () => { try { const outcome = await shareLyraContent({ title, text: envelopeText(event.envelope) }); onToast({ text: outcome === 'copied' ? 'Copied to clipboard' : 'Shared' }); } catch { /* cancelled */ } };
+  return <article class={`message ${event.actor === 'user' ? 'user-message' : 'assistant-message'} ${scheduled ? 'scheduled-message' : ''}`}><div class="message-rail">{event.actor === 'user' ? null : <span class="lyra-avatar">✦</span>}</div><div class="message-content"><header><strong>{event.actor === 'user' ? 'You' : 'Lyra'}</strong><time>{clock(event.occurredAt)}</time><button class="share-button" aria-label="Share this message" onClick={() => void share()}>↗</button></header>{scheduled && <p class="scheduled-label">{title} · {clock(event.occurredAt)}</p>}{event.status === 'failed' ? <aside class="message-failure"><strong>Update unavailable</strong><p>Lyra recorded this update but could not complete it.</p></aside> : <BlockList blocks={event.envelope.blocks} context={{ envelope: event.envelope, onAction, onQuestionAnswer: onAnswer, onShare: share }}/>}</div></article>;
 }
 
-function BlockView({ block, envelope }: { block: Block; envelope: Envelope }) {
-  const sources = (block.sourceRefs || []).map((id: string) => envelope.provenance.find(source => source.id === id)).filter(Boolean) as Source[];
-  const provenance = sources.length ? <div class="sources">{sources.map(source => <a class="source-chip" href={safeUrl(source.url)} target="_blank" rel="noreferrer">{source.title || source.source}</a>)}</div> : null;
-  if (block.type === 'rich_text') return <div class="block rich-text" dangerouslySetInnerHTML={{ __html: markdown(block.markdown || '') }}/>;
-  if (block.type === 'bullet_list' || block.type === 'numbered_list') { const List = block.type === 'bullet_list' ? 'ul' : 'ol'; return <div class="block"><List class="rich-list">{(block.items || []).map((item: string) => <li>{item}</li>)}</List>{provenance}</div>; }
-  if (block.type === 'checklist') return <section class="block checklist"><h3>{block.title || 'Checklist'}</h3>{(block.items || []).map((item: any) => <label class="check-row"><input type="checkbox" checked={Boolean(item.checked)} readOnly/><span>{item.label}</span></label>)}{provenance}</section>;
-  if (block.type === 'callout') return <aside class={`block callout ${block.tone || 'info'}`}><strong>{block.title}</strong><div>{block.body}</div>{provenance}</aside>;
-  if (block.type === 'metric_group') return <div class="block metrics">{(block.metrics || []).map((metric: any) => <div class="metric"><span>{metric.label}</span><strong>{metric.value} {metric.unit}</strong><small>{metric.delta}</small></div>)}</div>;
-  if (block.type === 'chart') return <figure class="block chart"><figcaption>{block.title}</figcaption>{(block.series || []).flatMap((series: any) => series.points || []).map((point: any) => <div class="chart-row"><span>{point.label}</span><span class="chart-track"><span class="chart-bar" style={{ width: `${Math.min(100, Number(point.value) || 0)}%` }}/></span><strong>{point.value}</strong></div>)}</figure>;
-  if (block.type === 'image' || block.type === 'media') return <figure class="media-card">{block.mediaType === 'audio' ? <audio controls src={safeUrl(block.url)}/> : <img src={safeUrl(block.url)} alt={block.alt || block.title || 'Lyra media'} loading="lazy"/>}<figcaption>{block.caption || block.title}</figcaption></figure>;
-  if (block.type === 'table') return <div class="rich-table-wrap"><table class="rich-table"><thead><tr>{(block.columns || []).map((column: any) => <th>{column.label || column}</th>)}</tr></thead><tbody>{(block.rows || []).map((row: string[]) => <tr>{row.map(cell => <td>{cell}</td>)}</tr>)}</tbody></table></div>;
-  return <div class="block callout info">{block.title || block.summary || 'Lyra update'}{provenance}</div>;
-}
-function markdown(value: string) { return escape(value).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>'); }
+function friendlyTitle(value?: string) { return ({ 'morning-digest-news': 'Morning news', 'morning-digest-combine': 'Morning briefing', 'health-morning-bundle': 'Morning health', 'health-evening-checkin': 'Health check-in', 'reading-nudge': 'Reading reminder' } as Record<string, string>)[value || ''] || value || 'Lyra update'; }
 
-function TodoScreen({ data, status, refresh, setData, onToast }: { data: { items: Task[]; warnings?: string[] }; status: Status; refresh: () => Promise<unknown>; setData: Setter<{ items: Task[]; warnings?: string[] }>; onToast: (value: { text: string; undo?: () => void } | null) => void }) {
-  const [filter, setFilter] = useState<'today' | 'scheduled' | 'all' | 'completed'>('today');
-  const visible = data.items.filter(item => filter === 'completed' ? item.completed : filter === 'scheduled' ? !item.completed && item.dueAt : filter === 'all' ? !item.completed : !item.completed && (!item.dueAt || new Date(item.dueAt).toDateString() === new Date().toDateString()));
+function TodoScreen({ data, status, refresh, setData, onToast }: { data: { items: Task[] }; status: Status; refresh: () => Promise<unknown>; setData: (next: { items: Task[] } | ((current: { items: Task[] }) => { items: Task[] })) => void; onToast: (next: Toast) => void }) {
+  const [filter, setFilter] = useState<'today' | 'scheduled' | 'all' | 'flagged'>('today'); const [selected, setSelected] = useState<Task | null>(null); const [adding, setAdding] = useState(false); const active = data.items.filter(item => !item.completed); const now = new Date(); const visible = active.filter(item => filter === 'all' ? true : filter === 'flagged' ? item.flagged : filter === 'scheduled' ? Boolean(item.dueAt) : !item.dueAt || new Date(item.dueAt).toDateString() === now.toDateString());
   const complete = async (task: Task) => {
-    const previous = data; setData({ ...data, items: data.items.map(item => item.id === task.id ? { ...item, completed: true, pending: true } : item) });
-    let actionId = ''; try { const preview = await request<Action>('/v1/actions', { method: 'POST', body: JSON.stringify({ type: 'complete', targetId: task.id, idempotencyKey: `complete:${task.id}:${Date.now()}`, payload: { source: task.source || 'Notion reminders', kind: 'reminder' } }) }); actionId = preview.id; const result = await request<Action>(`/v1/actions/${preview.id}/commit`, { method: 'POST' }); if (result.status === 'failed') throw new Error('Could not complete reminder'); setData(current => ({ ...current, items: current.items.map(item => item.id === task.id ? { ...item, pending: false } : item) })); onToast({ text: 'Completed', undo: () => void undo() }); }
-    catch (error) { setData(previous); onToast({ text: error instanceof Error ? error.message : 'Could not complete reminder' }); }
-    async function undo() { setData(previous); if (actionId) await request(`/v1/actions/${actionId}/undo`, { method: 'POST', body: '{}' }).catch(() => undefined); }
+    const prior = data; const payload = { type: 'complete', targetId: task.id, idempotencyKey: `complete:${task.id}:${crypto.randomUUID()}`, payload: { source: task.source || 'Notion reminders', kind: 'reminder' } };
+    setData({ items: data.items.map(item => item.id === task.id ? { ...item, completed: true, pending: true } : item) });
+    try {
+      const action = await request<{ id: string }>('/v1/actions', { method: 'POST', body: JSON.stringify(payload) });
+      const result = await request<{ status: string }>(`/v1/actions/${action.id}/commit`, { method: 'POST', body: '{}' });
+      if (result.status === 'failed') throw new Error('Provider did not confirm completion');
+      setData(current => ({ items: current.items.map(item => item.id === task.id ? { ...item, pending: false } : item) }));
+      onToast({ text: 'Completed', undo: () => { setData(prior); void request(`/v1/actions/${action.id}/undo`, { method: 'POST', body: '{}' }); } });
+    } catch (error) {
+      if (!navigator.onLine || error instanceof TypeError) { await queueMutation({ id: payload.idempotencyKey, kind: 'action', payload }); onToast({ text: 'Completion queued for sync' }); }
+      else { setData(prior); onToast({ text: error instanceof Error ? error.message : 'Could not complete reminder' }); }
+    }
   };
-  return <div class="lyra-stream reminders-screen"><ScreenHeader eyebrow="Your reminders" title="To Do" onRefresh={() => void refresh()}/><div class="list-count">{data.items.filter(item => !item.completed).length} reminders</div><div class="reminder-filters" role="tablist">{(['today', 'scheduled', 'all', 'completed'] as const).map(name => <button class={`filter-pill ${filter === name ? 'active' : ''}`} onClick={() => setFilter(name)}>{name[0].toUpperCase() + name.slice(1)}</button>)}</div>{status === 'offline' && <div class="source-strip">Showing saved reminders. Lyra will catch up when you reconnect.</div>}<div class="task-list">{visible.length ? visible.map(task => <article class={`reminder-row ${task.pending ? 'is-pending' : ''}`}><label><input type="checkbox" checked={Boolean(task.completed)} onChange={() => !task.completed && void complete(task)}/><span class="reminder-checkbox"/><span class="reminder-copy"><strong>{task.title}</strong><small>{task.detail || task.dueAt ? task.dueAt ? new Date(task.dueAt).toLocaleDateString() : task.detail : task.source || 'Anytime'}</small></span></label></article>) : <Empty title={filter === 'completed' ? 'No completed reminders' : 'All clear'} detail={filter === 'today' ? 'Nothing due today.' : 'Your reminders will appear here when Lyra finds them.'}/>}</div></div>;
+  return <div class="todo-screen"><header class="screen-heading"><div><h1>To Do</h1><p>{active.length} {active.length === 1 ? 'reminder' : 'reminders'}</p></div><button class="text-button" onClick={() => void refresh()}>Refresh</button></header><div class="smart-lists" role="tablist">{(['today', 'scheduled', 'all', 'flagged'] as const).map(name => <button class={filter === name ? 'active' : ''} onClick={() => setFilter(name)}>{name[0].toUpperCase() + name.slice(1)}</button>)}</div>{status === 'offline' && <div class="state-banner">Showing saved reminders. Changes will retry when you reconnect.</div>}<div class="reminder-list">{visible.length ? visible.map(task => <article class={`reminder-row ${task.pending ? 'pending' : ''}`}><button class="reminder-toggle" aria-label={`Complete ${task.title}`} onClick={() => void complete(task)}>{task.completed ? '✓' : ''}</button><button class="reminder-main" onClick={() => setSelected(task)}><strong>{task.title}</strong><span>{task.dueAt ? date(task.dueAt) : task.notes || task.detail || 'Anytime'}</span></button>{task.flagged && <span class="task-flag">⚑</span>}</article>) : <Empty title="All clear" detail={filter === 'today' ? 'Nothing is due today.' : 'No reminders in this list.'}/>}</div><button class="new-reminder" onClick={() => setAdding(true)}><span>＋</span> New Reminder</button>{selected && <TaskSheet task={selected} onClose={() => setSelected(null)}/>} {adding && <QuickAdd onClose={() => setAdding(false)} onToast={onToast} onRefresh={refresh}/>}</div>;
 }
 
-function NewsScreen({ data, status, refresh, setData }: { data: News; status: Status; refresh: (force?: boolean) => Promise<unknown>; setData: Setter<News> }) {
-  const [topic, setTopic] = useState('For you'); const topics = ['For you', ...(data.topics || [])]; const items = data.items.filter(item => topic === 'For you' || item.topic === topic);
-  const updateItem = (id: string, patch: Partial<NewsItem>) => setData({ ...data, items: data.items.map(item => item.id === id ? { ...item, ...patch } : item) });
-  return <div class="lyra-stream news-screen"><ScreenHeader eyebrow="A focused read from Lyra" title="News" onRefresh={() => void refresh(true)}/><div class="news-filters">{topics.map(value => <button class={`filter-pill ${topic === value ? 'active' : ''}`} onClick={() => setTopic(value)}>{value}</button>)}</div>{status === 'offline' && <div class="source-strip">Showing your last saved feed.</div>}<div class="news-feed">{items.length ? items.map(item => <article class="news-card rich-news-card"><button class="news-card-main" onClick={() => updateItem(item.id, { read: true })}>{item.imageUrl && <img src={safeUrl(item.imageUrl)} alt="" loading="lazy"/>}<div><div class="briefing-meta"><span class="news-topic">{item.topic || 'Briefing'}</span><span>{item.source || 'Lyra'} · {item.publishedAt ? relativeTime(item.publishedAt) : 'Today'}</span></div><h2>{item.headline}</h2><p>{item.summary}</p>{item.whyItMatters && <p class="why-it-matters"><strong>Why it matters</strong>{item.whyItMatters}</p>}</div></button><footer><button class={item.saved ? 'saved' : ''} onClick={() => updateItem(item.id, { saved: !item.saved })}>{item.saved ? 'Saved' : 'Save'}</button>{item.sourceUrl && <a href={safeUrl(item.sourceUrl)} target="_blank" rel="noreferrer">Read source ↗</a>}</footer></article>) : <Empty title="Your brief is on its way" detail="There are no stories in this feed yet. Pull to refresh or ask Lyra for today’s news."/>}</div></div>;
+function TaskSheet({ task, onClose }: { task: Task; onClose: () => void }) { return <div class="sheet-backdrop" onClick={onClose}><section class="sheet task-sheet" onClick={event => event.stopPropagation()}><div class="sheet-handle"/><header><h2>{task.title}</h2><button class="text-button" onClick={onClose}>Done</button></header><p>{task.notes || task.detail || 'No notes'}</p><dl><dt>Due</dt><dd>{task.dueAt ? date(task.dueAt) : 'Anytime'}</dd><dt>List</dt><dd>{task.list || 'Inbox'}</dd><dt>Source</dt><dd>{task.source || 'Lyra'}</dd></dl></section></div>; }
+function QuickAdd({ onClose, onToast, onRefresh }: { onClose: () => void; onToast: (next: Toast) => void; onRefresh: () => Promise<unknown> }) {
+  const [title, setTitle] = useState(''); const [saving, setSaving] = useState(false);
+  const save = async (event: Event) => {
+    event.preventDefault(); if (!title.trim()) return; setSaving(true);
+    const payload = { type: 'create_reminder', targetId: `new:${crypto.randomUUID()}`, idempotencyKey: crypto.randomUUID(), payload: { title: title.trim() } };
+    try {
+      const action = await request<{ id: string }>('/v1/actions', { method: 'POST', body: JSON.stringify(payload) });
+      const result = await request<{ status: string }>(`/v1/actions/${action.id}/commit`, { method: 'POST', body: '{}' });
+      if (result.status === 'failed') throw new Error('Lyra could not add this reminder.');
+      onToast({ text: 'Reminder added' }); onClose(); await onRefresh();
+    } catch (error) {
+      if (!navigator.onLine || error instanceof TypeError) { await queueMutation({ id: payload.idempotencyKey, kind: 'action', payload }); onToast({ text: 'Reminder queued for sync' }); onClose(); }
+      else onToast({ text: error instanceof Error ? error.message : 'Could not add reminder' });
+    } finally { setSaving(false); }
+  };
+  return <div class="sheet-backdrop" onClick={onClose}><form class="sheet quick-add" onSubmit={save} onClick={event => event.stopPropagation()}><div class="sheet-handle"/><header><h2>New Reminder</h2><button class="text-button" type="button" onClick={onClose}>Cancel</button></header><input autoFocus value={title} onInput={event => setTitle((event.target as HTMLInputElement).value)} placeholder="What do you need to do?"/><button class="primary-button" disabled={saving}>{saving ? 'Adding…' : 'Add reminder'}</button></form></div>;
 }
+
+function NewsScreen({ data, status, refresh, setData, onAsk, onToast }: { data: News; status: Status; refresh: (force?: boolean) => Promise<unknown>; setData: (next: News) => void; onAsk: (item: NewsItem) => void; onToast: (next: Toast) => void }) {
+  const [topic, setTopic] = useState('For you');
+  const [selected, setSelected] = useState<NewsItem | null>(null);
+  const topics = ['For you', ...(data.topics || [])];
+  const items = data.items.filter(item => topic === 'For you' || item.topic === topic);
+  const update = (id: string, patch: Partial<NewsItem>) => setData({ ...data, items: data.items.map(item => item.id === id ? { ...item, ...patch } : item) });
+  return <div class="news-screen">
+    <header class="screen-heading"><div><h1>News</h1><p>{data.refreshedAt ? `Updated ${clock(data.refreshedAt)}` : 'Your focused briefing'}</p></div><button class="text-button" onClick={() => void refresh(true)}>Refresh</button></header>
+    {data.brief && <article class="news-lead"><p class="block-eyebrow">{data.brief.date || 'Morning brief'}</p><h2>{data.brief.title || 'Your briefing'}</h2><p>{data.brief.summary}</p>{data.brief.themes?.length ? <div class="topic-row">{data.brief.themes.map(theme => <span>{theme}</span>)}</div> : null}</article>}
+    <div class="smart-lists news-topics">{topics.map(value => <button class={topic === value ? 'active' : ''} onClick={() => setTopic(value)}>{value}</button>)}</div>
+    {(status === 'offline' || data.stale) && <div class="state-banner">Showing the last available brief.</div>}
+    <div class="news-feed">{items.length ? items.map(item => <article class={`news-card ${item.read ? 'read' : ''}`}>
+      <button class="news-main" onClick={() => { update(item.id, { read: true }); setSelected(item); }}>
+        {item.imageUrl && <img src={safeUrl(item.imageUrl)} alt="" loading="lazy" onError={event => { (event.currentTarget as HTMLImageElement).style.display = 'none'; }}/>}
+        <div><p class="news-meta">{item.topic || 'Briefing'} · {item.source || 'Lyra'} · {clock(item.publishedAt)}</p><h2>{item.headline}</h2><p>{item.summary}</p>{item.whyItMatters && <p class="why"><strong>Why it matters</strong>{item.whyItMatters}</p>}</div>
+      </button>
+      <footer><button onClick={() => update(item.id, { saved: !item.saved })}>{item.saved ? 'Saved' : 'Save'}</button><button onClick={() => void shareLyraContent({ title: item.headline, text: item.summary || '', url: item.sourceUrl }).then(() => onToast({ text: 'Shared' })).catch(() => undefined)}>Share</button>{item.sourceUrl && <a href={safeUrl(item.sourceUrl)} target="_blank" rel="noreferrer">Source ↗</a>}</footer>
+    </article>) : <Empty title="Your brief is on its way" detail="No stories are available yet. Lyra will keep the last valid briefing here."/>}</div>
+    {selected && <StorySheet item={selected} onClose={() => setSelected(null)} onAsk={() => { onAsk(selected); setSelected(null); }} onToast={onToast}/>}</div>;
+}
+
+function StorySheet({ item, onClose, onAsk, onToast }: { item: NewsItem; onClose: () => void; onAsk: () => void; onToast: (next: Toast) => void }) { return <div class="sheet-backdrop" onClick={onClose}><section class="sheet story-sheet" onClick={event => event.stopPropagation()}><div class="sheet-handle"/><header><p class="block-eyebrow">{item.topic || 'News'}</p><button class="text-button" onClick={onClose}>Done</button></header><h2>{item.headline}</h2><p>{item.summary}</p>{item.whyItMatters && <aside class="why"><strong>Why it matters</strong>{item.whyItMatters}</aside>}<h3>Sources</h3><div class="story-sources">{(item.sources?.length ? item.sources : [{ title: item.source, url: item.sourceUrl }]).map(source => safeUrl(source.url) ? <a href={safeUrl(source.url)} target="_blank" rel="noreferrer">{source.title || source.source || 'Open source'} ↗</a> : <span>{source.title || source.source}</span>)}</div><div class="sheet-actions"><button class="secondary-button" onClick={() => void shareLyraContent({ title: item.headline, text: item.summary || '', url: item.sourceUrl }).then(() => onToast({ text: 'Shared' })).catch(() => undefined)}>Share</button><button class="primary-button" onClick={onAsk}>Ask Lyra</button></div></section></div>; }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(() => undefined);
 render(<App/>, document.getElementById('app')!);

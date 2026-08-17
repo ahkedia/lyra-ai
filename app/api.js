@@ -182,8 +182,10 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     if (existing) return existing;
     const envelope = normalizeAgentOutput(input.envelope || input.output || input.text || input.message || input.summary || '', { eventId: String(id), source: 'OpenClaw' });
     const event = addEvent({ id: String(id), eventType: input.status === 'failed' ? 'scheduled.failure' : 'scheduled', actor: 'automation', title: input.title || input.jobId || 'Lyra update', status: input.status || 'completed', envelope, metadata: { jobId: input.jobId, runId: input.runId, deliveryBridge: input.deliveryBridge } });
-    if (input.newsBrief) {
-      newsBrief = input.newsBrief;
+    const embeddedNewsBrief = envelope.blocks.find(block => block.type === 'news_brief');
+    const incomingBrief = input.newsBrief || embeddedNewsBrief;
+    if (incomingBrief) {
+      newsBrief = incomingBrief;
       const incoming = normaliseNewsBrief(newsBrief);
       const byId = new Map(newsItems.map(item => [item.id, item]));
       for (const item of incoming) byId.set(item.id, { ...byId.get(item.id), ...item });
@@ -226,6 +228,15 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
       items: data.items || [],
       sources: data.sources || [],
       warnings: data.warnings || [],
+    };
+  }
+
+  async function appHealth() {
+    const data = await dataProvider();
+    return {
+      generatedAt: now(),
+      sources: (data.sources || []).map(source => ({ name: source.name || 'Lyra source', status: source.status || 'unknown', asOf: source.asOf || null })),
+      pendingQuestions: [...questions.values()].filter(question => question.status === 'pending').length,
     };
   }
 
@@ -341,9 +352,14 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     return conversation;
   }
 
-  async function sendMessage(id, text, onEvent = () => {}) {
+  async function sendMessage(id, text, onEvent = () => {}, idempotencyKey, context = {}) {
     const conversation = getConversation(id);
-    const userMessage = { id: randomUUID(), role: 'user', content: text, createdAt: now() };
+    const existingIndex = idempotencyKey ? conversation.messages.findIndex(message => message.idempotencyKey === idempotencyKey) : -1;
+    if (existingIndex >= 0) {
+      const existingAssistant = conversation.messages.slice(existingIndex + 1).find(message => message.role === 'assistant');
+      if (existingAssistant) { onEvent({ type: 'message.completed', messageId: existingAssistant.id, sequence: 1, occurredAt: now(), message: existingAssistant }); return existingAssistant; }
+    }
+    const userMessage = { id: randomUUID(), role: 'user', content: text, createdAt: now(), idempotencyKey };
     const assistantMessageId = randomUUID();
     let sequence = 0;
     const emit = async (type, payload = {}) => onEvent({ type, messageId: assistantMessageId, sequence: ++sequence, occurredAt: now(), ...payload });
@@ -354,16 +370,18 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     await emit('message.started', { message: userMessage });
     await emit('tool.started', { name: 'lyra-context', label: 'Checking trusted context' });
     const data = await dataProvider();
+    const selectedNews = context.newsItemId ? newsItems.find(item => item.id === context.newsItemId) : null;
+    const groundedContext = selectedNews ? { ...data, selectedNews: { id: selectedNews.id, headline: selectedNews.headline, summary: selectedNews.summary, whyItMatters: selectedNews.whyItMatters, source: selectedNews.source, sourceUrl: selectedNews.sourceUrl, publishedAt: selectedNews.publishedAt } } : data;
     await emit('tool.completed', { name: 'lyra-context', label: 'Context ready', sourceCount: (data.sources || []).length });
     const fallback = data.warnings?.length
       ? `I’m here. ${data.warnings.join(' ')}`
       : `I found ${data.items?.length || 0} items in your current Lyra context. Ask me to prioritise, explain, or act on one of them.`;
-    const content = await agentRunner({ conversation, text, context: data, fallback });
+    const content = await agentRunner({ conversation, text, context: groundedContext, fallback });
     const assistantMessage = { id: assistantMessageId, role: 'assistant', content, createdAt: now(), sources: data.sources || [], envelope: normalizeAgentOutput(content, { eventId: id, source: 'OpenClaw' }) };
     conversation.messages.push(assistantMessage);
     conversation.updatedAt = now();
     persist();
-    addEvent({ id: assistantMessage.id, eventType: 'message', actor: 'assistant', title: 'Lyra', envelope: assistantMessage.envelope, metadata: { conversationId: id } });
+    addEvent({ id: assistantMessage.id, eventType: 'message', actor: 'assistant', title: 'Lyra', envelope: assistantMessage.envelope, metadata: { conversationId: id, ...(selectedNews ? { newsItemId: selectedNews.id } : {}) } });
     for (const chunk of String(content).match(/.{1,180}(?:\s|$)/gs) || [String(content)]) await emit('message.delta', { content: chunk });
     await emit('message.completed', { message: assistantMessage });
     return assistantMessage;
@@ -371,6 +389,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
 
   return {
     today,
+    appHealth,
     metrics,
     previewAction,
     commitAction,

@@ -9,12 +9,15 @@ import { createChannelAdapter } from '../app/channels.js';
 import { createPasskeyAuth } from '../app/auth.js';
 import { createActionHandler } from '../app/integrations.js';
 import { extractText, senderId } from '../scripts/telegram-lyra-bridge.mjs';
-import { assertLyraEnvelope, normalizeAgentOutput } from '../app/schemas.js';
+import { assertLyraEnvelope, formatEnvelopeForFallback, normalizeAgentOutput } from '../app/schemas.js';
 import { normaliseNewsBrief } from '../app/news.js';
 
 test('golden rich UI fixture conforms to the canonical envelope', async () => {
   const fixture = JSON.parse(await readFile(new URL('../docs/fixtures/lyra-ui-v1.golden.json', import.meta.url), 'utf8'));
-  for (const item of fixture.cases) assert.doesNotThrow(() => assertLyraEnvelope(item.envelope));
+  for (const item of fixture.cases) {
+    assert.doesNotThrow(() => assertLyraEnvelope(item.envelope));
+    assert.equal(formatEnvelopeForFallback(item.envelope), item.expected.fallbackText, item.id);
+  }
 });
 
 test('morning briefs become stable rich News items', () => {
@@ -22,6 +25,30 @@ test('morning briefs become stable rich News items', () => {
   assert.equal(item.headline, 'Payment rails change');
   assert.equal(item.topic, 'Fintech');
   assert.match(item.id, /^[a-f0-9]{24}$/);
+});
+
+test('a scheduled rich morning brief updates the Lyra stream and News from one canonical event', async () => {
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')) });
+  const envelope = {
+    schemaVersion: 1,
+    blocks: [
+      { id: 'briefing', type: 'briefing', title: 'Morning briefing', sections: [] },
+      { id: 'news', type: 'news_brief', date: '2026-08-17', title: 'Morning news', summary: 'One important story.', themes: ['Fintech'], items: [{ headline: 'Payment rails change', summary: 'A concise update.', topic: 'Fintech', sourceUrl: 'https://example.com/news' }] },
+    ], actions: [], provenance: [],
+  };
+  await api.ingestScheduled({ id: 'morning-brief-1', title: 'morning-digest-combine', envelope });
+  assert.equal(api.listFeed().events[0].id, 'morning-brief-1');
+  assert.equal((await api.news()).brief.title, 'Morning news');
+  assert.equal((await api.news()).items[0].headline, 'Payment rails change');
+});
+
+test('Ask Lyra news context resolves by stable item id, not copied page text', async () => {
+  let suppliedContext;
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), agentRunner: async ({ context, fallback }) => { suppliedContext = context.selectedNews; return fallback; } });
+  api.createConversation('Lyra', 'primary');
+  await api.ingestScheduled({ id: 'brief-for-context', envelope: { schemaVersion: 1, blocks: [{ id: 'news', type: 'news_brief', date: '2026-08-17', title: 'News', summary: 'Summary', themes: [], items: [{ id: 'story-1', headline: 'Stable story', summary: 'Safe summary', sourceUrl: 'https://example.com/story' }] }], actions: [], provenance: [] } });
+  await api.sendMessage('primary', 'What matters?', () => {}, 'news-context-message', { newsItemId: 'story-1' });
+  assert.deepEqual(suppliedContext, { id: 'story-1', headline: 'Stable story', summary: 'Safe summary', whyItMatters: '', source: 'Lyra morning brief', sourceUrl: 'https://example.com/story', publishedAt: '2026-08-17' });
 });
 
 test('structured content rejects unknown references and falls back safely', () => {
@@ -43,11 +70,29 @@ test('canonical feed and structured question settle once', async () => {
   assert.deepEqual((await api.answerQuestion(question.questionId, { answers: { day: 'Wed' } })).answers, { day: 'Tue' });
 });
 
+test('a retried message idempotency key creates one user and one assistant event', async () => {
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), agentRunner: async ({ fallback }) => fallback });
+  api.createConversation('Lyra', 'primary');
+  await api.sendMessage('primary', 'offline-safe message', () => {}, 'message-key-1');
+  await api.sendMessage('primary', 'offline-safe message', () => {}, 'message-key-1');
+  assert.equal(api.getConversation('primary').messages.length, 2);
+  assert.equal(api.listFeed().events.length, 2);
+});
+
 test('today preserves evidence and does not invent data', async () => {
   const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), dataProvider: async () => ({ items: [evidence({ id: 'r1', title: 'Call dentist', kind: 'reminder', source: 'Notion', detail: 'Due today', actions: ['complete'] })], sources: [] }) });
   const result = await api.today();
   assert.equal(result.items[0].source, 'Notion');
   assert.equal(result.items[0].confidence, 'verified');
+});
+
+test('app health exposes source status without private source data', async () => {
+  const api = createLyraApi({
+    storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')),
+    dataProvider: async () => ({ items: [], sources: [{ name: 'Notion reminders', status: 'current', asOf: '2026-08-17T00:00:00.000Z', privatePageId: 'do-not-return' }] }),
+  });
+  const health = await api.appHealth();
+  assert.deepEqual(health.sources, [{ name: 'Notion reminders', status: 'current', asOf: '2026-08-17T00:00:00.000Z' }]);
 });
 
 test('metrics summarize audit and durable usage signals', async () => {

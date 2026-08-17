@@ -124,6 +124,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && req.url === '/v1/today') return json(res, 200, await api.today());
+    if (req.method === 'GET' && req.url === '/v1/app-health') return json(res, 200, await api.appHealth());
     if (req.method === 'GET' && req.url === '/v1/metrics') return json(res, 200, await api.metrics());
     if (req.method === 'GET' && req.url.startsWith('/v1/feed')) {
       const parsed = new URL(req.url, 'http://lyra.local');
@@ -146,7 +147,7 @@ const server = http.createServer(async (req, res) => {
       const conversationId = 'primary';
       if (!api._state.conversations.has(conversationId)) api.createConversation('Lyra', conversationId);
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
-      try { await api.sendMessage(conversationId, input.text || '', event => { sse(res, event); }); } catch (error) { sse(res, { type: 'error', message: error.message }); }
+      try { await api.sendMessage(conversationId, input.text || '', event => { sse(res, event); }, input.idempotencyKey, input.context); } catch (error) { sse(res, { type: 'error', message: error.message }); }
       return res.end();
     }
     if (req.method === 'GET' && req.url === '/v1/conversations') return json(res, 200, { conversations: api.listConversations() });
@@ -161,7 +162,7 @@ const server = http.createServer(async (req, res) => {
       const conversationId = req.url.split('/')[3];
       const input = await body(req);
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
-      try { await api.sendMessage(conversationId, input.text || '', event => { sse(res, event); }); } catch (error) { sse(res, { type: 'error', message: error.message }); }
+      try { await api.sendMessage(conversationId, input.text || '', event => { sse(res, event); }, input.idempotencyKey, input.context); } catch (error) { sse(res, { type: 'error', message: error.message }); }
       return res.end();
     }
     if (req.method === 'POST' && req.url === '/v1/actions') return json(res, 200, await api.previewAction(await body(req)));
