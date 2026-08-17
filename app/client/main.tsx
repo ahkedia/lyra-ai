@@ -93,10 +93,11 @@ function App() {
       try {
         if (mutation.kind === 'message') { const response = await fetch('/v1/messages', { method: 'POST', credentials: 'include', headers: authHeaders({ 'content-type': 'application/json' }), body: JSON.stringify(mutation.payload) }); if (!response.ok) throw new Error('Queued message was rejected'); await response.text(); }
         if (mutation.kind === 'action') { const preview = await request<{ id: string }>('/v1/actions', { method: 'POST', body: JSON.stringify(mutation.payload) }); await request(`/v1/actions/${preview.id}/commit`, { method: 'POST', body: '{}' }); }
+        if (mutation.kind === 'news') { const payload = mutation.payload as { id: string; operation: 'read' | 'save' | 'unsave' }; await request(`/v1/news/items/${encodeURIComponent(payload.id)}/${payload.operation === 'read' ? 'read' : 'save'}`, { method: payload.operation === 'unsave' ? 'DELETE' : 'POST', body: '{}' }); }
         await removeMutation(mutation.id);
       } catch (error) { await updateMutation(mutation.id, { attempts: mutation.attempts + 1, error: error instanceof Error ? error.message : 'Retry failed' }); break; }
     }
-    refreshPending(); void feed.load(); void tasks.load();
+    refreshPending(); void feed.load(); void tasks.load(); void news.load();
   };
   useEffect(() => { refreshPending(); void flushPending(); const online = () => { void flushPending(); }; window.addEventListener('online', online); return () => window.removeEventListener('online', online); }, []);
   useEffect(() => {
@@ -263,8 +264,8 @@ function NewsScreen({ data, status, refresh, setData, onAsk, onToast }: { data: 
   const topics = ['For you', ...(data.topics || [])];
   const items = data.items.filter(item => topic === 'For you' || item.topic === topic);
   const update = (id: string, patch: Partial<NewsItem>) => setData({ ...data, items: data.items.map(item => item.id === id ? { ...item, ...patch } : item) });
-  const persistRead = (item: NewsItem) => { update(item.id, { read: true }); void request(`/v1/news/items/${encodeURIComponent(item.id)}/read`, { method: 'POST', body: '{}' }).catch(() => onToast({ text: 'Read state will retry when you reconnect.' })); };
-  const toggleSaved = (item: NewsItem) => { const saved = !item.saved; update(item.id, { saved }); void request(`/v1/news/items/${encodeURIComponent(item.id)}/save`, { method: saved ? 'POST' : 'DELETE', body: '{}' }).catch(() => onToast({ text: 'Saved state will retry when you reconnect.' })); };
+  const persistRead = (item: NewsItem) => { update(item.id, { read: true }); void request(`/v1/news/items/${encodeURIComponent(item.id)}/read`, { method: 'POST', body: '{}' }).catch(async () => { await queueMutation({ id: `news:read:${item.id}`, kind: 'news', payload: { id: item.id, operation: 'read' } }); onToast({ text: 'Read state will retry when you reconnect.' }); }); };
+  const toggleSaved = (item: NewsItem) => { const saved = !item.saved; update(item.id, { saved }); void request(`/v1/news/items/${encodeURIComponent(item.id)}/save`, { method: saved ? 'POST' : 'DELETE', body: '{}' }).catch(async () => { await queueMutation({ id: `news:save:${item.id}`, kind: 'news', payload: { id: item.id, operation: saved ? 'save' : 'unsave' } }); onToast({ text: 'Saved state will retry when you reconnect.' }); }); };
   return <div class="news-screen">
     <header class="screen-heading"><div><h1>News</h1><p>{data.refreshedAt ? `Updated ${clock(data.refreshedAt)}` : 'Your focused briefing'}</p></div><button class="text-button" onClick={() => void refresh(true)}>Refresh</button></header>
     {data.brief && <article class="news-lead"><p class="block-eyebrow">{data.brief.kind === 'live_feed' ? 'Live sources' : data.brief.date || 'Morning brief'}</p><h2>{data.brief.title || 'Your briefing'}</h2><p>{data.brief.summary}</p>{data.brief.themes?.length ? <div class="topic-row">{data.brief.themes.map(theme => <span>{theme}</span>)}</div> : null}</article>}

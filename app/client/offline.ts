@@ -4,7 +4,7 @@ const DB_VERSION = 1;
 type StoredValue<T> = { key: string; value: T; updatedAt: string };
 export type PendingMutation = {
   id: string;
-  kind: 'message' | 'action';
+  kind: 'message' | 'action' | 'news';
   payload: Record<string, unknown>;
   createdAt: string;
   attempts: number;
