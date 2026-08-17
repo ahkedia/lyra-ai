@@ -24,7 +24,7 @@ for (const job of jobs.filter(item => item.enabled && item.name !== 'lyra-pwa-cr
   const status = entry.status === 'ok' ? 'completed' : 'failed';
   const summary = clean(entry.summary || entry.diagnostics?.summary);
   if (!summary || summary === 'SKIP') { state.delivered[job.id] = entry.ts; continue; }
-  const response = await fetch(endpoint, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ id: `openclaw-cron:${job.id}:${entry.ts}`, jobId: job.id, runId: String(entry.ts), title: job.name, status, text: summary, finishedAt: entry.tsIso || new Date(entry.ts).toISOString() }) });
+  const response = await fetch(endpoint, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ id: `openclaw-cron:${job.id}:${entry.ts}`, jobId: job.id, runId: String(entry.ts), title: job.name, status, text: summary, finishedAt: entry.tsIso || new Date(entry.ts).toISOString(), deliveryBridge: 'openclaw-cron' }) });
   if (!response.ok) throw new Error(`PWA delivery failed for ${job.name}: ${response.status}`);
   state.delivered[job.id] = entry.ts;
   delivered += 1;

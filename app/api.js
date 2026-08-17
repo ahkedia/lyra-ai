@@ -113,6 +113,15 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     return event;
   }
 
+  function clearCronBackfill() {
+    let removed = 0;
+    for (const [id, event] of events) {
+      if (id.startsWith('openclaw-cron:') || event.metadata?.deliveryBridge === 'openclaw-cron') { events.delete(id); removed += 1; }
+    }
+    if (removed) persist();
+    return { removed };
+  }
+
   async function createQuestion(payload, { eventId = randomUUID() } = {}) {
     const question = { ...payload, questionId: payload.questionId || randomUUID(), status: 'pending', version: 1, createdAt: payload.createdAt || now(), answers: {} };
     question.expiresAt ||= new Date(Date.parse(question.createdAt) + Number(question.ttlSeconds || 86400) * 1000).toISOString();
@@ -172,7 +181,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     const existing = events.get(String(id));
     if (existing) return existing;
     const envelope = normalizeAgentOutput(input.envelope || input.output || input.text || input.message || input.summary || '', { eventId: String(id), source: 'OpenClaw' });
-    const event = addEvent({ id: String(id), eventType: input.status === 'failed' ? 'scheduled.failure' : 'scheduled', actor: 'automation', title: input.title || input.jobId || 'Lyra update', status: input.status || 'completed', envelope, metadata: { jobId: input.jobId, runId: input.runId } });
+    const event = addEvent({ id: String(id), eventType: input.status === 'failed' ? 'scheduled.failure' : 'scheduled', actor: 'automation', title: input.title || input.jobId || 'Lyra update', status: input.status || 'completed', envelope, metadata: { jobId: input.jobId, runId: input.runId, deliveryBridge: input.deliveryBridge } });
     if (input.newsBrief) {
       newsBrief = input.newsBrief;
       const incoming = normaliseNewsBrief(newsBrief);
@@ -373,6 +382,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     sendMessage,
     listFeed,
     getEvent,
+    clearCronBackfill,
     createQuestion,
     answerQuestion,
     ingestScheduled,

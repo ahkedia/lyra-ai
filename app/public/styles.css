@@ -672,6 +672,39 @@ dialog::backdrop {
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 .settings-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; align-items: end; background: #1b241c66; }
 .v3-settings { width: 100%; max-width: 520px; margin: 0 auto; border-radius: 22px 22px 0 0; padding: 20px max(18px, env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)); box-shadow: 0 -12px 36px #0002; }
+
+/* Conversation-first mobile surface. Scheduled work is presented as Lyra, never as an operations console. */
+.conversation-screen { padding-top: 12px; padding-bottom: 148px; }
+.conversation-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: 34px; margin: 0 0 14px; color: var(--muted); font-size: 13px; font-weight: 650; }
+.conversation-toolbar .refresh-button { padding: 6px 0; }
+.event-stream { gap: 22px; }
+.event-card { display: flex; grid-template-columns: none; gap: 9px; align-items: flex-start; max-width: 100%; }
+.event-card .event-avatar { flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; background: #f1f2f2; color: var(--accent); }
+.event-card .event-body { max-width: calc(100% - 42px); min-width: 0; padding: 11px 13px; border: 1px solid #e9e9ed; border-radius: 18px 18px 18px 5px; background: #f7f7f8; box-shadow: none; }
+.event-card .event-meta { margin: 0 0 7px; font-size: 12px; }
+.event-card .event-meta .event-title { font-weight: 700; }
+.event-card.user { flex-direction: row-reverse; }
+.event-card.user .event-avatar { display: none; }
+.event-card.user .event-body { max-width: 82%; border-color: #0d9b79; border-radius: 18px 18px 5px 18px; background: #10a37f; color: #fff; }
+.event-card.user .event-meta { justify-content: flex-end; color: #d5f5ea; }
+.event-card.user .event-title { color: #fff; }
+.event-card.user .block, .event-card .block { margin: 0; }
+.event-card .rich-text { font-size: 16px; line-height: 1.45; }
+.event-card .rich-text br + br { display: block; content: ''; margin-top: 7px; }
+.event-card.scheduled .event-body { background: #fff; border-color: #e4e8e6; }
+.cron-label { display: inline-flex; margin: 0 0 7px; color: #087f5b; font-size: 11px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.cron-card { display: grid; gap: 5px; }
+.cron-card span { color: #9a6700; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.cron-card h3, .cron-card p { margin: 0; }
+.cron-card p { color: var(--muted); font-size: 14px; line-height: 1.4; }
+.composer-wrap { position: fixed; z-index: 5; bottom: calc(68px + env(safe-area-inset-bottom)); left: max(14px, calc((100vw - 760px) / 2)); right: max(14px, calc((100vw - 760px) / 2)); padding: 12px 0 0; background: linear-gradient(180deg, #ffffff00, #fff 28%); }
+.composer { box-shadow: 0 5px 24px #0b1e1817; border-radius: 21px; }
+.composer-tools { padding: 0 4px; }
+@media (max-width: 430px) {
+  .conversation-screen { padding-bottom: 154px; }
+  .event-card .event-body { padding: 11px 12px; }
+  .composer-wrap { bottom: calc(70px + env(safe-area-inset-bottom)); left: 14px; right: 14px; }
+}
 .event-card, .reminder-row, .news-card, .toast { transition: opacity 160ms ease, transform 180ms ease, background-color 160ms ease; }
 .event-card.pending .event-body { opacity: .72; }
 .event-card.pending .event-meta::after { content: '…'; color: var(--accent); font-weight: 700; }
