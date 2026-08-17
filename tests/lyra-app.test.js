@@ -299,6 +299,14 @@ test('action handler failures are explicit and never reported as committed', asy
   assert.equal(result.error, 'Provider unavailable');
 });
 
+test('source conflicts remain conflicts instead of being reported as failures', async () => {
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), actionHandler: async () => ({ status: 'conflict', error: 'Changed in Notion' }) });
+  const preview = await api.previewAction({ type: 'update_reminder', targetId: 'r1', idempotencyKey: 'conflict-r1', payload: { title: 'Call dentist' } });
+  const result = await api.commitAction(preview.id);
+  assert.equal(result.status, 'conflict');
+  assert.equal(result.error, 'Changed in Notion');
+});
+
 test('live action adapter fails explicitly when a source is not configured', async () => {
   const handler = createActionHandler({ repoRoot: process.cwd() });
   const previousKey = process.env.NOTION_API_KEY;

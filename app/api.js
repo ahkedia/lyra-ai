@@ -446,6 +446,15 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     let execution;
     try { execution = await actionHandler(action); }
     catch (error) { execution = { status: 'failed', error: error.message }; }
+    if (execution?.status === 'conflict') {
+      action.status = 'conflict';
+      action.conflictedAt = now();
+      action.error = execution.error || 'The source changed before this action could be applied';
+      action.execution = execution;
+      persist();
+      await audit({ type: 'action.conflict', actionId, actionType: action.type, targetId: action.targetId, error: action.error });
+      return action;
+    }
     if (!execution || execution.status !== 'completed') {
       action.status = 'failed';
       action.failedAt = now();
