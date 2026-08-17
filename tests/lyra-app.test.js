@@ -186,6 +186,14 @@ test('actions validate type, deduplicate idempotency keys, and support undo', as
   assert.match(await readFile(path.join(dir, 'audit.jsonl'), 'utf8'), /action\.undo/);
 });
 
+test('a provider failure leaves a completed reminder completed when undo cannot reopen it', async () => {
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), actionHandler: async action => action.type === 'reopen' ? { status: 'failed', error: 'Notion is unavailable' } : { status: 'completed' } });
+  const action = await api.previewAction({ type: 'complete', targetId: 'r1', payload: { source: 'Notion reminders' } });
+  await api.commitAction(action.id);
+  await assert.rejects(() => api.undoAction(action.id), /Notion is unavailable/);
+  assert.equal(action.status, 'committed');
+});
+
 test('action handler failures are explicit and never reported as committed', async () => {
   const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), actionHandler: async () => ({ status: 'failed', error: 'Provider unavailable' }) });
   const preview = await api.previewAction({ type: 'complete', targetId: 'notion-1', payload: { source: 'Notion' } });

@@ -13,7 +13,7 @@ const DEFAULT_STORE = path.resolve(process.env.LYRA_APP_DATA_DIR || '.lyra-app')
 
 const now = () => new Date().toISOString();
 const runFile = promisify(execFile);
-const ACTION_TYPES = new Set(['complete', 'reopen', 'dismiss', 'snooze', 'reply', 'create_reminder', 'schedule', 'open', 'retry', 'undo', 'submit_answer']);
+const ACTION_TYPES = new Set(['complete', 'reopen', 'dismiss', 'snooze', 'reply', 'create_reminder', 'update_reminder', 'schedule', 'open', 'retry', 'undo', 'submit_answer']);
 
 function evidence({ id, title, kind, status = 'open', dueAt, source = 'Lyra', asOf = now(), confidence = 'verified', detail, actions = [] }) {
   return { id, title, kind, status, dueAt, source, asOf, confidence, detail, actions };
@@ -358,8 +358,17 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     if (!action) throw new Error('Action not found');
     if (action.status === 'undone') return action;
     if (action.status !== 'committed') throw new Error(`Action is ${action.status}`);
+    let execution;
+    try { execution = await actionHandler({ ...action, type: action.type === 'complete' ? 'reopen' : 'undo' }); }
+    catch (error) { execution = { status: 'failed', error: error.message }; }
+    if (!execution || execution.status !== 'completed') {
+      action.error = execution?.error || 'Undo handler did not complete';
+      await audit({ type: 'action.undo.failed', actionId, actionType: action.type, targetId: action.targetId, error: action.error });
+      throw new Error(action.error);
+    }
     action.status = 'undone';
     action.undoneAt = now();
+    action.undoExecution = execution;
     persist();
     await audit({ type: 'action.undo', actionId, actionType: action.type, targetId: action.targetId });
     await queuePush({ type: 'action.undone', actionId, actionType: action.type, targetId: action.targetId });

@@ -34,6 +34,25 @@ export function createActionHandler({ repoRoot = process.cwd() } = {}) {
         return { status: 'completed', provider: 'Notion', sourceId: page.id };
       } catch (error) { return { status: 'failed', error: error.message || 'Notion reminder creation failed' }; }
     }
+    if (notionEnabled && action.type === 'update_reminder') {
+      const payload = action.payload || {};
+      const schema = await notionDataSource(process.env.NOTION_REMINDERS_DS_ID);
+      const titleProperty = Object.entries(schema.properties || {}).find(([, value]) => value.type === 'title')?.[0];
+      const dueProperty = process.env.NOTION_REMINDERS_DUE_PROPERTY || 'Due';
+      const flagProperty = process.env.NOTION_REMINDERS_FLAG_PROPERTY || 'Flagged';
+      const notesProperty = process.env.NOTION_REMINDERS_NOTES_PROPERTY || 'Notes';
+      const properties = {};
+      if (payload.title !== undefined) { if (!titleProperty) return { status: 'failed', error: 'The configured Notion reminder source has no title property' }; properties[titleProperty] = { title: [{ type: 'text', text: { content: String(payload.title) } }] }; }
+      if (payload.dueAt !== undefined) properties[dueProperty] = { date: payload.dueAt ? { start: String(payload.dueAt) } : null };
+      if (payload.flagged !== undefined) properties[flagProperty] = { checkbox: Boolean(payload.flagged) };
+      if (payload.notes !== undefined) properties[notesProperty] = { rich_text: String(payload.notes) ? [{ type: 'text', text: { content: String(payload.notes) } }] : [] };
+      if (!Object.keys(properties).length) return { status: 'failed', error: 'No reminder changes were supplied' };
+      try {
+        const response = await fetch(`https://api.notion.com/v1/pages/${action.targetId}`, { method: 'PATCH', headers: notionHeaders(), body: JSON.stringify({ properties }) });
+        if (!response.ok) return { status: 'failed', error: `Notion API ${response.status}` };
+        return { status: 'completed', provider: 'Notion' };
+      } catch (error) { return { status: 'failed', error: error.message || 'Notion reminder update failed' }; }
+    }
     if ((source.toLowerCase().includes('notion') || source === 'reminder') && notionEnabled && ['complete', 'dismiss', 'reopen'].includes(action.type)) {
       const doneProperty = process.env.NOTION_REMINDERS_DONE_PROPERTY || 'Done';
       const response = await fetch(`https://api.notion.com/v1/pages/${action.targetId}`, {
