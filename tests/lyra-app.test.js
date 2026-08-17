@@ -11,6 +11,11 @@ import { createActionHandler } from '../app/integrations.js';
 import { extractText, senderId } from '../scripts/telegram-lyra-bridge.mjs';
 import { assertLyraEnvelope, normalizeAgentOutput } from '../app/schemas.js';
 
+test('golden rich UI fixture conforms to the canonical envelope', async () => {
+  const fixture = JSON.parse(await readFile(new URL('../docs/fixtures/lyra-ui-v1.golden.json', import.meta.url), 'utf8'));
+  for (const item of fixture.cases) assert.doesNotThrow(() => assertLyraEnvelope(item.envelope));
+});
+
 test('structured content rejects unknown references and falls back safely', () => {
   assert.throws(() => assertLyraEnvelope({ schemaVersion: 1, blocks: [{ id: 'x', type: 'action_group', actionRefs: ['missing'] }], actions: [], provenance: [] }), /Unknown action reference/);
   const fallback = normalizeAgentOutput('<script>no</script>', { eventId: 'safe' });

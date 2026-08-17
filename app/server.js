@@ -128,7 +128,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && req.url === '/v1/tasks') return json(res, 200, await api.tasks());
     if (req.method === 'GET' && req.url.startsWith('/v1/news')) return json(res, 200, await api.news());
-    if (req.method === 'GET' && /^\/v1\/questions\/[^/]+$/.test(req.url)) return json(res, 200, api._state.questions.get(req.url.split('/')[3]));
+    if (req.method === 'GET' && /^\/v1\/questions\/[^/]+$/.test(req.url)) {
+      const question = api._state.questions.get(req.url.split('/')[3]);
+      return question ? json(res, 200, question) : json(res, 404, { error: 'Question not found' });
+    }
     if (req.method === 'POST' && /^\/v1\/questions\/[^/]+\/answer$/.test(req.url)) return json(res, 200, await api.answerQuestion(req.url.split('/')[3], await body(req)));
     if (req.method === 'POST' && req.url === '/v1/messages') {
       const input = await body(req);
