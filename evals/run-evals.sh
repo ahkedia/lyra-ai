@@ -51,6 +51,7 @@ export EVAL_MAX_RETRIEVAL_JUDGE_FAILURES="${EVAL_MAX_RETRIEVAL_JUDGE_FAILURES:-0
 DAY_OF_MONTH=$(date -u +%-d)
 FORCE_FULL="${1:-}"
 IS_FULL_EVAL_DAY=false
+ALLOW_LIVE_EVALS="${EVAL_ALLOW_LIVE_EVALS:-0}"
 
 if [ "$FORCE_FULL" = "--force" ]; then
   IS_FULL_EVAL_DAY=true
@@ -62,6 +63,14 @@ elif [ $((DAY_OF_MONTH % 2)) -eq 1 ]; then
 else
   echo "Mode: Routing-only (even day: $DAY_OF_MONTH) — full eval skipped to save costs"
   echo "  Tip: Run with --force to override"
+fi
+
+# The connected gateway and Notion workspace are production systems. Full agent
+# evals must remain opt-in until they are moved to dedicated sandbox databases.
+# Routing checks below are offline and safe to retain on the daily schedule.
+if [ "$IS_FULL_EVAL_DAY" = true ] && [ "$ALLOW_LIVE_EVALS" != "1" ]; then
+  IS_FULL_EVAL_DAY=false
+  echo "Mode: Routing-only — live agent evals are quarantined (set EVAL_ALLOW_LIVE_EVALS=1 only for a sandbox run)"
 fi
 echo ""
 
