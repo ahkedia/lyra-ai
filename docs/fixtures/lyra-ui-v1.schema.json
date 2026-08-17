@@ -1,0 +1,501 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wa.akashkedia.com/schemas/lyra-ui-v1.schema.json",
+  "title": "Lyra UI v1 response envelope",
+  "description": "Normative structured response contract shared by the PWA renderer and fallback-channel formatters.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "blocks", "actions", "provenance"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "blocks": {
+      "type": "array",
+      "maxItems": 40,
+      "items": { "$ref": "#/$defs/contentBlock" }
+    },
+    "actions": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "provenance": {
+      "type": "array",
+      "maxItems": 50,
+      "items": { "$ref": "#/$defs/provenance" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "shortText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "longText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20000
+    },
+    "safeUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "sourceRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "sourceType", "asOf", "freshness", "confidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "source": { "$ref": "#/$defs/shortText" },
+        "sourceType": {
+          "enum": ["notion", "calendar", "gmail", "web", "openclaw", "user", "system"]
+        },
+        "title": { "$ref": "#/$defs/shortText" },
+        "url": { "$ref": "#/$defs/safeUrl" },
+        "asOf": { "type": "string", "format": "date-time" },
+        "freshness": { "enum": ["current", "stale", "unknown", "unavailable"] },
+        "confidence": { "enum": ["verified", "inferred", "unverified"] }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "actionType", "status", "requiresConfirmation"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/shortText" },
+        "actionType": {
+          "enum": ["complete", "reopen", "dismiss", "snooze", "reply", "create_reminder", "schedule", "open", "retry", "undo"]
+        },
+        "targetId": { "$ref": "#/$defs/id" },
+        "status": { "enum": ["available", "preview", "pending", "completed", "failed", "undone", "disabled"] },
+        "requiresConfirmation": { "type": "boolean" },
+        "disabledReason": { "$ref": "#/$defs/shortText" }
+      }
+    },
+    "richTextBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "markdown"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "rich_text" },
+        "markdown": { "$ref": "#/$defs/longText" },
+        "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "bulletListBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "items"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "bullet_list" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/shortText" }
+        },
+        "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "numberedListBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "items"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "numbered_list" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/shortText" }
+        },
+        "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "checklistItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "checked"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/shortText" },
+        "checked": { "type": "boolean" },
+        "actionId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "checklistBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "items"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "checklist" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/checklistItem" }
+        },
+        "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "calloutBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "tone", "body"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "callout" },
+        "tone": { "enum": ["info", "warning", "success", "error"] },
+        "title": { "$ref": "#/$defs/shortText" },
+        "body": { "$ref": "#/$defs/longText" },
+        "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "value"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/shortText" },
+        "value": { "type": ["string", "number"] },
+        "unit": { "type": "string", "maxLength": 40 },
+        "delta": { "type": ["string", "number"] },
+        "trend": { "enum": ["up", "down", "flat", "neutral"] }
+      }
+    },
+    "metricGroupBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "metrics"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "metric_group" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/metric" }
+        },
+        "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "chartPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "value"],
+      "properties": {
+        "label": { "$ref": "#/$defs/shortText" },
+        "value": { "type": "number" }
+      }
+    },
+    "chartSeries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "points"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/shortText" },
+        "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/chartPoint" }
+        }
+      }
+    },
+    "chartBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "chartType", "title", "summary", "series", "sourceRefs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "chart" },
+        "chartType": { "enum": ["bar", "line", "donut"] },
+        "title": { "$ref": "#/$defs/shortText" },
+        "summary": { "$ref": "#/$defs/shortText" },
+        "xAxis": { "$ref": "#/$defs/shortText" },
+        "unit": { "type": "string", "maxLength": 40 },
+        "series": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": { "$ref": "#/$defs/chartSeries" }
+        },
+        "sourceRefs": {
+          "allOf": [
+            { "$ref": "#/$defs/sourceRefs" },
+            { "type": "array", "minItems": 1 }
+          ]
+        }
+      }
+    },
+    "tableColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label"],
+      "properties": {
+        "key": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/shortText" },
+        "align": { "enum": ["left", "center", "right"] }
+      }
+    },
+    "tableCell": { "type": ["string", "number", "boolean", "null"] },
+    "tableRow": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/tableCell" }
+    },
+    "tableBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "columns", "rows"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "table" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/tableColumn" }
+        },
+        "rows": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/tableRow" }
+        },
+        "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "imageObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "alt"],
+      "properties": {
+        "url": { "$ref": "#/$defs/safeUrl" },
+        "alt": { "$ref": "#/$defs/shortText" }
+      }
+    },
+    "imageBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "url", "alt"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "image" },
+        "url": { "$ref": "#/$defs/safeUrl" },
+        "alt": { "$ref": "#/$defs/shortText" },
+        "caption": { "$ref": "#/$defs/shortText" },
+        "sourceRef": { "$ref": "#/$defs/id" }
+      }
+    },
+    "mediaBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "mediaType", "url", "title"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "media" },
+        "mediaType": { "enum": ["audio", "video", "file"] },
+        "url": { "$ref": "#/$defs/safeUrl" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "caption": { "$ref": "#/$defs/shortText" },
+        "mimeType": { "type": "string", "maxLength": 100 },
+        "sourceRef": { "$ref": "#/$defs/id" }
+      }
+    },
+    "sourceListBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "sourceRefs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "source_list" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "sourceRefs": {
+          "allOf": [
+            { "$ref": "#/$defs/sourceRefs" },
+            { "type": "array", "minItems": 1 }
+          ]
+        }
+      }
+    },
+    "actionGroupBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "actionRefs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "action_group" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "actionRefs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "briefingSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "blocks"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "blocks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/contentBlock" }
+        }
+      }
+    },
+    "briefingBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "title", "sections"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "briefing" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "subtitle": { "$ref": "#/$defs/shortText" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/briefingSection" }
+        },
+        "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "newsItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "topic", "headline", "summary", "sourceRefs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "topic": { "$ref": "#/$defs/shortText" },
+        "headline": { "$ref": "#/$defs/shortText" },
+        "summary": { "$ref": "#/$defs/longText" },
+        "whyItMatters": { "$ref": "#/$defs/longText" },
+        "image": { "$ref": "#/$defs/imageObject" },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "sourceRefs": {
+          "allOf": [
+            { "$ref": "#/$defs/sourceRefs" },
+            { "type": "array", "minItems": 1 }
+          ]
+        }
+      }
+    },
+    "newsBriefBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "date", "title", "summary", "themes", "items"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "news_brief" },
+        "date": { "type": "string", "format": "date" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "summary": { "$ref": "#/$defs/longText" },
+        "themes": {
+          "type": "array",
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/shortText" }
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 30,
+          "items": { "$ref": "#/$defs/newsItem" }
+        }
+      }
+    },
+    "taskSnapshotItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "completed", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "completed": { "type": "boolean" },
+        "dueAt": { "type": "string", "format": "date-time" },
+        "status": { "enum": ["current", "pending", "failed", "conflict", "stale"] },
+        "actionId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "taskSnapshotBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "title", "tasks"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "task_snapshot" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "tasks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/taskSnapshotItem" }
+        },
+        "sourceRefs": { "$ref": "#/$defs/sourceRefs" }
+      }
+    },
+    "codeBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "language", "code"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "code" },
+        "language": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "code": { "$ref": "#/$defs/longText" },
+        "caption": { "$ref": "#/$defs/shortText" }
+      }
+    },
+    "contentBlock": {
+      "oneOf": [
+        { "$ref": "#/$defs/richTextBlock" },
+        { "$ref": "#/$defs/bulletListBlock" },
+        { "$ref": "#/$defs/numberedListBlock" },
+        { "$ref": "#/$defs/checklistBlock" },
+        { "$ref": "#/$defs/calloutBlock" },
+        { "$ref": "#/$defs/metricGroupBlock" },
+        { "$ref": "#/$defs/chartBlock" },
+        { "$ref": "#/$defs/tableBlock" },
+        { "$ref": "#/$defs/imageBlock" },
+        { "$ref": "#/$defs/mediaBlock" },
+        { "$ref": "#/$defs/sourceListBlock" },
+        { "$ref": "#/$defs/actionGroupBlock" },
+        { "$ref": "#/$defs/briefingBlock" },
+        { "$ref": "#/$defs/newsBriefBlock" },
+        { "$ref": "#/$defs/taskSnapshotBlock" },
+        { "$ref": "#/$defs/codeBlock" }
+      ]
+    }
+  }
+}

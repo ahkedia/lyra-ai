@@ -362,7 +362,7 @@ The iOS system font stack is deliberate. It produces SF Pro in the installed PWA
 
 ## 8. Rich content component contract
 
-All Lyra output is represented as validated content blocks. The PWA renders the full component. Telegram and WhatsApp format the same block into their supported subset.
+All Lyra output is represented as validated content blocks. The PWA renders the full component. Telegram and WhatsApp format the same block into their supported subset. Every block requires the common fields `id` and `type`; the table lists the remaining required fields.
 
 ### 8.1 Block types
 
@@ -374,15 +374,15 @@ All Lyra output is represented as validated content blocks. The PWA renders the 
 | `checklist` | `items[{id,label,checked,actionId?}]` | Interactive check rows when action exists | Unicode checkbox list |
 | `callout` | `tone,title?,body` | Info/warning/success/error banner | Label plus text |
 | `metric_group` | `metrics[{label,value,delta?,unit?}]` | Compact metrics row; horizontally scrollable | Labeled lines |
-| `chart` | `chartType,title,series,xAxis?,unit?,sourceRefs[]` | Accessible SVG bar/line/donut chart | Compact data table |
+| `chart` | `chartType,title,summary,series,sourceRefs[]` | Accessible SVG bar/line/donut chart | Compact data table |
 | `table` | `columns,rows` | Scrollable table with sticky header when useful | Monospace/plain rows, truncated safely |
 | `image` | `url,alt,caption?,sourceRef?` | Responsive image with caption | Link plus caption |
 | `media` | `mediaType,url,title,caption?` | Audio/video/file control | Link |
-| `source_list` | `sources[]` | Source chips or expanded list | Numbered links |
-| `action_group` | `actions[]` | Buttons with preview/commit/status | Numbered action labels or omitted when unsafe |
+| `source_list` | `sourceRefs[]` | Source chips or expanded list | Numbered links |
+| `action_group` | `actionRefs[]` | Buttons with preview/commit/status | Numbered action labels or omitted when unsafe |
 | `briefing` | `title,sections[]` | Scheduled briefing container | Sectioned text |
-| `news_brief` | `date,summary,items[]` | Lyra summary plus News read-model input | Headline digest |
-| `task_snapshot` | `tasks[]` | Read-only embedded task list | Checklist text |
+| `news_brief` | `date,title,summary,themes[],items[]` | Lyra summary plus News read-model input | Headline digest |
+| `task_snapshot` | `title,tasks[]` | Read-only embedded task list | Checklist text |
 | `code` | `language,code` | Escaped code with copy button | Fenced code |
 
 ### 8.2 Validation limits
@@ -402,6 +402,138 @@ All Lyra output is represented as validated content blocks. The PWA renders the 
 - Include a text summary and an expandable data table.
 - Do not communicate meaning by color alone.
 - Values derived from external data require source references and an `asOf` timestamp.
+
+### 8.4 Normative schema artifacts
+
+The component contract is executable and versioned in two files:
+
+- [`docs/fixtures/lyra-ui-v1.schema.json`](fixtures/lyra-ui-v1.schema.json) is the normative JSON Schema for the complete response envelope and all 16 block types.
+- [`docs/fixtures/lyra-ui-v1.golden.json`](fixtures/lyra-ui-v1.golden.json) contains one validated golden case per component, including component variants, exact DOM assertions, required text, interaction sizing, error states, network mocks, screenshot names, and exact Telegram/WhatsApp fallback text.
+
+Every block has a stable `id` and `type`. Every reference is by stable ID:
+
+- `sourceRefs` and `sourceRef` resolve against envelope `provenance`.
+- `actionRefs` and item-level `actionId` resolve against envelope `actions`.
+- Missing or duplicate references invalidate structured rendering and trigger safe-text fallback.
+- Nested briefing blocks may be at most two levels deep at runtime, even though the recursive schema permits composition.
+
+The implementation's Zod schemas must be behaviorally identical to the JSON Schema. A contract test loads every golden envelope and requires both validators to agree. Any schema change requires:
+
+1. Incrementing `schemaVersion` for a breaking change.
+2. Adding or updating a golden case.
+3. Updating both PWA and fallback-channel tests.
+4. Maintaining safe rendering for stored v1 events.
+
+### 8.5 Exact response envelope example
+
+Lyra may emit the following object directly or inside one fenced `lyra-ui` block. This is the smallest complete interactive example:
+
+```json
+{
+  "schemaVersion": 1,
+  "blocks": [
+    {
+      "id": "focus-summary",
+      "type": "rich_text",
+      "markdown": "Your **highest-leverage** task is to finish the launch brief.",
+      "sourceRefs": ["source-launch-plan"]
+    },
+    {
+      "id": "focus-actions",
+      "type": "action_group",
+      "title": "Actions",
+      "actionRefs": ["action-complete-brief"]
+    }
+  ],
+  "actions": [
+    {
+      "id": "action-complete-brief",
+      "label": "Complete reminder",
+      "actionType": "complete",
+      "targetId": "task-launch-brief",
+      "status": "available",
+      "requiresConfirmation": false
+    }
+  ],
+  "provenance": [
+    {
+      "id": "source-launch-plan",
+      "source": "Launch plan",
+      "sourceType": "notion",
+      "title": "PWA launch",
+      "url": "https://example.com/launch-plan",
+      "asOf": "2026-08-17T07:00:00.000Z",
+      "freshness": "current",
+      "confidence": "verified"
+    }
+  ]
+}
+```
+
+The renderer receives the validated envelope plus an event context. It does not receive raw model output:
+
+```ts
+type RenderContext = {
+  eventId: string;
+  locale: "en-GB";
+  timeZone: "Europe/Berlin";
+  actionsById: Map<string, LyraActionReference>;
+  provenanceById: Map<string, Provenance>;
+  onAction: (actionId: string) => Promise<void>;
+};
+
+renderBlocks(envelope.blocks, context): DocumentFragment;
+formatBlocksForFallback(envelope, { channel: "telegram" | "whatsapp" }): string;
+```
+
+No component may fetch source or action data independently. This keeps the rendered PWA and fallback text tied to the same canonical event.
+
+### 8.6 Golden rendering rules
+
+The golden fixture fixes the following test contract:
+
+- Component gallery route: `/app/dev/components`, available only outside production.
+- Viewports: 390×844 light, 390×844 dark, and 768×1024 light.
+- Stable block root attributes: `data-block-id` and `data-block-type`.
+- Screenshot path: `tests/golden/lyra-ui-v1/<case-id>--<viewport-id>.png`.
+- Required checks before screenshot comparison: schema validation, reference integrity, DOM selector counts, text assertions, accessible names/roles, and 44 px interactive targets.
+- Exact fallback text in each case is a channel-formatter golden, not illustrative copy.
+- Broken image state, disabled action state, stale task state, chart data table, nested briefing blocks, and escaped hostile HTML are mandatory fixture assertions.
+- A screenshot baseline may be created only after design review approves the component gallery. Future differences require intentional review; the test command must never overwrite baselines automatically.
+
+Fixture fields are evaluated as follows:
+
+- Each `case` renders in an isolated host. No selectors may match navigation, another case, or test-runner chrome.
+- `expected.root` must match at least one element and every matched root must carry the declared block ID/type attributes.
+- `expected.selectors[].count` is the exact count inside the isolated case host.
+- `expected.textIncludes[]` uses visible text, not `innerHTML`.
+- `expected.accessible[]` maps directly to Playwright role queries. `name` is exact, `nameIncludes` is a substring, and `checked`/`disabled` are required state filters.
+- `expected.minimumInteractiveSize` applies to every enabled button, link, checkbox, or media control in that case.
+- `networkMocks[].response.body` is returned as UTF-8; `bodyBase64` is decoded before response. No golden depends on the public network.
+- `expected.errorState.action: abort-image-request` rerenders the same case with the image request aborted, then evaluates the error-state assertions.
+- `expected.fallbackText` must match byte-for-byte after normalizing line endings to `\n` and trimming one trailing newline.
+- Screenshot comparison uses reduced motion, loaded fonts, completed mocked media requests, and a zero-animation settling frame.
+
+The fixture contains the following cases:
+
+| Golden case | Coverage |
+|---|---|
+| `rich-text` | Heading, emphasis, external link, inline code, hostile HTML escaping, source reference |
+| `bullet-list` | Semantic unordered list and exact fallback bullets |
+| `numbered-list` | Semantic ordered list and deterministic numbering |
+| `checklist` | Checked/unchecked state, actionable item, source, 44 px target |
+| `callout-tones` | Info, warning, success, and error roles/tones |
+| `metric-group` | Values, units, deltas, and trends |
+| `chart-variants` | Bar, line, donut, SVG accessibility, data-table fallback |
+| `table` | Column alignment, null cell, scrolling table semantics |
+| `image` | Alt text, caption, lazy loading, source, failed-image state |
+| `media-variants` | Audio, video, and file link |
+| `source-list` | Two linked sources, timestamps, confidence/freshness data |
+| `action-group` | Available, completed, and disabled actions |
+| `briefing` | Nested rich text and list sections |
+| `news-brief` | Lead summary, themes, image, multi-source story, why-it-matters |
+| `task-snapshot` | Open, completed, stale, due time, actionable task |
+| `code` | Escaped code, language metadata, caption, copy target |
 
 ## 9. Canonical domain model
 
@@ -920,7 +1052,9 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 
 ### 19.1 Unit tests
 
-- Every Zod schema: valid case, missing required field, unknown block, limit overflow.
+- Compile `docs/fixtures/lyra-ui-v1.schema.json` in strict JSON Schema 2020-12 mode.
+- Validate all 16 envelopes in `docs/fixtures/lyra-ui-v1.golden.json` against JSON Schema and Zod; both validators must agree.
+- Every Zod schema: valid case, missing required field, extra field, duplicate ID, broken source/action reference, unknown block, nesting overflow, and size-limit overflow.
 - Markdown-to-block normalization and structured-output fallback.
 - Safe URL handling and HTML escaping.
 - Chart scale, zero/negative data, series limits, and accessible table output.
@@ -930,7 +1064,7 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 - Cron envelope extraction for `summary`, `output`, `text`, `message`, and existing OpenClaw formats.
 - Idempotency-key derivation and duplicate detection.
 - Delivery eligibility, push suppression, retry schedule, and terminal subscription errors.
-- Telegram and WhatsApp block formatters.
+- Telegram and WhatsApp block formatters must equal every fixture's exact `fallbackText`.
 - Session hashing and expiry.
 
 ### 19.2 API integration tests
@@ -958,7 +1092,10 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 - Default launch opens Lyra.
 - Cached launch works offline.
 - Send text, observe progress, receive rich response, inspect sources.
-- Render every block type at phone and desktop widths.
+- Render the fixture gallery at every `viewportMatrix` entry and assert each case's exact DOM selectors and text before visual comparison.
+- Compare all 48 component screenshots: 16 cases × three viewports. Baselines cannot update in the ordinary test command.
+- Verify every fixture's accessible role/name, keyboard focus behavior, and declared 44 px minimum target.
+- Run fixture-declared error states and network mocks, including failed image layout.
 - Voice permission, record, stop, upload, transcription failure, and retry.
 - Scheduled event appears without page reload; push deep link scrolls to it.
 - To Do add, edit, complete, reopen, offline queue, provider failure, and conflict.
@@ -975,6 +1112,8 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 - Model never claims an action completed before the provider result.
 - Access-control regression suite passes for private and shared sources.
 - Malicious source text cannot inject a new system instruction or executable HTML.
+- At least 30 representative interactive and scheduled responses either validate as `lyra-ui` v1 or produce the specified safe-text fallback; no response may disappear because structured parsing failed.
+- The morning brief, task summary, metric/chart response, source-heavy research answer, media response, and action response each select the intended block type rather than flattening everything into `rich_text`.
 
 ### 19.5 Physical iPhone acceptance
 
@@ -1011,13 +1150,14 @@ The implementation should be sequential in one goal. The backend contracts must 
 
 ### Phase 1: Persistence and schemas
 
-1. Add Zod schemas.
-2. Add migration runner and v2 tables.
-3. Add repository, event feed, persistent sessions, and persistent push subscriptions.
-4. Import legacy conversations once into the primary stream.
-5. Add feed APIs and compatibility wrappers.
+1. Implement Zod schemas behaviorally identical to `docs/fixtures/lyra-ui-v1.schema.json`.
+2. Add schema-parity and golden-envelope contract tests before building renderers.
+3. Add migration runner and v2 tables.
+4. Add repository, event feed, persistent sessions, and persistent push subscriptions.
+5. Import legacy conversations once into the primary stream.
+6. Add feed APIs and compatibility wrappers.
 
-**Gate:** Integration tests prove restart persistence, pagination, idempotency, and rollback-safe migration.
+**Gate:** All 16 golden envelopes pass JSON Schema, Zod, ID uniqueness, reference integrity, and nesting-limit tests. Integration tests prove restart persistence, pagination, idempotency, and rollback-safe migration.
 
 ### Phase 2: Scheduled-event ingestion and delivery
 
@@ -1035,11 +1175,14 @@ The implementation should be sequential in one goal. The backend contracts must 
 
 1. Replace index/sidebar shell with Lyra, To Do, News tabs.
 2. Add native-module frontend structure and IndexedDB cache.
-3. Add rich block renderer and fixture gallery for all states.
-4. Add settings sheet and operational controls.
-5. Remove current Today and Spaces UI while keeping compatibility APIs temporarily.
+3. Build `/app/dev/components` from `docs/fixtures/lyra-ui-v1.golden.json`; return 404 in production.
+4. Add all 16 rich block renderers and exact Telegram/WhatsApp formatters.
+5. Pass fixture DOM, accessibility, error-state, target-size, and fallback-text assertions.
+6. Run design review on the complete gallery, then create the 48 approved screenshot baselines.
+7. Add settings sheet and operational controls.
+8. Remove current Today and Spaces UI while keeping compatibility APIs temporarily.
 
-**Gate:** E2E proves exact tab set, no drawer, cached launch, safe renderer, responsive layout, and accessible sheets.
+**Gate:** E2E proves exact tab set, no drawer, cached launch, safe renderer, responsive layout, and accessible sheets. Every golden component passes at all three viewports with no unreviewed screenshot difference.
 
 ### Phase 4: Lyra stream
 
@@ -1108,6 +1251,7 @@ The implementation goal is complete only when all statements are true:
 - The installed PWA has exactly Lyra, To Do, and News tabs, with Lyra default.
 - There is no sidebar, hamburger, Spaces view, Today dashboard, or prompt-card empty state.
 - Interactive conversation behaves like the Telegram experience but uses validated rich components.
+- Every Lyra UI v1 component and variant in the golden fixture passes schema, reference, DOM, accessibility, error-state, screenshot, and exact fallback-channel tests.
 - Scheduled messages appear automatically in the same Lyra stream and trigger eligible push notifications.
 - Every scheduled run has a durable completed, skipped, or failed record.
 - To Do completes the supported Notion reminder lifecycle and never fakes provider success.
@@ -1135,6 +1279,10 @@ Do not use Sol for implementation. The critical product and architecture decisio
 Implement Lyra PWA v2 end to end using:
 /Users/akashkedia/AI/lyra-ai/docs/16-lyra-pwa-v2-technical-spec.md
 
+The response/rendering contracts are normative:
+/Users/akashkedia/AI/lyra-ai/docs/fixtures/lyra-ui-v1.schema.json
+/Users/akashkedia/AI/lyra-ai/docs/fixtures/lyra-ui-v1.golden.json
+
 Treat the specification as the source of truth. Do not redesign the product or add
 frameworks/services that the spec excludes. Keep OpenClaw, the Node service, Notion,
 Postgres, passkeys, service worker, and current Hetzner deployment. Implement phases
@@ -1145,6 +1293,8 @@ Work autonomously and token-efficiently:
 - reuse existing API, action, provider, auth, push, channel, cron, and deployment code;
 - make small coherent patches;
 - use Zod validation and parameterized SQL;
+- make Zod, JSON Schema, the PWA renderer, and fallback formatters pass every golden fixture;
+- do not change fixture expectations or screenshot baselines merely to make a failing implementation pass;
 - preserve unrelated user changes and all private configuration;
 - never print or commit secrets, recipients, phone numbers, or live source IDs;
 - never fabricate success when a provider or model fails;

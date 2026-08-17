@@ -1,0 +1,791 @@
+{
+  "fixtureVersion": 1,
+  "schema": "./lyra-ui-v1.schema.json",
+  "description": "Golden inputs and deterministic rendering assertions for every Lyra UI v1 component.",
+  "viewportMatrix": [
+    { "id": "iphone-light", "width": 390, "height": 844, "colorScheme": "light", "reducedMotion": true },
+    { "id": "iphone-dark", "width": 390, "height": 844, "colorScheme": "dark", "reducedMotion": true },
+    { "id": "tablet-light", "width": 768, "height": 1024, "colorScheme": "light", "reducedMotion": true }
+  ],
+  "renderContract": {
+    "galleryRoute": "/app/dev/components",
+    "productionAvailability": false,
+    "blockRootAttributes": ["data-block-id", "data-block-type"],
+    "screenshotPattern": "<case-id>--<viewport-id>.png",
+    "snapshotRoot": "tests/golden/lyra-ui-v1",
+    "rules": [
+      "Every envelope must validate against lyra-ui-v1.schema.json before rendering.",
+      "Every DOM assertion is evaluated before a screenshot is accepted.",
+      "No model-authored raw HTML may become a DOM node.",
+      "Fallback text is an exact golden for Telegram and WhatsApp formatters.",
+      "Source and action references must resolve to the envelope arrays.",
+      "Screenshot differences require explicit design approval, never blind baseline replacement."
+    ]
+  },
+  "cases": [
+    {
+      "id": "rich-text",
+      "component": "RichTextBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-rich-text",
+            "type": "rich_text",
+            "markdown": "## Today\n\nYour **highest-leverage** task is to finish the brief. Read the [source](https://example.com/brief).\n\n`<script>alert('never')</script>`",
+            "sourceRefs": ["source-brief"]
+          }
+        ],
+        "actions": [],
+        "provenance": [
+          {
+            "id": "source-brief",
+            "source": "Project brief",
+            "sourceType": "notion",
+            "title": "Launch brief",
+            "url": "https://example.com/brief",
+            "asOf": "2026-08-17T07:00:00.000Z",
+            "freshness": "current",
+            "confidence": "verified"
+          }
+        ]
+      },
+      "expected": {
+        "root": "[data-block-id='gold-rich-text'][data-block-type='rich_text']",
+        "selectors": [
+          { "selector": "h2", "count": 1 },
+          { "selector": "strong", "count": 1 },
+          { "selector": "a[href='https://example.com/brief']", "count": 1 },
+          { "selector": "script", "count": 0 }
+        ],
+        "accessible": [
+          { "role": "heading", "name": "Today", "count": 1 },
+          { "role": "link", "name": "source", "count": 1 }
+        ],
+        "textIncludes": ["Today", "highest-leverage", "<script>alert('never')</script>"],
+        "fallbackText": "Today\n\nYour highest-leverage task is to finish the brief. Read the source: https://example.com/brief.\n\n<script>alert('never')</script>"
+      }
+    },
+    {
+      "id": "bullet-list",
+      "component": "BulletListBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-bullets",
+            "type": "bullet_list",
+            "items": ["Confirm the launch date", "Review the migration gate", "Send the final brief"]
+          }
+        ],
+        "actions": [],
+        "provenance": []
+      },
+      "expected": {
+        "root": "[data-block-id='gold-bullets'][data-block-type='bullet_list']",
+        "selectors": [
+          { "selector": "ul", "count": 1 },
+          { "selector": "ul > li", "count": 3 }
+        ],
+        "accessible": [
+          { "role": "list", "count": 1 },
+          { "role": "listitem", "count": 3 }
+        ],
+        "textIncludes": ["Confirm the launch date", "Review the migration gate", "Send the final brief"],
+        "fallbackText": "• Confirm the launch date\n• Review the migration gate\n• Send the final brief"
+      }
+    },
+    {
+      "id": "numbered-list",
+      "component": "NumberedListBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-numbered",
+            "type": "numbered_list",
+            "items": ["Open Lyra", "Review the brief", "Commit the action"]
+          }
+        ],
+        "actions": [],
+        "provenance": []
+      },
+      "expected": {
+        "root": "[data-block-id='gold-numbered'][data-block-type='numbered_list']",
+        "selectors": [
+          { "selector": "ol", "count": 1 },
+          { "selector": "ol > li", "count": 3 }
+        ],
+        "accessible": [
+          { "role": "list", "count": 1 },
+          { "role": "listitem", "count": 3 }
+        ],
+        "textIncludes": ["Open Lyra", "Review the brief", "Commit the action"],
+        "fallbackText": "1. Open Lyra\n2. Review the brief\n3. Commit the action"
+      }
+    },
+    {
+      "id": "checklist",
+      "component": "ChecklistBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-checklist",
+            "type": "checklist",
+            "title": "Launch checklist",
+            "items": [
+              { "id": "check-1", "label": "Verify production health", "checked": true },
+              { "id": "check-2", "label": "Enable PWA notifications", "checked": false, "actionId": "action-check-2" }
+            ],
+            "sourceRefs": ["source-plan"]
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-check-2",
+            "label": "Complete notification setup",
+            "actionType": "complete",
+            "targetId": "check-2",
+            "status": "available",
+            "requiresConfirmation": false
+          }
+        ],
+        "provenance": [
+          {
+            "id": "source-plan",
+            "source": "Launch plan",
+            "sourceType": "notion",
+            "asOf": "2026-08-17T07:00:00.000Z",
+            "freshness": "current",
+            "confidence": "verified"
+          }
+        ]
+      },
+      "expected": {
+        "root": "[data-block-id='gold-checklist'][data-block-type='checklist']",
+        "selectors": [
+          { "selector": "[role='checkbox']", "count": 2 },
+          { "selector": "[role='checkbox'][aria-checked='true']", "count": 1 },
+          { "selector": "[role='checkbox'][aria-checked='false']", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "checkbox", "name": "Verify production health", "checked": true, "count": 1 },
+          { "role": "checkbox", "name": "Enable PWA notifications", "checked": false, "count": 1 }
+        ],
+        "minimumInteractiveSize": 44,
+        "textIncludes": ["Launch checklist", "Verify production health", "Enable PWA notifications"],
+        "fallbackText": "Launch checklist\n☑ Verify production health\n☐ Enable PWA notifications"
+      }
+    },
+    {
+      "id": "callout-tones",
+      "component": "CalloutBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          { "id": "gold-callout-info", "type": "callout", "tone": "info", "title": "Context", "body": "Calendar data was refreshed two minutes ago." },
+          { "id": "gold-callout-warning", "type": "callout", "tone": "warning", "title": "Stale source", "body": "Email has not refreshed since yesterday." },
+          { "id": "gold-callout-success", "type": "callout", "tone": "success", "title": "Completed", "body": "The reminder was completed in Notion." },
+          { "id": "gold-callout-error", "type": "callout", "tone": "error", "title": "Delivery failed", "body": "Push delivery will retry automatically." }
+        ],
+        "actions": [],
+        "provenance": []
+      },
+      "expected": {
+        "root": "[data-block-type='callout']",
+        "selectors": [
+          { "selector": "[data-tone='info'][role='status']", "count": 1 },
+          { "selector": "[data-tone='warning'][role='status']", "count": 1 },
+          { "selector": "[data-tone='success'][role='status']", "count": 1 },
+          { "selector": "[data-tone='error'][role='alert']", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "status", "count": 3 },
+          { "role": "alert", "nameIncludes": "Delivery failed", "count": 1 }
+        ],
+        "textIncludes": ["Context", "Stale source", "Completed", "Delivery failed"],
+        "fallbackText": "INFO — Context: Calendar data was refreshed two minutes ago.\nWARNING — Stale source: Email has not refreshed since yesterday.\nSUCCESS — Completed: The reminder was completed in Notion.\nERROR — Delivery failed: Push delivery will retry automatically."
+      }
+    },
+    {
+      "id": "metric-group",
+      "component": "MetricGroupBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-metrics",
+            "type": "metric_group",
+            "title": "This week",
+            "metrics": [
+              { "id": "metric-actions", "label": "Actions completed", "value": 18, "delta": 3, "trend": "up" },
+              { "id": "metric-captures", "label": "Captures", "value": 7, "trend": "flat" },
+              { "id": "metric-success", "label": "Success rate", "value": 98, "unit": "%", "delta": 1.2, "trend": "up" }
+            ],
+            "sourceRefs": ["source-metrics"]
+          }
+        ],
+        "actions": [],
+        "provenance": [
+          {
+            "id": "source-metrics",
+            "source": "Lyra metrics",
+            "sourceType": "system",
+            "asOf": "2026-08-17T07:00:00.000Z",
+            "freshness": "current",
+            "confidence": "verified"
+          }
+        ]
+      },
+      "expected": {
+        "root": "[data-block-id='gold-metrics'][data-block-type='metric_group']",
+        "selectors": [
+          { "selector": "dl", "count": 1 },
+          { "selector": "dt", "count": 3 },
+          { "selector": "dd", "count": 3 },
+          { "selector": "[data-trend='up']", "count": 2 }
+        ],
+        "accessible": [
+          { "role": "heading", "name": "This week", "count": 1 }
+        ],
+        "textIncludes": ["This week", "Actions completed", "18", "Captures", "7", "Success rate", "98%"],
+        "fallbackText": "This week\nActions completed: 18 (↑ 3)\nCaptures: 7\nSuccess rate: 98% (↑ 1.2)"
+      }
+    },
+    {
+      "id": "chart-variants",
+      "component": "ChartBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-chart-bar",
+            "type": "chart",
+            "chartType": "bar",
+            "title": "Actions by day",
+            "summary": "Wednesday had the highest action count at five.",
+            "xAxis": "Day",
+            "unit": "actions",
+            "series": [
+              {
+                "id": "series-actions",
+                "name": "Completed",
+                "color": "#10A37F",
+                "points": [
+                  { "label": "Mon", "value": 2 },
+                  { "label": "Tue", "value": 3 },
+                  { "label": "Wed", "value": 5 }
+                ]
+              }
+            ],
+            "sourceRefs": ["source-chart"]
+          },
+          {
+            "id": "gold-chart-line",
+            "type": "chart",
+            "chartType": "line",
+            "title": "Capture trend",
+            "summary": "Captures increased from one to four over three weeks.",
+            "xAxis": "Week",
+            "unit": "captures",
+            "series": [
+              {
+                "id": "series-captures",
+                "name": "Captured",
+                "points": [
+                  { "label": "W1", "value": 1 },
+                  { "label": "W2", "value": 2 },
+                  { "label": "W3", "value": 4 }
+                ]
+              }
+            ],
+            "sourceRefs": ["source-chart"]
+          },
+          {
+            "id": "gold-chart-donut",
+            "type": "chart",
+            "chartType": "donut",
+            "title": "Task status",
+            "summary": "Twelve tasks are complete and three remain open.",
+            "unit": "tasks",
+            "series": [
+              {
+                "id": "series-status",
+                "name": "Tasks",
+                "points": [
+                  { "label": "Complete", "value": 12 },
+                  { "label": "Open", "value": 3 }
+                ]
+              }
+            ],
+            "sourceRefs": ["source-chart"]
+          }
+        ],
+        "actions": [],
+        "provenance": [
+          {
+            "id": "source-chart",
+            "source": "Lyra metrics",
+            "sourceType": "system",
+            "asOf": "2026-08-17T07:00:00.000Z",
+            "freshness": "current",
+            "confidence": "verified"
+          }
+        ]
+      },
+      "expected": {
+        "root": "[data-block-type='chart']",
+        "selectors": [
+          { "selector": "figure", "count": 3 },
+          { "selector": "svg[role='img']", "count": 3 },
+          { "selector": "figcaption", "count": 3 },
+          { "selector": "details table", "count": 3 },
+          { "selector": "[data-chart-type='bar']", "count": 1 },
+          { "selector": "[data-chart-type='line']", "count": 1 },
+          { "selector": "[data-chart-type='donut']", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "img", "name": "Actions by day. Wednesday had the highest action count at five.", "count": 1 },
+          { "role": "img", "name": "Capture trend. Captures increased from one to four over three weeks.", "count": 1 },
+          { "role": "img", "name": "Task status. Twelve tasks are complete and three remain open.", "count": 1 },
+          { "role": "table", "count": 3 }
+        ],
+        "textIncludes": ["Actions by day", "Wednesday had the highest action count at five.", "Capture trend", "Task status"],
+        "fallbackText": "Actions by day\nMon: 2 actions\nTue: 3 actions\nWed: 5 actions\n\nCapture trend\nW1: 1 captures\nW2: 2 captures\nW3: 4 captures\n\nTask status\nComplete: 12 tasks\nOpen: 3 tasks"
+      }
+    },
+    {
+      "id": "table",
+      "component": "TableBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-table",
+            "type": "table",
+            "title": "Source health",
+            "columns": [
+              { "key": "source", "label": "Source", "align": "left" },
+              { "key": "status", "label": "Status", "align": "center" },
+              { "key": "latency", "label": "Latency", "align": "right" }
+            ],
+            "rows": [
+              { "source": "Notion", "status": "Current", "latency": "420 ms" },
+              { "source": "Calendar", "status": "Stale", "latency": null }
+            ],
+            "sourceRefs": ["source-health"]
+          }
+        ],
+        "actions": [],
+        "provenance": [
+          {
+            "id": "source-health",
+            "source": "Source monitor",
+            "sourceType": "system",
+            "asOf": "2026-08-17T07:00:00.000Z",
+            "freshness": "current",
+            "confidence": "verified"
+          }
+        ]
+      },
+      "expected": {
+        "root": "[data-block-id='gold-table'][data-block-type='table']",
+        "selectors": [
+          { "selector": "table", "count": 1 },
+          { "selector": "thead th", "count": 3 },
+          { "selector": "tbody tr", "count": 2 },
+          { "selector": "tbody td", "count": 6 }
+        ],
+        "accessible": [
+          { "role": "table", "name": "Source health", "count": 1 },
+          { "role": "columnheader", "count": 3 },
+          { "role": "row", "count": 3 }
+        ],
+        "textIncludes": ["Source health", "Notion", "Current", "420 ms", "Calendar", "Stale"],
+        "fallbackText": "Source health\nSource | Status | Latency\nNotion | Current | 420 ms\nCalendar | Stale | —"
+      }
+    },
+    {
+      "id": "image",
+      "component": "ImageBlock",
+      "networkMocks": [
+        {
+          "url": "https://example.com/images/lyra-brief.jpg",
+          "response": {
+            "status": 200,
+            "contentType": "image/svg+xml",
+            "body": "<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360' viewBox='0 0 640 360'><rect width='640' height='360' fill='#e7f5ef'/><circle cx='320' cy='180' r='72' fill='#10a37f'/></svg>"
+          }
+        }
+      ],
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-image",
+            "type": "image",
+            "url": "https://example.com/images/lyra-brief.jpg",
+            "alt": "A notebook beside a morning coffee",
+            "caption": "Morning brief illustration",
+            "sourceRef": "source-image"
+          }
+        ],
+        "actions": [],
+        "provenance": [
+          {
+            "id": "source-image",
+            "source": "Brief artwork",
+            "sourceType": "web",
+            "title": "Morning brief illustration",
+            "url": "https://example.com/images/lyra-brief.jpg",
+            "asOf": "2026-08-17T07:00:00.000Z",
+            "freshness": "current",
+            "confidence": "verified"
+          }
+        ]
+      },
+      "expected": {
+        "root": "[data-block-id='gold-image'][data-block-type='image']",
+        "selectors": [
+          { "selector": "figure", "count": 1 },
+          { "selector": "img[alt='A notebook beside a morning coffee'][loading='lazy']", "count": 1 },
+          { "selector": "figcaption", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "img", "name": "A notebook beside a morning coffee", "count": 1 }
+        ],
+        "textIncludes": ["Morning brief illustration"],
+        "fallbackText": "Morning brief illustration — https://example.com/images/lyra-brief.jpg",
+        "errorState": {
+          "action": "abort-image-request",
+          "selectors": [
+            { "selector": "img", "count": 0 },
+            { "selector": "[data-media-error='true']", "count": 1 }
+          ],
+          "textIncludes": ["Morning brief illustration"]
+        }
+      }
+    },
+    {
+      "id": "media-variants",
+      "component": "MediaBlock",
+      "networkMocks": [
+        { "url": "https://example.com/media/note.m4a", "response": { "status": 200, "contentType": "audio/mp4", "bodyBase64": "" } },
+        { "url": "https://example.com/media/brief.mp4", "response": { "status": 200, "contentType": "video/mp4", "bodyBase64": "" } },
+        { "url": "https://example.com/media/plan.pdf", "response": { "status": 200, "contentType": "application/pdf", "bodyBase64": "" } }
+      ],
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          { "id": "gold-media-audio", "type": "media", "mediaType": "audio", "url": "https://example.com/media/note.m4a", "title": "Voice capture", "caption": "Recorded today", "mimeType": "audio/mp4" },
+          { "id": "gold-media-video", "type": "media", "mediaType": "video", "url": "https://example.com/media/brief.mp4", "title": "Brief walkthrough", "caption": "Two-minute summary", "mimeType": "video/mp4" },
+          { "id": "gold-media-file", "type": "media", "mediaType": "file", "url": "https://example.com/media/plan.pdf", "title": "Migration plan", "caption": "PDF · 4 pages", "mimeType": "application/pdf" }
+        ],
+        "actions": [],
+        "provenance": []
+      },
+      "expected": {
+        "root": "[data-block-type='media']",
+        "selectors": [
+          { "selector": "audio[controls]", "count": 1 },
+          { "selector": "video[controls]", "count": 1 },
+          { "selector": "a[href='https://example.com/media/plan.pdf']", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "group", "name": "Voice capture", "count": 1 },
+          { "role": "group", "name": "Brief walkthrough", "count": 1 },
+          { "role": "link", "nameIncludes": "Migration plan", "count": 1 }
+        ],
+        "textIncludes": ["Voice capture", "Recorded today", "Brief walkthrough", "Two-minute summary", "Migration plan", "PDF · 4 pages"],
+        "fallbackText": "Voice capture — https://example.com/media/note.m4a\nBrief walkthrough — https://example.com/media/brief.mp4\nMigration plan — https://example.com/media/plan.pdf"
+      }
+    },
+    {
+      "id": "source-list",
+      "component": "SourceListBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          { "id": "gold-sources", "type": "source_list", "title": "Sources", "sourceRefs": ["source-news-1", "source-news-2"] }
+        ],
+        "actions": [],
+        "provenance": [
+          {
+            "id": "source-news-1",
+            "source": "Example Journal",
+            "sourceType": "web",
+            "title": "Primary report",
+            "url": "https://example.com/report",
+            "asOf": "2026-08-17T06:30:00.000Z",
+            "freshness": "current",
+            "confidence": "verified"
+          },
+          {
+            "id": "source-news-2",
+            "source": "Example Wire",
+            "sourceType": "web",
+            "title": "Independent follow-up",
+            "url": "https://example.com/follow-up",
+            "asOf": "2026-08-17T06:45:00.000Z",
+            "freshness": "current",
+            "confidence": "verified"
+          }
+        ]
+      },
+      "expected": {
+        "root": "[data-block-id='gold-sources'][data-block-type='source_list']",
+        "selectors": [
+          { "selector": "ol", "count": 1 },
+          { "selector": "li", "count": 2 },
+          { "selector": "a[href^='https://example.com/']", "count": 2 },
+          { "selector": "time[datetime]", "count": 2 }
+        ],
+        "accessible": [
+          { "role": "link", "nameIncludes": "Primary report", "count": 1 },
+          { "role": "link", "nameIncludes": "Independent follow-up", "count": 1 }
+        ],
+        "textIncludes": ["Sources", "Example Journal", "Primary report", "Example Wire", "Independent follow-up"],
+        "fallbackText": "Sources\n1. Example Journal — Primary report: https://example.com/report\n2. Example Wire — Independent follow-up: https://example.com/follow-up"
+      }
+    },
+    {
+      "id": "action-group",
+      "component": "ActionGroupBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          { "id": "gold-actions", "type": "action_group", "title": "Actions", "actionRefs": ["action-complete", "action-undo", "action-disabled"] }
+        ],
+        "actions": [
+          { "id": "action-complete", "label": "Complete reminder", "actionType": "complete", "targetId": "task-42", "status": "available", "requiresConfirmation": false },
+          { "id": "action-undo", "label": "Undo", "actionType": "undo", "targetId": "task-41", "status": "completed", "requiresConfirmation": true },
+          { "id": "action-disabled", "label": "Schedule", "actionType": "schedule", "targetId": "task-42", "status": "disabled", "requiresConfirmation": true, "disabledReason": "Calendar is unavailable" }
+        ],
+        "provenance": []
+      },
+      "expected": {
+        "root": "[data-block-id='gold-actions'][data-block-type='action_group']",
+        "selectors": [
+          { "selector": "button", "count": 3 },
+          { "selector": "button:not([disabled])", "count": 2 },
+          { "selector": "button[disabled]", "count": 1 },
+          { "selector": "[data-action-status='completed']", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "button", "name": "Complete reminder", "disabled": false, "count": 1 },
+          { "role": "button", "name": "Undo", "disabled": false, "count": 1 },
+          { "role": "button", "name": "Schedule", "disabled": true, "count": 1 }
+        ],
+        "minimumInteractiveSize": 44,
+        "textIncludes": ["Actions", "Complete reminder", "Undo", "Schedule", "Calendar is unavailable"],
+        "fallbackText": "Actions\n1. Complete reminder\n2. Undo\n3. Schedule — unavailable: Calendar is unavailable"
+      }
+    },
+    {
+      "id": "briefing",
+      "component": "BriefingBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-briefing",
+            "type": "briefing",
+            "title": "Morning brief",
+            "subtitle": "Monday, 17 August",
+            "sections": [
+              {
+                "id": "briefing-focus",
+                "title": "Focus",
+                "blocks": [
+                  { "id": "briefing-focus-text", "type": "rich_text", "markdown": "Finish the launch brief before the afternoon review." }
+                ]
+              },
+              {
+                "id": "briefing-calendar",
+                "title": "Calendar",
+                "blocks": [
+                  { "id": "briefing-calendar-items", "type": "bullet_list", "items": ["10:00 Product review", "15:30 Dentist"] }
+                ]
+              }
+            ],
+            "sourceRefs": ["source-briefing"]
+          }
+        ],
+        "actions": [],
+        "provenance": [
+          {
+            "id": "source-briefing",
+            "source": "Morning automation",
+            "sourceType": "openclaw",
+            "asOf": "2026-08-17T07:00:00.000Z",
+            "freshness": "current",
+            "confidence": "verified"
+          }
+        ]
+      },
+      "expected": {
+        "root": "[data-block-id='gold-briefing'][data-block-type='briefing']",
+        "selectors": [
+          { "selector": ":scope > header", "count": 1 },
+          { "selector": ":scope > section", "count": 2 },
+          { "selector": "[data-block-id='briefing-focus-text']", "count": 1 },
+          { "selector": "[data-block-id='briefing-calendar-items']", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "heading", "name": "Morning brief", "count": 1 },
+          { "role": "heading", "name": "Focus", "count": 1 },
+          { "role": "heading", "name": "Calendar", "count": 1 }
+        ],
+        "textIncludes": ["Morning brief", "Monday, 17 August", "Focus", "Finish the launch brief", "Calendar", "10:00 Product review", "15:30 Dentist"],
+        "fallbackText": "Morning brief — Monday, 17 August\n\nFocus\nFinish the launch brief before the afternoon review.\n\nCalendar\n• 10:00 Product review\n• 15:30 Dentist"
+      }
+    },
+    {
+      "id": "news-brief",
+      "component": "NewsBriefBlock",
+      "networkMocks": [
+        {
+          "url": "https://example.com/images/story.jpg",
+          "response": {
+            "status": 200,
+            "contentType": "image/svg+xml",
+            "body": "<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360' viewBox='0 0 640 360'><rect width='640' height='360' fill='#f0f0f0'/><path d='M80 260 L220 100 L320 210 L420 130 L560 260 Z' fill='#10a37f'/></svg>"
+          }
+        }
+      ],
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-news",
+            "type": "news_brief",
+            "date": "2026-08-17",
+            "title": "Morning news",
+            "summary": "Two developments are worth your attention today.",
+            "themes": ["AI", "Markets"],
+            "items": [
+              {
+                "id": "story-ai",
+                "topic": "AI",
+                "headline": "A new model changes inference economics",
+                "summary": "The release lowers the cost of routine agent workloads.",
+                "whyItMatters": "Lyra may be able to route background tasks more cheaply.",
+                "image": { "url": "https://example.com/images/story.jpg", "alt": "Abstract server racks" },
+                "publishedAt": "2026-08-17T05:30:00.000Z",
+                "sourceRefs": ["source-story-1", "source-story-2"]
+              },
+              {
+                "id": "story-market",
+                "topic": "Markets",
+                "headline": "European markets open higher",
+                "summary": "Technology shares led a modest morning gain.",
+                "sourceRefs": ["source-story-3"]
+              }
+            ]
+          }
+        ],
+        "actions": [],
+        "provenance": [
+          { "id": "source-story-1", "source": "Example Journal", "sourceType": "web", "title": "Model release", "url": "https://example.com/model-release", "asOf": "2026-08-17T05:30:00.000Z", "freshness": "current", "confidence": "verified" },
+          { "id": "source-story-2", "source": "Example Lab", "sourceType": "web", "title": "Technical report", "url": "https://example.com/technical-report", "asOf": "2026-08-17T05:15:00.000Z", "freshness": "current", "confidence": "verified" },
+          { "id": "source-story-3", "source": "Example Wire", "sourceType": "web", "title": "Market open", "url": "https://example.com/market-open", "asOf": "2026-08-17T06:45:00.000Z", "freshness": "current", "confidence": "verified" }
+        ]
+      },
+      "expected": {
+        "root": "[data-block-id='gold-news'][data-block-type='news_brief']",
+        "selectors": [
+          { "selector": ":scope > header", "count": 1 },
+          { "selector": "article[data-news-item-id]", "count": 2 },
+          { "selector": "article[data-news-item-id='story-ai'] img", "count": 1 },
+          { "selector": "[data-topic='AI']", "count": 1 },
+          { "selector": "[data-topic='Markets']", "count": 1 },
+          { "selector": "[data-source-count='2']", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "heading", "name": "Morning news", "count": 1 },
+          { "role": "article", "nameIncludes": "A new model changes inference economics", "count": 1 },
+          { "role": "article", "nameIncludes": "European markets open higher", "count": 1 }
+        ],
+        "textIncludes": ["Morning news", "Two developments", "A new model changes inference economics", "Why it matters", "European markets open higher"],
+        "fallbackText": "Morning news — 17 Aug 2026\nTwo developments are worth your attention today.\n\nAI — A new model changes inference economics\nThe release lowers the cost of routine agent workloads.\nWhy it matters: Lyra may be able to route background tasks more cheaply.\nSources: https://example.com/model-release, https://example.com/technical-report\n\nMarkets — European markets open higher\nTechnology shares led a modest morning gain.\nSource: https://example.com/market-open"
+      }
+    },
+    {
+      "id": "task-snapshot",
+      "component": "TaskSnapshotBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-tasks",
+            "type": "task_snapshot",
+            "title": "Due today",
+            "tasks": [
+              { "id": "task-1", "title": "Finish the launch brief", "completed": false, "dueAt": "2026-08-17T10:00:00.000Z", "status": "current", "actionId": "action-task-1" },
+              { "id": "task-2", "title": "Book train tickets", "completed": true, "status": "current" },
+              { "id": "task-3", "title": "Confirm dentist", "completed": false, "status": "stale" }
+            ],
+            "sourceRefs": ["source-tasks"]
+          }
+        ],
+        "actions": [
+          { "id": "action-task-1", "label": "Complete task", "actionType": "complete", "targetId": "task-1", "status": "available", "requiresConfirmation": false }
+        ],
+        "provenance": [
+          { "id": "source-tasks", "source": "Notion reminders", "sourceType": "notion", "asOf": "2026-08-17T07:00:00.000Z", "freshness": "stale", "confidence": "verified" }
+        ]
+      },
+      "expected": {
+        "root": "[data-block-id='gold-tasks'][data-block-type='task_snapshot']",
+        "selectors": [
+          { "selector": "[data-task-id]", "count": 3 },
+          { "selector": "[data-task-id='task-1'][role='checkbox'][aria-checked='false']", "count": 1 },
+          { "selector": "[data-task-id='task-2'][aria-checked='true']", "count": 1 },
+          { "selector": "[data-task-id='task-3'][data-sync-status='stale']", "count": 1 },
+          { "selector": "time[datetime='2026-08-17T10:00:00.000Z']", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "checkbox", "nameIncludes": "Finish the launch brief", "checked": false, "count": 1 },
+          { "role": "checkbox", "nameIncludes": "Book train tickets", "checked": true, "count": 1 },
+          { "role": "checkbox", "nameIncludes": "Confirm dentist", "checked": false, "count": 1 }
+        ],
+        "minimumInteractiveSize": 44,
+        "textIncludes": ["Due today", "Finish the launch brief", "Book train tickets", "Confirm dentist", "Stale"],
+        "fallbackText": "Due today\n☐ Finish the launch brief — 12:00\n☑ Book train tickets\n☐ Confirm dentist — stale"
+      }
+    },
+    {
+      "id": "code",
+      "component": "CodeBlock",
+      "envelope": {
+        "schemaVersion": 1,
+        "blocks": [
+          {
+            "id": "gold-code",
+            "type": "code",
+            "language": "javascript",
+            "code": "const event = await lyra.feed.getLatest();\nconsole.log(event.id);",
+            "caption": "Load the latest Lyra event"
+          }
+        ],
+        "actions": [],
+        "provenance": []
+      },
+      "expected": {
+        "root": "[data-block-id='gold-code'][data-block-type='code']",
+        "selectors": [
+          { "selector": "pre", "count": 1 },
+          { "selector": "code[data-language='javascript']", "count": 1 },
+          { "selector": "button[data-copy-code]", "count": 1 }
+        ],
+        "accessible": [
+          { "role": "button", "name": "Copy code", "count": 1 }
+        ],
+        "minimumInteractiveSize": 44,
+        "textIncludes": ["Load the latest Lyra event", "const event = await lyra.feed.getLatest();", "Copy"],
+        "fallbackText": "Load the latest Lyra event\n```javascript\nconst event = await lyra.feed.getLatest();\nconsole.log(event.id);\n```"
+      }
+    }
+  ]
+}
