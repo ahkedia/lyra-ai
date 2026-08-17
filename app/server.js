@@ -20,7 +20,10 @@ const passkeys = createPasskeyAuth({ storeDir: process.env.LYRA_APP_DATA_DIR || 
 const channels = createChannelAdapter({ api });
 const authAttempts = new Map();
 const MAX_BODY_BYTES = 20 * 1024 * 1024;
-setInterval(() => { void api.deliverDue().catch(() => {}); }, 5_000).unref();
+setInterval(() => {
+  void api.deliverDue().catch(() => {});
+  void api.processQuestionContinuations().catch(() => {});
+}, 5_000).unref();
 
 const json = (res, status, body) => {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -207,7 +210,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/v1/push/public-key') return json(res, 200, { publicKey: api.pushPublicKey });
     return json(res, 404, { error: 'Not found' });
   } catch (error) {
-    return json(res, 400, { error: error.message });
+    return json(res, Number(error.status) || 400, { error: error.message });
   }
 });
 

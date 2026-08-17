@@ -88,9 +88,36 @@ test('canonical feed and structured question settle once', async () => {
   const feed = api.listFeed();
   assert.equal(feed.events.length, 2);
   const question = await api.createQuestion({ preview: 'Choose a day', composite: 'single', ttlSeconds: 3600, resumeContext: { task: 'demo' }, questions: [{ id: 'day', type: 'single_select', question: 'Which day?', options: ['Tue', 'Wed'] }] });
-  const answered = await api.answerQuestion(question.questionId, { expectedVersion: 1, answers: { day: 'Tue' } });
+  const answered = await api.answerQuestion(question.questionId, { expectedVersion: 1, idempotencyKey: 'answer-1', answers: { day: 'tue' } });
   assert.equal(answered.status, 'answered');
-  assert.deepEqual((await api.answerQuestion(question.questionId, { answers: { day: 'Wed' } })).answers, { day: 'Tue' });
+  assert.deepEqual((await api.answerQuestion(question.questionId, { idempotencyKey: 'answer-1', answers: { day: 'tue' } })).answers, { day: 'tue' });
+  await assert.rejects(() => api.answerQuestion(question.questionId, { idempotencyKey: 'different-answer', answers: { day: 'wed' } }), error => error.status === 409);
+});
+
+test('a settled structured question resumes Lyra once and appends one canonical result', async () => {
+  const calls = [];
+  const api = createLyraApi({
+    storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')),
+    agentRunner: async input => { calls.push(input); return 'Your Tuesday plan is ready.'; },
+  });
+  const question = await api.createQuestion({ preview: 'Choose a day', resumeContext: { workflow: 'weekly-plan' }, questions: [{ id: 'day', type: 'single_select', question: 'Which day?', options: ['Tue', 'Wed'] }] });
+  await api.answerQuestion(question.questionId, { expectedVersion: 1, idempotencyKey: 'answer-once', answers: { day: 'tue' } });
+  assert.deepEqual(await api.processQuestionContinuations(), { claimed: 1, completed: 1, failed: 0 });
+  assert.deepEqual(await api.processQuestionContinuations(), { claimed: 0, completed: 0, failed: 0 });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].context.question, { questionId: question.questionId, answers: { day: 'tue' }, resumeContext: { workflow: 'weekly-plan' } });
+  assert.equal(api._state.questions.get(question.questionId).continuationStatus, 'completed');
+  assert.equal(api.listFeed().events.filter(event => event.id === `question:${question.questionId}:continuation`).length, 1);
+});
+
+test('a failed question continuation records a safe failed event instead of a fabricated reply', async () => {
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), agentRunner: async () => { throw new Error('Provider credentials expired'); } });
+  const question = await api.createQuestion({ preview: 'Choose a day', questions: [{ id: 'day', type: 'single_select', question: 'Which day?', options: ['Tue', 'Wed'] }] });
+  await api.answerQuestion(question.questionId, { expectedVersion: 1, idempotencyKey: 'answer-failure', answers: { day: 'tue' } });
+  assert.deepEqual(await api.processQuestionContinuations(), { claimed: 1, completed: 0, failed: 1 });
+  const event = api.getEvent(`question:${question.questionId}:continuation`);
+  assert.equal(event.status, 'failed');
+  assert.doesNotMatch(event.envelope.blocks[0].markdown, /credentials expired/i);
 });
 
 test('a retried message idempotency key creates one user and one assistant event', async () => {

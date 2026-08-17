@@ -9,6 +9,7 @@ type Tab = 'lyra' | 'todo' | 'news';
 type Status = 'fresh' | 'refreshing' | 'stale' | 'offline' | 'sign-in';
 type Toast = { text: string; undo?: () => void };
 type FeedEvent = { id: string; actor: 'user' | 'assistant' | 'automation'; title?: string; occurredAt: string; status?: string; envelope: LyraEnvelope };
+type Feed = { events: FeedEvent[]; nextCursor?: string | null };
 type Task = { id: string; title: string; detail?: string; notes?: string; dueAt?: string; source?: string; list?: string; completed?: boolean; flagged?: boolean; pending?: boolean };
 type NewsItem = { id: string; headline: string; summary?: string; whyItMatters?: string; topic?: string; source?: string; sourceUrl?: string; imageUrl?: string; publishedAt?: string; read?: boolean; saved?: boolean; sources?: Array<{ title?: string; source?: string; url?: string }> };
 type News = { items: NewsItem[]; brief?: { title?: string; summary?: string; date?: string; themes?: string[] }; refreshedAt?: string; stale?: boolean; topics?: string[] };
@@ -53,11 +54,33 @@ function useResource<T>(key: string, path: string, empty: T) {
   return { value, setValue, status, load };
 }
 
+function useFeedResource() {
+  const [value, setValue] = useState<Feed>({ events: [] }); const [status, setStatus] = useState<Status>('refreshing');
+  const load = async () => {
+    setStatus(current => current === 'fresh' ? 'refreshing' : current);
+    try { const next = await request<Feed>('/v1/feed?limit=40'); setValue(next); void writeCached('feed', next); setStatus('fresh'); return next; }
+    catch (error) { setStatus((error as { status?: number }).status === 401 ? 'sign-in' : 'offline'); return null; }
+  };
+  const loadOlder = async () => {
+    const cursor = value.nextCursor; if (!cursor) return null;
+    try {
+      const next = await request<Feed>(`/v1/feed?limit=40&cursor=${encodeURIComponent(cursor)}`);
+      setValue(current => {
+        const events = [...current.events, ...next.events.filter(item => !current.events.some(existing => existing.id === item.id))];
+        const merged = { events, nextCursor: next.nextCursor }; void writeCached('feed', merged); return merged;
+      });
+      return next;
+    } catch { return null; }
+  };
+  useEffect(() => { void readCached<Feed>('feed').then(cached => { if (cached) { setValue(cached); setStatus('stale'); } }).finally(() => { void load(); }); }, []);
+  return { value, setValue, status, load, loadOlder };
+}
+
 function App() {
   if (location.pathname === '/app/dev/components') return <ComponentGallery/>;
   const query = new URLSearchParams(location.search); const initial = query.get('tab');
   const [tab, setTab] = useState<Tab>(initial === 'todo' || initial === 'news' ? initial : 'lyra'); const [seed, setSeed] = useState(''); const [storyContext, setStoryContext] = useState<string | null>(null);
-  const feed = useResource<{ events: FeedEvent[] }>('feed', '/v1/feed', { events: [] });
+  const feed = useFeedResource();
   const tasks = useResource<{ items: Task[] }>('tasks', '/v1/tasks', { items: [] });
   const news = useResource<News>('news', '/v1/news', { items: [] });
   const [toast, setToast] = useState<Toast | null>(null); const [settings, setSettings] = useState(false); const [pendingCount, setPendingCount] = useState(0);
@@ -88,7 +111,7 @@ function App() {
     };
     return () => stream.close();
   }, []);
-  return <div class="app-shell app-next"><header class="topbar"><strong class="topbar-title">{tab === 'lyra' ? 'Lyra' : tab === 'todo' ? 'To Do' : 'News'}</strong><div class="topbar-actions"><Connection status={tab === 'lyra' ? feed.status : tab === 'todo' ? tasks.status : news.status}/><button class="icon-button" aria-label="Open settings" onClick={() => setSettings(true)}>•••</button></div></header><main class="main-content"><section hidden={tab !== 'lyra'}><LyraStream events={feed.value.events} reload={feed.load} seed={seed} storyContext={storyContext} clearSeed={() => setSeed('')} clearStoryContext={() => setStoryContext(null)} onToast={setToast}/></section><section hidden={tab !== 'todo'}><TodoScreen data={tasks.value} status={tasks.status} refresh={tasks.load} setData={tasks.setValue} onToast={setToast}/></section><section hidden={tab !== 'news'}><NewsScreen data={news.value} status={news.status} refresh={news.load} setData={news.setValue} onAsk={item => { setSeed('What matters about this story, and what should I do next?'); setStoryContext(item.id); setTab('lyra'); }} onToast={setToast}/></section></main><nav class="tabbar" aria-label="Primary navigation"><Tab label="Lyra" icon="✦" active={tab === 'lyra'} onClick={() => setTab('lyra')}/><Tab label="To Do" icon="✓" active={tab === 'todo'} onClick={() => setTab('todo')}/><Tab label="News" icon="◌" active={tab === 'news'} onClick={() => setTab('news')}/></nav>{toast && <div class="toast" role="status"><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null); }}>Undo</button>}</div>}{settings && <SettingsSheet onClose={() => setSettings(false)} pendingCount={pendingCount} onRetry={() => void flushPending()}/>}</div>;
+  return <div class="app-shell app-next"><header class="topbar"><strong class="topbar-title">{tab === 'lyra' ? 'Lyra' : tab === 'todo' ? 'To Do' : 'News'}</strong><div class="topbar-actions"><Connection status={tab === 'lyra' ? feed.status : tab === 'todo' ? tasks.status : news.status}/><button class="icon-button" aria-label="Open settings" onClick={() => setSettings(true)}>•••</button></div></header><main class="main-content"><section hidden={tab !== 'lyra'}><LyraStream events={feed.value.events} hasOlder={Boolean(feed.value.nextCursor)} loadOlder={feed.loadOlder} reload={feed.load} seed={seed} storyContext={storyContext} clearSeed={() => setSeed('')} clearStoryContext={() => setStoryContext(null)} onToast={setToast}/></section><section hidden={tab !== 'todo'}><TodoScreen data={tasks.value} status={tasks.status} refresh={tasks.load} setData={tasks.setValue} onToast={setToast}/></section><section hidden={tab !== 'news'}><NewsScreen data={news.value} status={news.status} refresh={news.load} setData={news.setValue} onAsk={item => { setSeed('What matters about this story, and what should I do next?'); setStoryContext(item.id); setTab('lyra'); }} onToast={setToast}/></section></main><nav class="tabbar" aria-label="Primary navigation"><Tab label="Lyra" icon="✦" active={tab === 'lyra'} onClick={() => setTab('lyra')}/><Tab label="To Do" icon="✓" active={tab === 'todo'} onClick={() => setTab('todo')}/><Tab label="News" icon="◌" active={tab === 'news'} onClick={() => setTab('news')}/></nav>{toast && <div class="toast" role="status"><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null); }}>Undo</button>}</div>}{settings && <SettingsSheet onClose={() => setSettings(false)} pendingCount={pendingCount} onRetry={() => void flushPending()}/>}</div>;
 }
 
 function ComponentGallery() {
@@ -110,7 +133,8 @@ function SettingsSheet({ onClose, pendingCount, onRetry }: { onClose: () => void
   useEffect(() => { void request<{ sources?: Array<{ name: string; status: string }> }>('/v1/app-health').then(setHealth).catch(() => setHealth(null)); }, []);
   const run = async (work: () => Promise<unknown>, success: string) => { try { await work(); setMessage(success); } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not update settings'); } };
   const changeTheme = (next: string) => { localStorage.setItem('lyra.theme', next); document.documentElement.dataset.theme = next; setTheme(next); };
-  return <div class="sheet-backdrop" role="presentation" onClick={onClose}><section class="sheet settings-sheet" role="dialog" aria-modal="true" aria-label="Lyra settings" onClick={event => event.stopPropagation()}><div class="sheet-handle"/><header><h2>Settings</h2><button class="text-button" onClick={onClose}>Done</button></header><p class="settings-status">{message}</p><section><h3>Account</h3><button class="setting-row" onClick={() => void run(registerPasskey, 'Face ID is ready on this device.')}><span>Face ID</span><small>Set up</small></button><button class="setting-row" onClick={() => void run(loginPasskey, 'Signed in with Face ID.')}><span>Sign in</span><small>Use Face ID</small></button></section><section><h3>Notifications</h3><button class="setting-row" onClick={() => void run(enablePushNotifications, 'Alerts are enabled on this device.')}><span>Alerts</span><small>{typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Enabled' : 'Enable'}</small></button><button class="setting-row" onClick={() => void run(() => request('/v1/push/test', { method: 'POST', body: '{}' }), 'A test notification was sent.')}><span>Test alert</span><small>Send</small></button></section><section><h3>Appearance</h3><div class="theme-picker">{['system', 'light', 'dark'].map(choice => <button class={theme === choice ? 'active' : ''} onClick={() => changeTheme(choice)}>{choice}</button>)}</div></section><section><h3>Connection</h3><button class="setting-row" onClick={onRetry}><span>Offline changes</span><small>{pendingCount ? `${pendingCount} pending · Retry` : 'Up to date'}</small></button>{health?.sources?.map(source => <div class="setting-row static"><span>{source.name}</span><small>{source.status}</small></div>)}<div class="setting-row static"><span>Version</span><small>Next</small></div></section></section></div>;
+  const signOut = async () => { await request('/v1/auth/logout', { method: 'POST', body: '{}' }); localStorage.removeItem('lyra_token'); location.reload(); };
+  return <div class="sheet-backdrop" role="presentation" onClick={onClose}><section class="sheet settings-sheet" role="dialog" aria-modal="true" aria-label="Lyra settings" onClick={event => event.stopPropagation()}><div class="sheet-handle"/><header><h2>Settings</h2><button class="text-button" onClick={onClose}>Done</button></header><p class="settings-status">{message}</p><section><h3>Account</h3><button class="setting-row" onClick={() => void run(registerPasskey, 'Face ID is ready on this device.')}><span>Face ID</span><small>Set up</small></button><button class="setting-row" onClick={() => void run(loginPasskey, 'Signed in with Face ID.')}><span>Sign in</span><small>Use Face ID</small></button><button class="setting-row" onClick={() => void run(signOut, 'Signed out.')}><span>Sign out</span><small>End session</small></button></section><section><h3>Notifications</h3><button class="setting-row" onClick={() => void run(enablePushNotifications, 'Alerts are enabled on this device.')}><span>Alerts</span><small>{typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Enabled' : 'Enable'}</small></button><button class="setting-row" onClick={() => void run(() => request('/v1/push/test', { method: 'POST', body: '{}' }), 'A test notification was sent.')}><span>Test alert</span><small>Send</small></button></section><section><h3>Appearance</h3><div class="theme-picker">{['system', 'light', 'dark'].map(choice => <button class={theme === choice ? 'active' : ''} onClick={() => changeTheme(choice)}>{choice}</button>)}</div></section><section><h3>Connection</h3><button class="setting-row" onClick={onRetry}><span>Offline changes</span><small>{pendingCount ? `${pendingCount} pending · Retry` : 'Up to date'}</small></button>{health?.sources?.map(source => <div class="setting-row static"><span>{source.name}</span><small>{source.status}</small></div>)}<div class="setting-row static"><span>Version</span><small>Next</small></div></section></section></div>;
 }
 
 function VoiceCapture({ onToast }: { onToast: (next: Toast) => void }) {
@@ -142,12 +166,23 @@ function VoiceCapture({ onToast }: { onToast: (next: Toast) => void }) {
   return <button type="button" class={state === 'recording' ? 'recording' : ''} onClick={() => state === 'recording' ? stop() : void start()} disabled={state === 'saving'}>{state === 'recording' ? 'Stop recording' : state === 'saving' ? 'Saving voice note…' : 'Add voice or note'}</button>;
 }
 
-function LyraStream({ events, reload, seed, storyContext, clearSeed, clearStoryContext, onToast }: { events: FeedEvent[]; reload: () => Promise<unknown>; seed: string; storyContext: string | null; clearSeed: () => void; clearStoryContext: () => void; onToast: (next: Toast) => void }) {
-  const [draft, setDraft] = useState(''); const [sending, setSending] = useState(false); const [local, setLocal] = useState<FeedEvent[]>([]); const bottom = useRef<HTMLDivElement>(null);
+function LyraStream({ events, hasOlder, loadOlder, reload, seed, storyContext, clearSeed, clearStoryContext, onToast }: { events: FeedEvent[]; hasOlder: boolean; loadOlder: () => Promise<unknown>; reload: () => Promise<unknown>; seed: string; storyContext: string | null; clearSeed: () => void; clearStoryContext: () => void; onToast: (next: Toast) => void }) {
+  const [draft, setDraft] = useState(''); const [sending, setSending] = useState(false); const [loadingOlder, setLoadingOlder] = useState(false); const [local, setLocal] = useState<FeedEvent[]>([]); const [newMessages, setNewMessages] = useState(0); const [atNewest, setAtNewest] = useState(true); const bottom = useRef<HTMLDivElement>(null); const knownIds = useRef(new Set<string>()); const hydrated = useRef(false);
   useEffect(() => { if (seed) { setDraft(seed); clearSeed(); } }, [seed]);
   const all = useMemo(() => [...events, ...local].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt)), [events, local]);
+  useEffect(() => { const update = () => setAtNewest(window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 180); update(); window.addEventListener('scroll', update, { passive: true }); return () => window.removeEventListener('scroll', update); }, []);
+  useEffect(() => {
+    const incoming = events.filter(event => !knownIds.current.has(event.id));
+    for (const event of events) knownIds.current.add(event.id);
+    if (!hydrated.current) { hydrated.current = true; return; }
+    if (!incoming.length) return;
+    if (atNewest) { requestAnimationFrame(() => bottom.current?.scrollIntoView({ block: 'end' })); }
+    else setNewMessages(count => count + incoming.length);
+  }, [events, atNewest]);
+  const jumpToLatest = () => { bottom.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }); setNewMessages(0); };
+  const older = async () => { setLoadingOlder(true); try { await loadOlder(); } finally { setLoadingOlder(false); } };
   const onAction = async (action: LyraAction) => { const preview = await request<{ id: string }>('/v1/actions', { method: 'POST', body: JSON.stringify({ type: action.actionType, targetId: action.targetId || action.id, payload: action.payload || {}, idempotencyKey: `block:${action.id}:${crypto.randomUUID()}` }) }); const result = await request<{ status: string }>(`/v1/actions/${preview.id}/commit`, { method: 'POST', body: '{}' }); if (result.status === 'failed') throw new Error('Lyra could not complete that action.'); onToast({ text: 'Action completed' }); void reload(); };
-  const onAnswer = async (block: Record<string, any>, answers: Record<string, string | string[]>) => { await request(`/v1/questions/${block.questionId}/answer`, { method: 'POST', body: JSON.stringify({ answers, idempotencyKey: crypto.randomUUID() }) }); onToast({ text: 'Answer sent' }); void reload(); };
+  const onAnswer = async (block: Record<string, any>, answers: Record<string, string | string[]>) => { await request(`/v1/questions/${block.questionId}/answer`, { method: 'POST', body: JSON.stringify({ answers, expectedVersion: block.version, idempotencyKey: crypto.randomUUID() }) }); onToast({ text: 'Answer sent' }); void reload(); };
   const send = async (event: Event) => {
     event.preventDefault(); const text = draft.trim(); if (!text || sending) return;
     setSending(true); setDraft(''); const userId = crypto.randomUUID(); const assistantId = crypto.randomUUID(); const contextId = storyContext; clearStoryContext();
@@ -170,7 +205,7 @@ function LyraStream({ events, reload, seed, storyContext, clearSeed, clearStoryC
       }
     } finally { setSending(false); }
   };
-  return <div class="conversation-screen"><div class="stream-context">{all.length ? 'Today' : 'Lyra'}</div><div class="event-stream">{all.length ? all.map(event => <Message event={event} onAction={onAction} onAnswer={onAnswer} onToast={onToast}/>) : <Empty title="Lyra is ready" detail="Your reminders, briefings, and conversations will live here."/>}</div><div ref={bottom}/><form class="composer-wrap" onSubmit={send}><div class="composer"><textarea value={draft} onInput={event => setDraft((event.target as HTMLTextAreaElement).value)} rows={1} placeholder="Message Lyra…" aria-label="Message Lyra"/><button class="send-button" type="submit" disabled={sending} aria-label="Send message">↑</button></div><div class="composer-tools"><VoiceCapture onToast={onToast}/><span>{sending ? 'Lyra is working…' : 'Trusted context appears with every answer.'}</span></div></form></div>;
+  return <div class="conversation-screen"><div class="stream-context">{all.length ? 'Today' : 'Lyra'}</div>{hasOlder && <button class="load-older" onClick={() => void older()} disabled={loadingOlder}>{loadingOlder ? 'Loading older messages…' : 'Load earlier messages'}</button>}<div class="event-stream">{all.length ? all.slice(-120).map(event => <Message event={event} onAction={onAction} onAnswer={onAnswer} onToast={onToast}/>) : <Empty title="Lyra is ready" detail="Your reminders, briefings, and conversations will live here."/>}</div><div ref={bottom}/>{newMessages > 0 && <button class="new-messages" onClick={jumpToLatest}>{newMessages === 1 ? '1 new message' : `${newMessages} new messages`} ↓</button>}<form class="composer-wrap" onSubmit={send}><div class="composer"><textarea value={draft} onInput={event => setDraft((event.target as HTMLTextAreaElement).value)} rows={1} placeholder="Message Lyra…" aria-label="Message Lyra"/><button class="send-button" type="submit" disabled={sending} aria-label="Send message">↑</button></div><div class="composer-tools"><VoiceCapture onToast={onToast}/><span>{sending ? 'Lyra is working…' : 'Trusted context appears with every answer.'}</span></div></form></div>;
 }
 
 function Message({ event, onAction, onAnswer, onToast }: { event: FeedEvent; onAction: (action: LyraAction) => Promise<void>; onAnswer: (block: Record<string, any>, answers: Record<string, string | string[]>) => Promise<void>; onToast: (next: Toast) => void }) {

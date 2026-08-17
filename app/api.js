@@ -169,7 +169,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     const question = { ...payload, questionId: payload.questionId || randomUUID(), status: 'pending', version: 1, createdAt: payload.createdAt || now(), answers: {} };
     question.expiresAt ||= new Date(Date.parse(question.createdAt) + Number(question.ttlSeconds || 86400) * 1000).toISOString();
     if (!question.preview || !Array.isArray(question.questions) || question.questions.length < 1 || question.questions.length > 4) throw new Error('Invalid structured question');
-    const envelope = normalizeAgentOutput({ schemaVersion: 1, blocks: [{ id: `${question.questionId}-form`, type: 'question_form', questionId: question.questionId, preview: question.preview, mode: question.composite || 'single', status: 'pending', questions: question.questions.map(field => ({ id: field.id, inputType: field.type, label: field.question, optional: Boolean(field.optional), allowOther: Boolean(field.allow_other), options: field.options?.map(option => typeof option === 'string' ? { id: option.toLowerCase().replace(/[^a-z0-9]+/g, '-'), label: option } : option), when: field.when ? conditionFromLegacy(field.when) : undefined })), expiresAt: question.expiresAt, submitActionId: `${question.questionId}-submit` }], actions: [{ id: `${question.questionId}-submit`, label: 'Send answer', actionType: 'submit_answer', targetId: question.questionId, status: 'available', requiresConfirmation: false }], provenance: [] });
+    const envelope = normalizeAgentOutput({ schemaVersion: 1, blocks: [{ id: `${question.questionId}-form`, type: 'question_form', questionId: question.questionId, version: question.version, preview: question.preview, mode: question.composite || 'single', status: 'pending', questions: question.questions.map(field => ({ id: field.id, inputType: field.type, label: field.question, optional: Boolean(field.optional), allowOther: Boolean(field.allow_other), options: field.options?.map(option => typeof option === 'string' ? { id: option.toLowerCase().replace(/[^a-z0-9]+/g, '-'), label: option } : option), when: field.when ? conditionFromLegacy(field.when) : undefined })), expiresAt: question.expiresAt, submitActionId: `${question.questionId}-submit` }], actions: [{ id: `${question.questionId}-submit`, label: 'Send answer', actionType: 'submit_answer', targetId: question.questionId, status: 'available', requiresConfirmation: false }], provenance: [] });
     question.eventId = eventId;
     question.envelope = envelope;
     questions.set(question.questionId, question);
@@ -179,31 +179,99 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
 
   async function answerQuestion(questionId, input = {}) {
     const question = questions.get(questionId);
-    if (!question) throw new Error('Question not found');
-    if (question.status !== 'pending') return question;
-    if (Date.now() > Date.parse(question.expiresAt)) { question.status = 'expired'; question.version += 1; persist(); throw new Error('Question expired'); }
-    if (input.expectedVersion && Number(input.expectedVersion) !== question.version) throw new Error('Question version conflict');
+    if (!question) { const error = new Error('Question not found'); error.status = 404; throw error; }
+    if (question.status !== 'pending') {
+      if (input.idempotencyKey && input.idempotencyKey === question.answerIdempotencyKey) return question;
+      const error = new Error('Question is already settled'); error.status = 409; throw error;
+    }
+    if (Date.now() > Date.parse(question.expiresAt)) { question.status = 'expired'; question.version += 1; persist(); const error = new Error('Question expired'); error.status = 410; throw error; }
+    if (input.expectedVersion && Number(input.expectedVersion) !== question.version) { const error = new Error('Question version conflict'); error.status = 409; throw error; }
     const answers = input.answers || {};
     for (const field of question.questions) {
       const visible = !field.when || conditionMatches(field.when, answers);
-      if (visible && !field.optional && (answers[field.id] === undefined || answers[field.id] === '')) throw new Error(`Missing answer: ${field.id}`);
-      if (!visible && answers[field.id] !== undefined) throw new Error(`Inapplicable answer: ${field.id}`);
+      if (visible && !field.optional && (answers[field.id] === undefined || answers[field.id] === '')) { const error = new Error(`Missing answer: ${field.id}`); error.status = 422; throw error; }
+      if (!visible && answers[field.id] !== undefined) { const error = new Error(`Inapplicable answer: ${field.id}`); error.status = 422; throw error; }
       if (field.type !== 'free_text' && answers[field.id] !== undefined) {
         const values = Array.isArray(answers[field.id]) ? answers[field.id] : [answers[field.id]];
-        const labels = (field.options || []).map(option => typeof option === 'string' ? option : option.label);
-        if (!field.allow_other && values.some(value => !labels.includes(value))) throw new Error(`Invalid answer: ${field.id}`);
+        const allowed = new Set((field.options || []).flatMap(option => typeof option === 'string' ? [option, option.toLowerCase().replace(/[^a-z0-9]+/g, '-')] : [option.id, option.label]).filter(Boolean));
+        if (!field.allow_other && values.some(value => !allowed.has(value))) { const error = new Error(`Invalid answer: ${field.id}`); error.status = 422; throw error; }
       }
     }
     question.answers = { ...answers };
+    question.answerIdempotencyKey = input.idempotencyKey;
     question.status = 'answered';
     question.version += 1;
     question.answeredAt = now();
     question.continuationStatus = 'queued';
     persist();
     const event = events.get(question.eventId);
-    if (event) event.envelope.blocks[0].status = 'answered';
+    if (event) { event.envelope.blocks[0].status = 'answered'; event.envelope.blocks[0].version = question.version; persist(); }
     await audit({ type: 'question.answered', questionId, eventId: question.eventId });
     return question;
+  }
+
+  async function processQuestionContinuations({ limit = 10, staleAfterMs = 5 * 60_000 } = {}) {
+    const claimed = [];
+    const cutoff = Date.now() - staleAfterMs;
+    for (const question of questions.values()) {
+      if (question.continuationStatus === 'running' && Date.parse(question.continuationStartedAt || 0) < cutoff) {
+        question.continuationStatus = 'queued';
+        question.continuationError = 'Previous continuation attempt did not finish.';
+      }
+      if (question.status === 'answered' && question.continuationStatus === 'queued' && claimed.length < limit) {
+        question.continuationStatus = 'running';
+        question.continuationStartedAt = now();
+        question.continuationAttempts = Number(question.continuationAttempts || 0) + 1;
+        question.continuationIdempotencyKey ||= `question:${question.questionId}:continuation`;
+        claimed.push(question);
+      }
+    }
+    if (claimed.length) persist();
+
+    for (const question of claimed) {
+      const continuationEventId = `question:${question.questionId}:continuation`;
+      try {
+        const conversationId = question.conversationId || 'primary';
+        const conversation = conversations.get(conversationId) || createConversation('Lyra', conversationId);
+        const prompt = [
+          'Continue the pending Lyra task using the confirmed answer below.',
+          'Do not claim an action completed unless the trusted context confirms it.',
+          `Question: ${question.preview}`,
+          `Answer: ${JSON.stringify(question.answers)}`,
+        ].join('\n');
+        const content = await agentRunner({
+          conversation,
+          text: prompt,
+          context: { question: { questionId: question.questionId, answers: question.answers, resumeContext: question.resumeContext || {} } },
+          fallback: 'I recorded your answer. I could not continue this update yet, so I will not invent a result.',
+        });
+        const envelope = normalizeAgentOutput(content, { eventId: continuationEventId, source: 'OpenClaw' });
+        const existing = events.get(continuationEventId);
+        if (!existing) addEvent({ id: continuationEventId, eventType: 'question.continuation', actor: 'assistant', title: 'Lyra', envelope, metadata: { questionId: question.questionId, parentEventId: question.eventId } });
+        question.continuationStatus = 'completed';
+        question.continuationEventId = continuationEventId;
+        question.continuationCompletedAt = now();
+        delete question.continuationError;
+        persist();
+        await audit({ type: 'question.continuation.completed', questionId: question.questionId, eventId: continuationEventId });
+      } catch (error) {
+        question.continuationStatus = 'failed';
+        question.continuationFailedAt = now();
+        question.continuationError = String(error?.message || 'Lyra could not continue this update.').slice(0, 240);
+        if (!events.has(continuationEventId)) addEvent({
+          id: continuationEventId,
+          eventType: 'question.continuation',
+          actor: 'system',
+          status: 'failed',
+          title: 'Update unavailable',
+          envelope: safeTextEnvelope('Lyra recorded your answer but could not complete the follow-up. Retry from the conversation when the service is available.', { eventId: continuationEventId, source: 'Lyra' }),
+          metadata: { questionId: question.questionId, parentEventId: question.eventId, errorCategory: 'continuation_failed' },
+        });
+        persist();
+        await audit({ type: 'question.continuation.failed', questionId: question.questionId, error: question.continuationError });
+      }
+    }
+    return { claimed: claimed.length, completed: claimed.filter(question => question.continuationStatus === 'completed').length, failed: claimed.filter(question => question.continuationStatus === 'failed').length };
   }
 
   function conditionFromLegacy(value) {
@@ -474,6 +542,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     clearCronBackfill,
     createQuestion,
     answerQuestion,
+    processQuestionContinuations,
     ingestScheduled,
     tasks,
     news,
