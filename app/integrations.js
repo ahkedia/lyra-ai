@@ -37,6 +37,12 @@ export function createActionHandler({ repoRoot = process.cwd() } = {}) {
     }
     if (notionEnabled && action.type === 'update_reminder') {
       const payload = action.payload || {};
+      if (payload.sourceUpdatedAt) {
+        const current = await fetch(`https://api.notion.com/v1/pages/${action.targetId}`, { headers: notionHeaders() });
+        if (!current.ok) return { status: 'failed', error: `Notion API ${current.status}` };
+        const page = await current.json();
+        if (page.last_edited_time && page.last_edited_time !== payload.sourceUpdatedAt) return { status: 'conflict', error: 'This reminder changed in Notion. Refresh it before saving again.', currentVersion: page.last_edited_time };
+      }
       const schema = await reminderSchema();
       const titleProperty = Object.entries(schema.properties || {}).find(([, value]) => value.type === 'title')?.[0];
       const dueProperty = configuredProperty(schema, 'NOTION_REMINDERS_DUE_PROPERTY', 'Due', 'date');
@@ -132,8 +138,8 @@ export function createNotionReminderProvider() {
         const priorityProperty = configuredProperty(schema, 'NOTION_REMINDERS_PRIORITY_PROPERTY', '', 'select');
         const title = property?.title?.map(part => part.plain_text || '').join('') || '(untitled)';
         const notes = notesProperty ? page.properties?.[notesProperty]?.rich_text?.map(part => part.plain_text || '').join('') || '' : '';
-        return { id: page.id, sourceId: page.id, title, kind: 'reminder', status: doneProperty && page.properties?.[doneProperty]?.checkbox ? 'done' : 'open', source: 'Notion reminders', asOf: now(), confidence: 'verified', notes, detail: notes || 'Reminder', dueAt: dateProperty ? page.properties?.[dateProperty]?.date?.start : undefined, flagged: flagProperty ? Boolean(page.properties?.[flagProperty]?.checkbox) : false, list: listProperty ? page.properties?.[listProperty]?.select?.name || '' : '', priority: priorityProperty ? page.properties?.[priorityProperty]?.select?.name || '' : '', actions: doneProperty && page.properties?.[doneProperty]?.checkbox ? [] : ['complete'] };
-      }).filter(item => item.status !== 'done');
+        return { id: page.id, sourceId: page.id, sourceUpdatedAt: page.last_edited_time || undefined, title, kind: 'reminder', status: doneProperty && page.properties?.[doneProperty]?.checkbox ? 'done' : 'open', source: 'Notion reminders', asOf: now(), confidence: 'verified', notes, detail: notes || 'Reminder', dueAt: dateProperty ? page.properties?.[dateProperty]?.date?.start : undefined, flagged: flagProperty ? Boolean(page.properties?.[flagProperty]?.checkbox) : false, list: listProperty ? page.properties?.[listProperty]?.select?.name || '' : '', priority: priorityProperty ? page.properties?.[priorityProperty]?.select?.name || '' : '', actions: doneProperty && page.properties?.[doneProperty]?.checkbox ? [] : ['complete'] };
+      });
       return { items, capabilities: { reminders: capabilities }, sources: [{ name: 'Notion reminders', status: 'current', asOf: now() }], warnings: [] };
     } catch (error) { return { items: [], sources: [{ name: 'Notion reminders', status: 'unavailable', asOf: now() }], warnings: [`Notion reminders unavailable: ${error.message}`] }; }
   };
