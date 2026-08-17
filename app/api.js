@@ -28,6 +28,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
   const events = new Map();
   const feedListeners = new Set();
   const questions = new Map();
+  const cronRuns = new Map();
   let newsBrief = null;
   let newsItems = [];
   let newsRefreshedAt = null;
@@ -43,6 +44,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
       for (const delivery of saved.deliveries || []) deliveries.set(delivery.id, delivery);
       for (const event of saved.events || []) events.set(event.id, event);
       for (const question of saved.questions || []) questions.set(question.questionId, question);
+      for (const run of saved.cronRuns || []) cronRuns.set(run.id, run);
       newsBrief = saved.newsBrief || null;
       newsItems = saved.newsItems || normaliseNewsBrief(newsBrief);
       newsRefreshedAt = saved.newsRefreshedAt || null;
@@ -50,7 +52,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
   }
 
   function persist() {
-    const state = { conversations: [...conversations.values()], actions: [...actions.values()], captures, pushSubscriptions, deliveries: [...deliveries.values()], events: [...events.values()], questions: [...questions.values()], newsBrief, newsItems, newsRefreshedAt };
+    const state = { conversations: [...conversations.values()], actions: [...actions.values()], captures, pushSubscriptions, deliveries: [...deliveries.values()], events: [...events.values()], questions: [...questions.values()], cronRuns: [...cronRuns.values()], newsBrief, newsItems, newsRefreshedAt };
     mkdirSync(storeDir, { recursive: true });
     writeFileSync(stateFile, JSON.stringify(state, null, 2), { mode: 0o600 });
     const stateWrite = durableStore.writeState?.(state);
@@ -66,6 +68,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     conversations.clear();
     events.clear();
     questions.clear();
+    cronRuns.clear();
     for (const conversation of saved.conversations || []) conversations.set(conversation.id, conversation);
     for (const action of saved.actions || []) actions.set(action.id, action);
     captures.push(...(saved.captures || []));
@@ -73,6 +76,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     for (const delivery of saved.deliveries || []) deliveries.set(delivery.id, delivery);
     for (const event of saved.events || []) events.set(event.id, event);
     for (const question of saved.questions || []) questions.set(question.questionId, question);
+    for (const run of saved.cronRuns || []) cronRuns.set(run.id, run);
     newsBrief = saved.newsBrief || null;
     newsItems = saved.newsItems || normaliseNewsBrief(newsBrief);
     newsRefreshedAt = saved.newsRefreshedAt || null;
@@ -308,6 +312,21 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     return event;
   }
 
+  async function recordCronStatus(input = {}) {
+    const id = String(input.id || (input.jobId && input.runId && `openclaw-cron:${input.jobId}:${input.runId}`) || '');
+    if (!id || !input.jobId || !input.runId || !['completed', 'failed', 'skipped'].includes(input.status)) {
+      const error = new Error('Cron status needs id, jobId, runId, and terminal status'); error.status = 422; throw error;
+    }
+    const previous = cronRuns.get(id);
+    const run = { id, jobId: String(input.jobId), runId: String(input.runId), status: input.status, scheduledAt: input.scheduledAt || null, finishedAt: input.finishedAt || now(), errorCategory: input.errorCategory || null, updatedAt: now() };
+    cronRuns.set(id, { ...previous, ...run });
+    if (input.status === 'failed' && !events.has(id)) {
+      addEvent({ id, eventType: 'scheduled.failure', actor: 'system', status: 'failed', title: input.title || input.jobId, envelope: { schemaVersion: 1, blocks: [{ id: `${id}-failed`, type: 'callout', tone: 'warning', title: 'Update unavailable', body: 'Lyra could not complete this scheduled update. It has been recorded and will retry when a later successful run is available.' }], actions: [], provenance: [] }, metadata: { jobId: input.jobId, runId: input.runId, errorCategory: input.errorCategory || 'cron_failed' } });
+    } else persist();
+    await audit({ type: 'cron.status', cronRunId: id, status: input.status, errorCategory: input.errorCategory || undefined });
+    return cronRuns.get(id);
+  }
+
   async function tasks() {
     const data = await dataProvider();
     return { items: (data.items || []).filter(item => ['reminder', 'task'].includes(item.kind) || item.source?.toLowerCase().includes('notion')).map(item => ({ ...item, completed: item.status === 'done' })), sources: data.sources || [], warnings: data.warnings || [], generatedAt: now() };
@@ -368,6 +387,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
       generatedAt: now(),
       sources: (data.sources || []).map(source => ({ name: source.name || 'Lyra source', status: source.status || 'unknown', asOf: source.asOf || null })),
       pendingQuestions: [...questions.values()].filter(question => question.status === 'pending').length,
+      cron: { completed: [...cronRuns.values()].filter(run => run.status === 'completed').length, skipped: [...cronRuns.values()].filter(run => run.status === 'skipped').length, failed: [...cronRuns.values()].filter(run => run.status === 'failed').length },
       delivery: { pending: [...deliveries.values()].filter(item => ['pending', 'retry', 'delivering'].includes(item.status)).length, failed: [...deliveries.values()].filter(item => item.status === 'failed').length },
     };
   }
@@ -551,6 +571,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     answerQuestion,
     processQuestionContinuations,
     ingestScheduled,
+    recordCronStatus,
     tasks,
     news,
     updateNewsItem,
@@ -569,7 +590,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     queuePush,
     deliverDue,
     testPush,
-    _state: { actions, captures, pushSubscriptions, deliveries, conversations, events, questions },
+    _state: { actions, captures, pushSubscriptions, deliveries, conversations, events, questions, cronRuns },
     ready,
   };
 }

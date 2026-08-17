@@ -61,6 +61,16 @@ test('canonical event subscribers receive each new scheduled event once', async 
   assert.deepEqual(received, ['live-cron-1']);
 });
 
+test('cron reconciliation persists skipped and failed runs without duplicating failures', async () => {
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')) });
+  await api.recordCronStatus({ id: 'openclaw-cron:job:skip', jobId: 'job', runId: 'skip', status: 'skipped' });
+  await api.recordCronStatus({ id: 'openclaw-cron:job:fail', jobId: 'job', runId: 'fail', title: 'Morning brief', status: 'failed', errorCategory: 'provider_failed' });
+  await api.recordCronStatus({ id: 'openclaw-cron:job:fail', jobId: 'job', runId: 'fail', title: 'Morning brief', status: 'failed', errorCategory: 'provider_failed' });
+  const health = await api.appHealth();
+  assert.deepEqual(health.cron, { completed: 0, skipped: 1, failed: 1 });
+  assert.equal(api.listFeed().events.filter(event => event.id === 'openclaw-cron:job:fail').length, 1);
+});
+
 test('News read and saved states persist through an API restart', async () => {
   const storeDir = await mkdtemp(path.join(os.tmpdir(), 'lyra-app-'));
   const first = createLyraApi({ storeDir });

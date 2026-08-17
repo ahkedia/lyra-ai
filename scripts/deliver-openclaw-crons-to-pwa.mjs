@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 const run = promisify(execFile);
 const statePath = process.env.LYRA_CRON_DELIVERY_STATE || '/var/lib/lyra-app/openclaw-cron-delivery.json';
 const endpoint = process.env.LYRA_APP_INTERNAL_URL || 'http://127.0.0.1:8787/v1/internal/cron-deliver';
+const statusEndpoint = endpoint.replace(/\/cron-deliver$/, '/cron-status');
 const token = process.env.LYRA_CRON_TOKEN;
 if (!token) throw new Error('LYRA_CRON_TOKEN is required');
 
@@ -24,8 +25,11 @@ for (const job of jobs.filter(item => item.enabled && item.name !== 'lyra-pwa-cr
   const entry = history.entries?.[0];
   if (!entry || entry.action !== 'finished' || !entry.ts || state.delivered[job.id] === entry.ts) continue;
   const content = contentFrom(entry);
-  if (!content || content === 'SKIP') { state.delivered[job.id] = entry.ts; continue; }
   const failed = entry.status !== 'ok' || looksOperational(content);
+  const terminalStatus = !content || content === 'SKIP' ? 'skipped' : failed ? 'failed' : 'completed';
+  const statusResponse = await fetch(statusEndpoint, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ id: `openclaw-cron:${job.id}:${entry.ts}`, jobId: job.id, runId: String(entry.ts), title: job.name, status: terminalStatus, finishedAt: entry.tsIso || new Date(entry.ts).toISOString(), ...(failed ? { errorCategory: 'cron_execution_failed' } : {}) }) });
+  if (!statusResponse.ok) throw new Error(`PWA cron status failed for ${job.name}: ${statusResponse.status}`);
+  if (!content || content === 'SKIP') { state.delivered[job.id] = entry.ts; continue; }
   const payload = {
     id: `openclaw-cron:${job.id}:${entry.ts}`, jobId: job.id, runId: String(entry.ts), title: job.name,
     status: failed ? 'failed' : 'completed', finishedAt: entry.tsIso || new Date(entry.ts).toISOString(), deliveryBridge: 'openclaw-cron',

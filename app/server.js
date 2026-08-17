@@ -131,6 +131,11 @@ const server = http.createServer(async (req, res) => {
       if (!cronToken || req.headers.authorization !== `Bearer ${cronToken}`) return json(res, 401, { error: 'Unauthorized' });
       return json(res, 200, await api.ingestScheduled(await body(req)));
     }
+    if (req.method === 'POST' && req.url === '/v1/internal/cron-status') {
+      const cronToken = process.env.LYRA_CRON_TOKEN || '';
+      if (!cronToken || req.headers.authorization !== `Bearer ${cronToken}`) return json(res, 401, { error: 'Unauthorized' });
+      return json(res, 200, await api.recordCronStatus(await body(req)));
+    }
 
     if (!await authorised(req)) return json(res, 401, { error: 'Unauthorized' });
 
