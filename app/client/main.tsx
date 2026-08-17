@@ -17,6 +17,7 @@ const token = () => localStorage.getItem('lyra_token') || '';
 const authHeaders = (base: HeadersInit = {}) => ({ ...(token() ? { authorization: `Bearer ${token()}` } : {}), ...base });
 const clock = (value?: string) => value ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : '';
 const date = (value?: string) => value ? new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(value)) : '';
+const berlinDay = (value: string | Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
 const safeUrl = (value?: string) => { try { const url = new URL(value || ''); return ['https:', 'http:'].includes(url.protocol) ? url.href : undefined; } catch { return undefined; } };
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -180,7 +181,7 @@ function Message({ event, onAction, onAnswer, onToast }: { event: FeedEvent; onA
 function friendlyTitle(value?: string) { return ({ 'morning-digest-news': 'Morning news', 'morning-digest-combine': 'Morning briefing', 'health-morning-bundle': 'Morning health', 'health-evening-checkin': 'Health check-in', 'reading-nudge': 'Reading reminder' } as Record<string, string>)[value || ''] || value || 'Lyra update'; }
 
 function TodoScreen({ data, status, refresh, setData, onToast }: { data: { items: Task[] }; status: Status; refresh: () => Promise<unknown>; setData: (next: { items: Task[] } | ((current: { items: Task[] }) => { items: Task[] })) => void; onToast: (next: Toast) => void }) {
-  const [filter, setFilter] = useState<'today' | 'scheduled' | 'all' | 'flagged'>('today'); const [selected, setSelected] = useState<Task | null>(null); const [adding, setAdding] = useState(false); const active = data.items.filter(item => !item.completed); const now = new Date(); const visible = active.filter(item => filter === 'all' ? true : filter === 'flagged' ? item.flagged : filter === 'scheduled' ? Boolean(item.dueAt) : !item.dueAt || new Date(item.dueAt).toDateString() === now.toDateString());
+  const [filter, setFilter] = useState<'today' | 'scheduled' | 'all' | 'flagged'>('today'); const [selected, setSelected] = useState<Task | null>(null); const [adding, setAdding] = useState(false); const active = data.items.filter(item => !item.completed); const today = berlinDay(new Date()); const visible = active.filter(item => filter === 'all' ? true : filter === 'flagged' ? item.flagged : filter === 'scheduled' ? Boolean(item.dueAt) : !item.dueAt || berlinDay(item.dueAt) === today);
   const complete = async (task: Task) => {
     const prior = data; const payload = { type: 'complete', targetId: task.id, idempotencyKey: `complete:${task.id}:${crypto.randomUUID()}`, payload: { source: task.source || 'Notion reminders', kind: 'reminder' } };
     setData({ items: data.items.map(item => item.id === task.id ? { ...item, completed: true, pending: true } : item) });
