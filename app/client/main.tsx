@@ -4,7 +4,7 @@ import type { ComponentChildren } from 'preact';
 import { loginPasskey, registerPasskey } from './passkey.js';
 
 type Tab = 'lyra' | 'todo' | 'news';
-type Status = 'fresh' | 'refreshing' | 'stale' | 'offline';
+type Status = 'fresh' | 'refreshing' | 'stale' | 'offline' | 'sign-in';
 type Action = { id: string; status: string; label?: string; actionType?: string; targetId?: string };
 type Source = { id: string; title?: string; source?: string; url?: string; asOf?: string };
 type Block = Record<string, any>;
@@ -16,6 +16,8 @@ type News = { items: NewsItem[]; generatedAt?: string; stale?: boolean; topics?:
 type Setter<T> = (next: T | ((current: T) => T)) => void;
 
 const CACHE_PREFIX = 'lyra.v3.';
+const legacyToken = () => localStorage.getItem('lyra_token') || '';
+const apiHeaders = (headers: HeadersInit = {}) => ({ ...(legacyToken() ? { authorization: `Bearer ${legacyToken()}` } : {}), ...headers });
 const getCached = <T,>(key: string): T | null => { try { return JSON.parse(localStorage.getItem(CACHE_PREFIX + key) || 'null') as T | null; } catch { return null; } };
 const cache = (key: string, value: unknown) => localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(value));
 const escape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
@@ -23,8 +25,8 @@ const safeUrl = (value?: string) => { try { const parsed = new URL(value || '');
 const relativeTime = (value?: string) => value ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : '';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, { credentials: 'include', ...options, headers: { 'content-type': 'application/json', ...(options.headers || {}) } });
-  if (!response.ok) { const detail = await response.json().catch(() => ({})); throw new Error(detail.error?.message || detail.error || `Request failed (${response.status})`); }
+  const response = await fetch(path, { credentials: 'include', ...options, headers: apiHeaders({ 'content-type': 'application/json', ...(options.headers || {}) }) });
+  if (!response.ok) { const detail = await response.json().catch(() => ({})); const error = Object.assign(new Error(detail.error?.message || detail.error || `Request failed (${response.status})`), { status: response.status }); throw error; }
   return response.json() as Promise<T>;
 }
 
@@ -34,7 +36,7 @@ function useResource<T>(key: string, path: string, empty: T) {
   const load = async (force = false) => {
     setStatus(current => current === 'fresh' ? 'refreshing' : current);
     try { const next = await request<T>(force ? `${path}${path.includes('?') ? '&' : '?'}refresh=1` : path); setValue(next); cache(key, next); setStatus('fresh'); return next; }
-    catch { setStatus('offline'); return null; }
+    catch (error) { setStatus((error as { status?: number }).status === 401 ? 'sign-in' : 'offline'); return null; }
   };
   useEffect(() => { void load(); }, [path]);
   return { value, setValue, status, load };
@@ -71,7 +73,7 @@ function App() {
   </div>;
 }
 
-function StatusPill({ status }: { status: Status }) { return status === 'offline' ? <span class="connection-state">Offline, showing saved data</span> : status === 'refreshing' ? <span class="quiet-status">Updating</span> : null; }
+function StatusPill({ status }: { status: Status }) { return status === 'offline' ? <span class="connection-state">Offline, showing saved data</span> : status === 'sign-in' ? <span class="connection-state">Sign in required</span> : status === 'refreshing' ? <span class="quiet-status">Updating</span> : null; }
 function SettingsSheet({ onClose, onToast }: { onClose: () => void; onToast: (value: { text: string } | null) => void }) {
   const [message, setMessage] = useState('Private controls for this device.');
   const run = async (work: () => Promise<unknown>, success: string) => { try { await work(); setMessage(success); } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not update settings'); } };
@@ -88,7 +90,7 @@ function LyraStream({ events, reload, onToast }: { events: FeedEvent[]; reload: 
     setLocalEvents(current => [...current, { id: userId, actor: 'user', title: 'You', occurredAt: new Date().toISOString(), envelope: { blocks: [{ id: `${userId}-text`, type: 'rich_text', markdown: text }], actions: [], provenance: [] } }, { id: assistantId, actor: 'assistant', title: 'Lyra', occurredAt: new Date().toISOString(), status: 'pending', envelope: { blocks: [{ id: `${assistantId}-text`, type: 'rich_text', markdown: '' }], actions: [], provenance: [] } }]);
     requestAnimationFrame(() => bottom.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }));
     try {
-      const response = await fetch('/v1/messages', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, idempotencyKey: userId }) });
+      const response = await fetch('/v1/messages', { method: 'POST', credentials: 'include', headers: apiHeaders({ 'content-type': 'application/json' }), body: JSON.stringify({ text, idempotencyKey: userId }) });
       if (!response.ok || !response.body) throw new Error('Lyra could not be reached');
       const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = '';
       while (true) { const { value, done } = await reader.read(); if (done) break; buffer += decoder.decode(value, { stream: true }); const frames = buffer.split('\n\n'); buffer = frames.pop() || ''; for (const frame of frames) { if (!frame.startsWith('data: ')) continue; const message = JSON.parse(frame.slice(6)); if (message.type === 'error' || message.type === 'message.failed') throw new Error(message.message || 'Lyra could not finish'); if (message.type === 'message.delta') setLocalEvents(current => current.map(item => item.id === assistantId ? { ...item, envelope: { ...item.envelope, blocks: [{ ...item.envelope.blocks[0], markdown: String(item.envelope.blocks[0].markdown || '') + String(message.content || '') }] } } : item)); if (message.type === 'tool.started') setLocalEvents(current => current.map(item => item.id === assistantId ? { ...item, status: message.label || 'Thinking' } : item)); } }
