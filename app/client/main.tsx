@@ -25,6 +25,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+const decodePushKey = (value: string) => {
+  const padded = `${value}${'='.repeat((4 - value.length % 4) % 4)}`.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(padded);
+  return Uint8Array.from(binary, character => character.charCodeAt(0));
+};
+
+async function enablePushNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) throw new Error('Notifications are not supported on this device');
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') throw new Error('Notification permission was not granted');
+  const registration = await navigator.serviceWorker.ready;
+  const existing = await registration.pushManager.getSubscription();
+  const subscription = existing || await request<{ publicKey: string }>('/v1/push/public-key').then(({ publicKey }) => registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodePushKey(publicKey) }));
+  await request('/v1/push/subscriptions', { method: 'POST', body: JSON.stringify(subscription) });
+}
+
 function useResource<T>(key: string, path: string, empty: T) {
   const [value, setValue] = useState<T>(empty); const [status, setStatus] = useState<Status>('refreshing');
   const load = async (force = false) => {
@@ -71,7 +87,36 @@ function SettingsSheet({ onClose, pendingCount, onRetry }: { onClose: () => void
   useEffect(() => { void request<{ sources?: Array<{ name: string; status: string }> }>('/v1/app-health').then(setHealth).catch(() => setHealth(null)); }, []);
   const run = async (work: () => Promise<unknown>, success: string) => { try { await work(); setMessage(success); } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not update settings'); } };
   const changeTheme = (next: string) => { localStorage.setItem('lyra.theme', next); document.documentElement.dataset.theme = next; setTheme(next); };
-  return <div class="sheet-backdrop" role="presentation" onClick={onClose}><section class="sheet settings-sheet" role="dialog" aria-modal="true" aria-label="Lyra settings" onClick={event => event.stopPropagation()}><div class="sheet-handle"/><header><h2>Settings</h2><button class="text-button" onClick={onClose}>Done</button></header><p class="settings-status">{message}</p><section><h3>Account</h3><button class="setting-row" onClick={() => void run(registerPasskey, 'Face ID is ready on this device.')}><span>Face ID</span><small>Set up</small></button><button class="setting-row" onClick={() => void run(loginPasskey, 'Signed in with Face ID.')}><span>Sign in</span><small>Use Face ID</small></button></section><section><h3>Notifications</h3><button class="setting-row" onClick={() => void run(() => request('/v1/push/test', { method: 'POST', body: '{}' }), 'A test notification was sent.')}><span>Test alert</span><small>Send</small></button></section><section><h3>Appearance</h3><div class="theme-picker">{['system', 'light', 'dark'].map(choice => <button class={theme === choice ? 'active' : ''} onClick={() => changeTheme(choice)}>{choice}</button>)}</div></section><section><h3>Connection</h3><button class="setting-row" onClick={onRetry}><span>Offline changes</span><small>{pendingCount ? `${pendingCount} pending · Retry` : 'Up to date'}</small></button>{health?.sources?.map(source => <div class="setting-row static"><span>{source.name}</span><small>{source.status}</small></div>)}<div class="setting-row static"><span>Version</span><small>Next</small></div></section></section></div>;
+  return <div class="sheet-backdrop" role="presentation" onClick={onClose}><section class="sheet settings-sheet" role="dialog" aria-modal="true" aria-label="Lyra settings" onClick={event => event.stopPropagation()}><div class="sheet-handle"/><header><h2>Settings</h2><button class="text-button" onClick={onClose}>Done</button></header><p class="settings-status">{message}</p><section><h3>Account</h3><button class="setting-row" onClick={() => void run(registerPasskey, 'Face ID is ready on this device.')}><span>Face ID</span><small>Set up</small></button><button class="setting-row" onClick={() => void run(loginPasskey, 'Signed in with Face ID.')}><span>Sign in</span><small>Use Face ID</small></button></section><section><h3>Notifications</h3><button class="setting-row" onClick={() => void run(enablePushNotifications, 'Alerts are enabled on this device.')}><span>Alerts</span><small>{typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Enabled' : 'Enable'}</small></button><button class="setting-row" onClick={() => void run(() => request('/v1/push/test', { method: 'POST', body: '{}' }), 'A test notification was sent.')}><span>Test alert</span><small>Send</small></button></section><section><h3>Appearance</h3><div class="theme-picker">{['system', 'light', 'dark'].map(choice => <button class={theme === choice ? 'active' : ''} onClick={() => changeTheme(choice)}>{choice}</button>)}</div></section><section><h3>Connection</h3><button class="setting-row" onClick={onRetry}><span>Offline changes</span><small>{pendingCount ? `${pendingCount} pending · Retry` : 'Up to date'}</small></button>{health?.sources?.map(source => <div class="setting-row static"><span>{source.name}</span><small>{source.status}</small></div>)}<div class="setting-row static"><span>Version</span><small>Next</small></div></section></section></div>;
+}
+
+function VoiceCapture({ onToast }: { onToast: (next: Toast) => void }) {
+  const recorder = useRef<MediaRecorder | null>(null);
+  const [state, setState] = useState<'idle' | 'recording' | 'saving'>('idle');
+  const stop = () => recorder.current?.state === 'recording' && recorder.current.stop();
+  const start = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { onToast({ text: 'Voice capture is not supported on this device.' }); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const chunks: Blob[] = [];
+      const next = new MediaRecorder(stream);
+      recorder.current = next;
+      next.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+      next.onerror = () => { stream.getTracks().forEach(track => track.stop()); setState('idle'); onToast({ text: 'Voice recording could not start.' }); };
+      next.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop()); setState('saving');
+        try {
+          const audio = new Blob(chunks, { type: next.mimeType || 'audio/webm' });
+          const encoded = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error('Could not read the recording')); reader.onloadend = () => resolve(String(reader.result).split(',')[1] || ''); reader.readAsDataURL(audio); });
+          const capture = await request<{ status?: string }>('/v1/captures', { method: 'POST', body: JSON.stringify({ kind: 'audio', audioBase64: encoded }) });
+          onToast({ text: capture.status === 'transcription_failed' ? 'Voice note saved. Transcription is unavailable.' : 'Voice note saved.' });
+        } catch (error) { onToast({ text: error instanceof Error ? error.message : 'Voice note could not be saved.' }); }
+        finally { recorder.current = null; setState('idle'); }
+      };
+      next.start(); setState('recording');
+    } catch (error) { onToast({ text: error instanceof Error ? error.message : 'Microphone access was not granted.' }); }
+  };
+  return <button type="button" class={state === 'recording' ? 'recording' : ''} onClick={() => state === 'recording' ? stop() : void start()} disabled={state === 'saving'}>{state === 'recording' ? 'Stop recording' : state === 'saving' ? 'Saving voice note…' : 'Add voice or note'}</button>;
 }
 
 function LyraStream({ events, reload, seed, storyContext, clearSeed, clearStoryContext, onToast }: { events: FeedEvent[]; reload: () => Promise<unknown>; seed: string; storyContext: string | null; clearSeed: () => void; clearStoryContext: () => void; onToast: (next: Toast) => void }) {
@@ -102,7 +147,7 @@ function LyraStream({ events, reload, seed, storyContext, clearSeed, clearStoryC
       }
     } finally { setSending(false); }
   };
-  return <div class="conversation-screen"><div class="stream-context">{all.length ? 'Today' : 'Lyra'}</div><div class="event-stream">{all.length ? all.map(event => <Message event={event} onAction={onAction} onAnswer={onAnswer} onToast={onToast}/>) : <Empty title="Lyra is ready" detail="Your reminders, briefings, and conversations will live here."/>}</div><div ref={bottom}/><form class="composer-wrap" onSubmit={send}><div class="composer"><textarea value={draft} onInput={event => setDraft((event.target as HTMLTextAreaElement).value)} rows={1} placeholder="Message Lyra…" aria-label="Message Lyra"/><button class="send-button" type="submit" disabled={sending} aria-label="Send message">↑</button></div><div class="composer-tools"><button type="button" onClick={() => onToast({ text: 'Voice capture is coming next.' })}>Add voice or note</button><span>{sending ? 'Lyra is working…' : 'Trusted context appears with every answer.'}</span></div></form></div>;
+  return <div class="conversation-screen"><div class="stream-context">{all.length ? 'Today' : 'Lyra'}</div><div class="event-stream">{all.length ? all.map(event => <Message event={event} onAction={onAction} onAnswer={onAnswer} onToast={onToast}/>) : <Empty title="Lyra is ready" detail="Your reminders, briefings, and conversations will live here."/>}</div><div ref={bottom}/><form class="composer-wrap" onSubmit={send}><div class="composer"><textarea value={draft} onInput={event => setDraft((event.target as HTMLTextAreaElement).value)} rows={1} placeholder="Message Lyra…" aria-label="Message Lyra"/><button class="send-button" type="submit" disabled={sending} aria-label="Send message">↑</button></div><div class="composer-tools"><VoiceCapture onToast={onToast}/><span>{sending ? 'Lyra is working…' : 'Trusted context appears with every answer.'}</span></div></form></div>;
 }
 
 function Message({ event, onAction, onAnswer, onToast }: { event: FeedEvent; onAction: (action: LyraAction) => Promise<void>; onAnswer: (block: Record<string, any>, answers: Record<string, string | string[]>) => Promise<void>; onToast: (next: Toast) => void }) {

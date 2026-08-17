@@ -66,7 +66,8 @@ async function notionDataSource(id) {
 export function createNotionReminderProvider() {
   return async () => {
     const key = process.env.NOTION_API_KEY;
-    const dataSource = process.env.NOTION_REMINDERS_DS_ID || '32678008-9100-8171-8940-000b30243ddd';
+    const dataSource = process.env.NOTION_REMINDERS_DS_ID;
+    if (!dataSource) return { items: [], source: { name: 'Notion reminders', status: 'unconfigured', asOf: new Date().toISOString() } };
     try {
       const response = await fetch(`https://api.notion.com/v1/data_sources/${dataSource}/query`, {
         method: 'POST', headers: notionHeaders(), body: JSON.stringify({ page_size: 50 }),
