@@ -9,6 +9,7 @@ import { createLiveProvider, createActionHandler } from './integrations.js';
 import { createPasskeyAuth } from './auth.js';
 import { createChannelAdapter } from './channels.js';
 import { createSessionStore } from './storage.js';
+import { migrate } from './migrate.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
@@ -246,5 +247,10 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-if (import.meta.url === `file://${process.argv[1]}`) server.listen(port, '127.0.0.1', () => console.log(`Lyra PWA listening on http://127.0.0.1:${port}`));
+if (import.meta.url === `file://${process.argv[1]}`) {
+  migrate().then(() => server.listen(port, '127.0.0.1', () => console.log(`Lyra PWA listening on http://127.0.0.1:${port}`))).catch(error => {
+    console.error(`Lyra migration failed: ${error.message}`);
+    process.exitCode = 1;
+  });
+}
 export { server };
