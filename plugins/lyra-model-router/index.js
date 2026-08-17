@@ -1,11 +1,11 @@
 /**
  * Lyra Model Router v16 — OpenClaw Plugin
  *
- * 4-way real-time router for ad-hoc traffic:
- *   Tier0 CRUD -> MiniMax -> Haiku -> Sonnet
+ * 3-way real-time router for ad-hoc traffic:
+ *   Tier0 CRUD -> Gemini Flash -> Claude Sonnet
  *
  * Includes:
- * - MiniMax-first complexity routing with configurable thresholds
+ * - Gemini Flash-first complexity routing with configurable thresholds
  * - rolling 24h/3d/7d Anthropic share checks
  * - conservative fallback profile
  * - budget-aware route clamping
@@ -38,8 +38,10 @@ const POLICY_VERSION = process.env.LYRA_ROUTING_POLICY_VERSION || "routing_thres
 const THRESHOLD_SET = process.env.LYRA_ROUTING_THRESHOLD_SET || "routing_thresholds_v1";
 
 const MODELS = {
-  minimax: { providerOverride: undefined, modelOverride: undefined, provider: "minimax", model: "minimax/MiniMax-M2.7" },
-  haiku: { providerOverride: "anthropic", modelOverride: "claude-haiku-4-5", provider: "anthropic", model: "anthropic/claude-haiku-4-5" },
+  // Kept as the legacy tier name so historic routing metrics remain readable.
+  // It now means the regular Gemini Flash path, not MiniMax.
+  minimax: { providerOverride: undefined, modelOverride: undefined, provider: "google", model: "google/gemini-3.5-flash" },
+  haiku: { providerOverride: "google", modelOverride: "gemini-3.5-flash", provider: "google", model: "google/gemini-3.5-flash" },
   sonnet: { providerOverride: "anthropic", modelOverride: "claude-sonnet-4-6", provider: "anthropic", model: "anthropic/claude-sonnet-4-6" },
 };
 
@@ -501,7 +503,7 @@ function logDecision(event, ctx, chosen, scores, features, modeState) {
       tier: chosen.tier,
       provider: mapped.provider,
       model: mapped.model,
-      anthropic_call: chosen.tier === "haiku" || chosen.tier === "sonnet",
+      anthropic_call: chosen.tier === "sonnet",
       confidence: Number(Math.max(scores.minimax, scores.haiku, scores.sonnet).toFixed(3)),
       classifier: "plugin_scoring_v1",
       scores: {
@@ -548,7 +550,7 @@ function resolveRoutingCore(event, ctx) {
     return { type: "tier0", direct: tier0 };
   }
 
-  if (HAIKU_PATTERNS.some((p) => p.test(prompt)) && anthropicAllowedForPolicy(ctx)) {
+  if (HAIKU_PATTERNS.some((p) => p.test(prompt))) {
     return { type: "haiku_early" };
   }
 
@@ -583,7 +585,7 @@ function routeQuery(event, ctx) {
   const { scores, features, modeState } = r;
 
   let route = undefined;
-  if (chosen.tier !== "minimax" && !anthropicAllowedForPolicy(ctx)) {
+  if (chosen.tier === "sonnet" && !anthropicAllowedForPolicy(ctx)) {
     chosen.tier = "minimax";
     chosen.reason = "anthropic_unavailable_fallback_minimax";
   }
@@ -652,14 +654,14 @@ export function routeForCli(message, ctx = {}) {
       latency_ms: Date.now() - startTime,
       policy_version: POLICY_VERSION,
       threshold_set_id: THRESHOLD_SET,
-      anthropic_call: true,
+      anthropic_call: false,
     };
   }
 
   const chosen = { ...r.chosen };
   const { scores, features, modeState } = r;
 
-  if (chosen.tier !== "minimax" && !anthropicAllowedForPolicy(ctx)) {
+  if (chosen.tier === "sonnet" && !anthropicAllowedForPolicy(ctx)) {
     chosen.tier = "minimax";
     chosen.reason = "anthropic_unavailable_fallback_minimax";
   }
@@ -680,7 +682,7 @@ export function routeForCli(message, ctx = {}) {
     policy_version: POLICY_VERSION,
     threshold_set_id: THRESHOLD_SET,
     threshold_mode: modeState.mode,
-    anthropic_call: chosen.tier === "haiku" || chosen.tier === "sonnet",
+    anthropic_call: chosen.tier === "sonnet",
     semantic_scores: {
       minimax: Number(scores.minimax.toFixed(3)),
       haiku: Number(scores.haiku.toFixed(3)),
