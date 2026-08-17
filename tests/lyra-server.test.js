@@ -60,6 +60,9 @@ test('server exposes health and protects API behind a session', async () => {
     const today = await fetch(`http://127.0.0.1:${port}/v1/today`, { headers: { cookie } });
     assert.equal(today.status, 200);
     assert.ok(Array.isArray((await today.json()).warnings));
+    const device = await fetch(`http://127.0.0.1:${port}/v1/device-status`, { headers: { cookie } });
+    assert.equal(device.status, 200);
+    assert.equal((await device.json()).authenticated, true);
     const feed = await fetch(`http://127.0.0.1:${port}/v1/feed`, { headers: { cookie } });
     assert.equal(feed.status, 200);
     const feedBody = await feed.json();

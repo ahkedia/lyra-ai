@@ -15,6 +15,7 @@ const publicDir = path.join(root, 'public');
 const componentFixturePath = path.resolve(root, '..', 'docs', 'fixtures', 'lyra-ui-v1.golden.json');
 const port = Number(process.env.LYRA_APP_PORT || 8787);
 const token = process.env.LYRA_APP_TOKEN || '';
+const appVersion = process.env.LYRA_APP_VERSION || '1.0.0';
 const api = createLyraApi({ dataProvider: createLiveProvider({ repoRoot: path.resolve(root, '..') }), actionHandler: createActionHandler({ repoRoot: path.resolve(root, '..') }) });
 const sessions = createSessionStore({ storeDir: process.env.LYRA_APP_DATA_DIR || path.resolve(process.cwd(), '.lyra-app') });
 const passkeys = createPasskeyAuth({ storeDir: process.env.LYRA_APP_DATA_DIR || path.resolve(process.cwd(), '.lyra-app') });
@@ -184,6 +185,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && req.url === '/v1/today') return json(res, 200, await api.today());
     if (req.method === 'GET' && req.url === '/v1/app-health') return json(res, 200, await api.appHealth());
+    if (req.method === 'GET' && req.url === '/v1/device-status') return json(res, 200, { authenticated: true, passkeyConfigured: passkeys.hasCredentials(), appVersion });
     if (req.method === 'GET' && req.url === '/v1/metrics') return json(res, 200, await api.metrics());
     if (req.method === 'GET' && req.url.startsWith('/v1/feed')) {
       const parsed = new URL(req.url, 'http://lyra.local');
