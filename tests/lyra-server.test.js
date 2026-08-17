@@ -40,6 +40,11 @@ test('server exposes health and protects API behind a session', async () => {
     const shell = await fetch(`http://127.0.0.1:${port}/app/`);
     assert.equal(shell.status, 200);
     assert.match(await shell.text(), /assets\/main\.js/);
+    const gallery = await fetch(`http://127.0.0.1:${port}/app/dev/components`);
+    assert.equal(gallery.status, 200);
+    const fixtures = await fetch(`http://127.0.0.1:${port}/v1/dev/components`);
+    assert.equal(fixtures.status, 200);
+    assert.equal((await fixtures.json()).cases.length, 17);
     const denied = await fetch(`http://127.0.0.1:${port}/v1/today`);
     assert.equal(denied.status, 401);
     const cronDelivery = await fetch(`http://127.0.0.1:${port}/v1/internal/cron-deliver`, { method: 'POST', headers: { authorization: 'Bearer cron-token', 'content-type': 'application/json' }, body: JSON.stringify({ id: 'cron:test:1', title: 'Cron test', text: 'A scheduled update.' }) });

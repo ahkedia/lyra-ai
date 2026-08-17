@@ -53,6 +53,7 @@ function useResource<T>(key: string, path: string, empty: T) {
 }
 
 function App() {
+  if (location.pathname === '/app/dev/components') return <ComponentGallery/>;
   const query = new URLSearchParams(location.search); const initial = query.get('tab');
   const [tab, setTab] = useState<Tab>(initial === 'todo' || initial === 'news' ? initial : 'lyra'); const [seed, setSeed] = useState(''); const [storyContext, setStoryContext] = useState<string | null>(null);
   const feed = useResource<{ events: FeedEvent[] }>('feed', '/v1/feed', { events: [] });
@@ -87,6 +88,15 @@ function App() {
     return () => stream.close();
   }, []);
   return <div class="app-shell app-next"><header class="topbar"><strong class="topbar-title">{tab === 'lyra' ? 'Lyra' : tab === 'todo' ? 'To Do' : 'News'}</strong><div class="topbar-actions"><Connection status={tab === 'lyra' ? feed.status : tab === 'todo' ? tasks.status : news.status}/><button class="icon-button" aria-label="Open settings" onClick={() => setSettings(true)}>•••</button></div></header><main class="main-content"><section hidden={tab !== 'lyra'}><LyraStream events={feed.value.events} reload={feed.load} seed={seed} storyContext={storyContext} clearSeed={() => setSeed('')} clearStoryContext={() => setStoryContext(null)} onToast={setToast}/></section><section hidden={tab !== 'todo'}><TodoScreen data={tasks.value} status={tasks.status} refresh={tasks.load} setData={tasks.setValue} onToast={setToast}/></section><section hidden={tab !== 'news'}><NewsScreen data={news.value} status={news.status} refresh={news.load} setData={news.setValue} onAsk={item => { setSeed('What matters about this story, and what should I do next?'); setStoryContext(item.id); setTab('lyra'); }} onToast={setToast}/></section></main><nav class="tabbar" aria-label="Primary navigation"><Tab label="Lyra" icon="✦" active={tab === 'lyra'} onClick={() => setTab('lyra')}/><Tab label="To Do" icon="✓" active={tab === 'todo'} onClick={() => setTab('todo')}/><Tab label="News" icon="◌" active={tab === 'news'} onClick={() => setTab('news')}/></nav>{toast && <div class="toast" role="status"><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null); }}>Undo</button>}</div>}{settings && <SettingsSheet onClose={() => setSettings(false)} pendingCount={pendingCount} onRetry={() => void flushPending()}/>}</div>;
+}
+
+function ComponentGallery() {
+  const [fixture, setFixture] = useState<{ cases?: Array<{ id: string; component: string; envelope: LyraEnvelope }> } | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => { void fetch('/v1/dev/components').then(response => response.ok ? response.json() : Promise.reject(new Error('Component gallery is unavailable'))).then(setFixture).catch(issue => setError(issue.message)); }, []);
+  if (error) return <main class="component-gallery"><h1>Component gallery</h1><p>{error}</p></main>;
+  if (!fixture) return <main class="component-gallery"><h1>Component gallery</h1><p>Loading fixtures…</p></main>;
+  return <main class="component-gallery"><header><p class="block-eyebrow">Development only</p><h1>Lyra rich components</h1><p>Every fixture below uses the same validated renderer as the Lyra stream.</p></header>{fixture.cases?.map(item => <section class="gallery-case" data-fixture-id={item.id}><header><strong>{item.component}</strong><small>{item.id}</small></header><BlockList blocks={item.envelope.blocks} context={{ envelope: item.envelope, onAction: async () => undefined, onQuestionAnswer: async () => undefined }}/></section>)}</main>;
 }
 
 function Connection({ status }: { status: Status }) { return status === 'offline' ? <span class="connection-state">Offline</span> : status === 'sign-in' ? <span class="connection-state">Sign in required</span> : status === 'refreshing' ? <span class="quiet-status">Updating</span> : null; }

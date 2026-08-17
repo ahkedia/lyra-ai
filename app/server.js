@@ -1,4 +1,4 @@
-import { createReadStream } from 'node:fs';
+import { createReadStream, readFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
@@ -11,6 +11,7 @@ import { createSessionStore } from './storage.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
+const componentFixturePath = path.resolve(root, '..', 'docs', 'fixtures', 'lyra-ui-v1.golden.json');
 const port = Number(process.env.LYRA_APP_PORT || 8787);
 const token = process.env.LYRA_APP_TOKEN || '';
 const api = createLyraApi({ dataProvider: createLiveProvider({ repoRoot: path.resolve(root, '..') }), actionHandler: createActionHandler({ repoRoot: path.resolve(root, '..') }) });
@@ -62,6 +63,10 @@ function authAllowed(req) {
 
 async function serveStatic(req, res) {
   const rawPath = req.url.split('?')[0];
+  if (rawPath === '/app/dev/components' && process.env.NODE_ENV !== 'production') {
+    req.url = '/app/';
+    return serveStatic(req, res);
+  }
   const requested = rawPath === '/' || rawPath === '/app' || rawPath === '/app/' ? '/index.html' : rawPath.startsWith('/app/') ? rawPath.slice(4) : rawPath;
   const file = path.resolve(publicDir, `.${requested}`);
   if (!file.startsWith(publicDir)) return json(res, 404, { error: 'Not found' });
@@ -76,6 +81,7 @@ const server = http.createServer(async (req, res) => {
     await Promise.all([api.ready, sessions.ready]);
     if (req.url === '/health') return json(res, 200, { ok: true, service: 'lyra-app', at: new Date().toISOString() });
     if (!req.url.startsWith('/v1/')) return serveStatic(req, res);
+    if (req.method === 'GET' && req.url === '/v1/dev/components') return process.env.NODE_ENV !== 'production' ? json(res, 200, JSON.parse(readFileSync(componentFixturePath, 'utf8'))) : json(res, 404, { error: 'Not found' });
     if (req.method === 'POST' && req.url === '/v1/auth/session') {
       if (!authAllowed(req)) return json(res, 429, { error: 'Too many authentication attempts' });
       const input = await body(req);
