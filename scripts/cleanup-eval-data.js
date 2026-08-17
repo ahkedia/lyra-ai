@@ -126,6 +126,10 @@ const CLEANUP_PATTERNS = [
   'water the plants',              // Common test reminder
   'meal planning sync',            // Cross-user test
   'pick up groceries',             // Test reminder
+  'apples',                        // Tier 0 shopping-list test
+  'yogurt',                        // Abhigna shopping-list test
+  'go to dentist',                 // Legacy reminder test
+  'get oranges',                   // Legacy shopping-list test
 ];
 
 function extractTitle(page, titleProperties) {
