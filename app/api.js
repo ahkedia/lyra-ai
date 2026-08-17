@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -23,6 +23,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
   const actions = new Map();
   const captures = [];
   const pushSubscriptions = [];
+  const deliveries = new Map();
   const conversations = new Map();
   const events = new Map();
   const feedListeners = new Set();
@@ -38,6 +39,8 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
       for (const conversation of saved.conversations || []) conversations.set(conversation.id, conversation);
       for (const action of saved.actions || []) actions.set(action.id, action);
       captures.push(...(saved.captures || []));
+      pushSubscriptions.push(...(saved.pushSubscriptions || []));
+      for (const delivery of saved.deliveries || []) deliveries.set(delivery.id, delivery);
       for (const event of saved.events || []) events.set(event.id, event);
       for (const question of saved.questions || []) questions.set(question.questionId, question);
       newsBrief = saved.newsBrief || null;
@@ -47,8 +50,9 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
   }
 
   function persist() {
-    const state = { conversations: [...conversations.values()], actions: [...actions.values()], captures, events: [...events.values()], questions: [...questions.values()], newsBrief, newsItems, newsRefreshedAt };
-    mkdir(storeDir, { recursive: true }).then(() => writeFileSync(stateFile, JSON.stringify(state, null, 2), { mode: 0o600 })).catch(() => {});
+    const state = { conversations: [...conversations.values()], actions: [...actions.values()], captures, pushSubscriptions, deliveries: [...deliveries.values()], events: [...events.values()], questions: [...questions.values()], newsBrief, newsItems, newsRefreshedAt };
+    mkdirSync(storeDir, { recursive: true });
+    writeFileSync(stateFile, JSON.stringify(state, null, 2), { mode: 0o600 });
     const stateWrite = durableStore.writeState?.(state);
     stateWrite?.catch(() => {});
   }
@@ -58,6 +62,8 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     for (const conversation of saved.conversations || []) conversations.set(conversation.id, conversation);
     for (const action of saved.actions || []) actions.set(action.id, action);
     captures.push(...(saved.captures || []));
+    pushSubscriptions.push(...(saved.pushSubscriptions || []));
+    for (const delivery of saved.deliveries || []) deliveries.set(delivery.id, delivery);
     for (const event of saved.events || []) events.set(event.id, event);
     for (const question of saved.questions || []) questions.set(question.questionId, question);
     newsBrief = saved.newsBrief || null;
@@ -72,11 +78,39 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     await durableStore.write({ at: now(), ...event });
   }
 
+  const retryDelay = [10_000, 60_000, 300_000, 1_800_000, 7_200_000];
+
   async function queuePush(event) {
     await mkdir(storeDir, { recursive: true });
     await writeFile(path.join(storeDir, 'push-outbox.jsonl'), `${JSON.stringify({ at: now(), ...event })}\n`, { flag: 'a', mode: 0o600 });
-    const results = await Promise.allSettled(pushSubscriptions.map(item => pushSender.send(item.subscription, event)));
-    return { queued: true, delivered: results.filter(result => result.status === 'fulfilled' && result.value.delivered).length };
+    const id = `push:${event.eventId || event.actionId || randomUUID()}`;
+    if (!deliveries.has(id)) deliveries.set(id, { id, channel: 'push', event, status: 'pending', attempts: 0, createdAt: now(), nextAttemptAt: now() });
+    persist();
+    const result = await deliverDue();
+    return { queued: true, delivered: result.delivered };
+  }
+
+  async function deliverDue(at = Date.now()) {
+    let delivered = 0;
+    const due = [...deliveries.values()].filter(item => ['pending', 'retry'].includes(item.status) && Date.parse(item.nextAttemptAt) <= at).slice(0, 20);
+    for (const delivery of due) {
+      delivery.status = 'delivering';
+      delivery.attempts += 1;
+      persist();
+      if (!pushSubscriptions.length) {
+        delivery.status = 'skipped'; delivery.reason = 'no_subscription'; delivery.completedAt = now(); persist();
+        continue;
+      }
+      const results = await Promise.allSettled(pushSubscriptions.map(item => pushSender.send(item.subscription, delivery.event)));
+      const count = results.filter(result => result.status === 'fulfilled' && result.value?.delivered).length;
+      if (count) { delivered += count; delivery.status = 'delivered'; delivery.completedAt = now(); delete delivery.error; persist(); continue; }
+      const failure = results.find(result => result.status === 'rejected');
+      delivery.error = failure?.status === 'rejected' ? String(failure.reason?.message || 'Push delivery failed').slice(0, 240) : 'Push delivery failed';
+      if (delivery.attempts >= retryDelay.length) { delivery.status = 'failed'; delivery.failedAt = now(); }
+      else { delivery.status = 'retry'; delivery.nextAttemptAt = new Date(at + retryDelay[delivery.attempts - 1]).toISOString(); }
+      persist();
+    }
+    return { delivered, processed: due.length };
   }
 
   async function testPush() {
@@ -252,6 +286,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
       generatedAt: now(),
       sources: (data.sources || []).map(source => ({ name: source.name || 'Lyra source', status: source.status || 'unknown', asOf: source.asOf || null })),
       pendingQuestions: [...questions.values()].filter(question => question.status === 'pending').length,
+      delivery: { pending: [...deliveries.values()].filter(item => ['pending', 'retry', 'delivering'].includes(item.status)).length, failed: [...deliveries.values()].filter(item => item.status === 'failed').length },
     };
   }
 
@@ -429,14 +464,20 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     updateNewsItem,
     refreshNews,
     subscribePush(subscription) {
-      pushSubscriptions.push({ subscription, createdAt: now() });
+      const endpoint = subscription?.endpoint;
+      if (!endpoint) throw new Error('Push subscription needs an endpoint');
+      const index = pushSubscriptions.findIndex(item => item.subscription?.endpoint === endpoint);
+      const item = { subscription, createdAt: now() };
+      if (index >= 0) pushSubscriptions[index] = item;
+      else pushSubscriptions.push(item);
       persist();
       return { accepted: true };
     },
     pushPublicKey: pushSender.publicKey,
     queuePush,
+    deliverDue,
     testPush,
-    _state: { actions, captures, pushSubscriptions, conversations, events, questions },
+    _state: { actions, captures, pushSubscriptions, deliveries, conversations, events, questions },
     ready,
   };
 }

@@ -142,6 +142,20 @@ test('test push is safely queued even when delivery is not configured', async ()
   assert.match(await readFile(path.join(dir, 'push-outbox.jsonl'), 'utf8'), /push\.test/);
 });
 
+test('push deliveries are persisted, deduplicated, and marked delivered only after sender confirmation', async () => {
+  const storeDir = await mkdtemp(path.join(os.tmpdir(), 'lyra-app-'));
+  const api = createLyraApi({ storeDir, pushSender: { send: async () => ({ delivered: true }) } });
+  api.subscribePush({ endpoint: 'https://push.example/device-1' });
+  api.subscribePush({ endpoint: 'https://push.example/device-1' });
+  const result = await api.queuePush({ type: 'feed.event', eventId: 'push-event-1', title: 'Lyra update' });
+  assert.equal(result.delivered, 1);
+  assert.equal(api._state.deliveries.get('push:push-event-1').status, 'delivered');
+  const restarted = createLyraApi({ storeDir, pushSender: { send: async () => ({ delivered: true }) } });
+  await restarted.ready;
+  assert.equal(restarted._state.deliveries.get('push:push-event-1').status, 'delivered');
+  assert.equal(restarted._state.pushSubscriptions.length, 1);
+});
+
 test('telegram bridge maps updates into the shared channel contract', () => {
   const update = { message: { text: 'What is next?', chat: { id: 42 } } };
   assert.equal(extractText(update), 'What is next?');
