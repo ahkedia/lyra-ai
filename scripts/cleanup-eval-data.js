@@ -125,6 +125,7 @@ const CLEANUP_PATTERNS = [
   'dentist appointment tomorrow',  // Common test reminder
   'water the plants',              // Common test reminder
   'meal planning sync',            // Cross-user test
+  'meal plan follow-up',           // Cross-user test
   'pick up groceries',             // Test reminder
   'apples',                        // Tier 0 shopping-list test
   'yogurt',                        // Abhigna shopping-list test
