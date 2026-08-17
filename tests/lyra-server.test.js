@@ -40,6 +40,8 @@ test('server exposes health and protects API behind a session', async () => {
     const shell = await fetch(`http://127.0.0.1:${port}/app/`);
     assert.equal(shell.status, 200);
     assert.match(await shell.text(), /assets\/main\.js/);
+    assert.equal(shell.headers.get('x-frame-options'), 'DENY');
+    assert.equal(shell.headers.get('content-security-policy'), "frame-ancestors 'none'");
     const gallery = await fetch(`http://127.0.0.1:${port}/app/dev/components`);
     assert.equal(gallery.status, 200);
     const fixtures = await fetch(`http://127.0.0.1:${port}/v1/dev/components`);

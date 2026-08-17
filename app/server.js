@@ -72,7 +72,13 @@ async function serveStatic(req, res) {
   if (!file.startsWith(publicDir)) return json(res, 404, { error: 'Not found' });
   try { await stat(file); } catch { return json(res, 404, { error: 'Not found' }); }
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
-  res.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream' });
+  res.writeHead(200, {
+    'content-type': types[path.extname(file)] || 'application/octet-stream',
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'DENY',
+    'content-security-policy': "frame-ancestors 'none'",
+    'referrer-policy': 'same-origin',
+  });
   createReadStream(file).pipe(res);
 }
 
