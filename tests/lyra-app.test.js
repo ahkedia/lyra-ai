@@ -10,7 +10,7 @@ import { createPasskeyAuth } from '../app/auth.js';
 import { createActionHandler, createNotionReminderProvider } from '../app/integrations.js';
 import { extractText, senderId } from '../scripts/telegram-lyra-bridge.mjs';
 import { assertLyraEnvelope, formatEnvelopeForFallback, normalizeAgentOutput } from '../app/schemas.js';
-import { normaliseNewsBrief } from '../app/news.js';
+import { clusterNewsItems, normaliseNewsBrief } from '../app/news.js';
 import { buildMorningEnvelope } from '../scripts/deliver-morning-brief-to-pwa.mjs';
 
 test('golden rich UI fixture conforms to the canonical envelope', async () => {
@@ -27,6 +27,16 @@ test('morning briefs become stable rich News items', () => {
   assert.equal(item.topic, 'Fintech');
   assert.match(item.id, /^[a-f0-9]{24}$/);
   assert.equal(item.sources[0].source, 'Example News');
+});
+
+test('News clustering groups the same event while retaining every source', () => {
+  const clustered = clusterNewsItems([
+    { id: 'one', headline: 'Stripe launches new payments tools for European startups', summary: 'First report', source: 'Source A', sourceUrl: 'https://example.com/a', publishedAt: '2026-08-17T08:00:00.000Z', sources: [{ source: 'Source A', title: 'Stripe launches new payments tools for European startups', url: 'https://example.com/a' }] },
+    { id: 'two', headline: 'Stripe launches payments tools for Europe startups', summary: 'A longer second report with more detail.', source: 'Source B', sourceUrl: 'https://example.com/b', publishedAt: '2026-08-17T09:00:00.000Z', sources: [{ source: 'Source B', title: 'Stripe launches payments tools for Europe startups', url: 'https://example.com/b' }] },
+    { id: 'three', headline: 'A separate artificial intelligence report', summary: 'Independent story', source: 'Source C', sourceUrl: 'https://example.com/c', publishedAt: '2026-08-17T09:00:00.000Z', sources: [{ source: 'Source C', title: 'A separate artificial intelligence report', url: 'https://example.com/c' }] },
+  ]);
+  assert.equal(clustered.length, 2);
+  assert.equal(clustered.find(item => item.headline.startsWith('Stripe')).sources.length, 2);
 });
 
 test('a populated live source feed has an honest lead state before the morning brief arrives', async () => {

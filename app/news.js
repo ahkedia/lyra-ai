@@ -13,6 +13,14 @@ const text = value => String(value || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,
 const field = (xml, tag) => text(xml.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, 'i'))?.[1]);
 const link = xml => xml.match(/<link[^>]+href=["']([^"']+)["'][^>]*>/i)?.[1] || field(xml, 'link');
 const stableId = value => createHash('sha256').update(value).digest('hex').slice(0, 24);
+const headlineTokens = value => new Set(text(value).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(token => token.length > 2 && !new Set(['with', 'from', 'that', 'this', 'into', 'after', 'about', 'over', 'will', 'have', 'their', 'your']).has(token)));
+const sameStory = (left, right) => {
+  const a = headlineTokens(left.headline); const b = headlineTokens(right.headline);
+  const overlap = [...a].filter(token => b.has(token)).length;
+  const similarity = overlap / Math.max(1, Math.min(a.size, b.size));
+  const hoursApart = Math.abs(Date.parse(left.publishedAt || 0) - Date.parse(right.publishedAt || 0)) / 3_600_000;
+  return similarity >= 0.72 && (!Number.isFinite(hoursApart) || hoursApart <= 72);
+};
 
 function parseFeed(xml, source) {
   const entries = [...xml.matchAll(/<(?:item|entry)(?:\s[^>]*)?>([\s\S]*?)<\/(?:item|entry)>/gi)].map(match => match[1]);
@@ -34,15 +42,29 @@ export async function fetchNewsSources({ timeoutMs = 5000 } = {}) {
   }));
   const items = results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
   const seen = new Set();
-  return items.filter(item => !seen.has(item.id) && seen.add(item.id)).sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || ''))).slice(0, 24);
+  return clusterNewsItems(items.filter(item => !seen.has(item.id) && seen.add(item.id))).slice(0, 24);
+}
+
+export function clusterNewsItems(items = []) {
+  const groups = [];
+  for (const item of items.sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')))) {
+    const group = groups.find(candidate => sameStory(candidate.lead, item));
+    if (group) group.items.push(item);
+    else groups.push({ lead: item, items: [item] });
+  }
+  return groups.map(group => {
+    const sources = [...new Map(group.items.flatMap(item => item.sources || [{ source: item.source, title: item.headline, url: item.sourceUrl, publishedAt: item.publishedAt }]).filter(source => source.url).map(source => [source.url, source])).values()];
+    const lead = [...group.items].sort((a, b) => String(b.summary || '').length - String(a.summary || '').length)[0];
+    return { ...lead, id: group.items.length === 1 ? lead.id : stableId(sources.map(source => source.url).sort().join('|') || lead.id), sources, source: lead.source || sources[0]?.source, sourceUrl: lead.sourceUrl || sources[0]?.url };
+  }).sort((a, b) => String(b.publishedAt || '').localeCompare(String(a.publishedAt || '')));
 }
 
 export function normaliseNewsBrief(brief) {
   if (!brief) return [];
-  return (brief.items || []).flatMap((item, index) => {
+  return clusterNewsItems((brief.items || []).flatMap((item, index) => {
     const headline = String(item.headline || item.title || '').trim(); const sourceUrl = item.sourceUrl || item.url;
     if (!headline) return [];
     const sources = Array.isArray(item.sources) ? item.sources : [{ source: item.source || 'Lyra morning brief', title: item.sourceTitle || headline, url: sourceUrl, publishedAt: item.publishedAt || brief.generatedAt || brief.date }];
     return [{ id: item.id || stableId(sourceUrl || `${brief.date || brief.generatedAt || 'brief'}:${headline}:${index}`), headline, summary: String(item.summary || '').slice(0, 620), whyItMatters: String(item.whyItMatters || '').slice(0, 480), topic: item.topic || 'For you', source: item.source || sources[0]?.source || 'Lyra morning brief', sourceUrl, imageUrl: item.imageUrl || item.image?.url, publishedAt: item.publishedAt || brief.generatedAt || brief.date, sources }];
-  });
+  }));
 }
