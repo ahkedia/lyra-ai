@@ -19,17 +19,17 @@ const contentFrom = entry => clean(entry.output || entry.text || entry.message |
 
 const state = await loadState();
 const { jobs = [] } = await command(['cron', 'list', '--json']);
-let delivered = 0;
-for (const job of jobs.filter(item => item.enabled && item.name !== 'lyra-pwa-cron-delivery')) {
+const activeJobs = jobs.filter(item => item.enabled && item.name !== 'lyra-pwa-cron-delivery');
+async function processJob(job) {
   const history = await command(['cron', 'runs', '--id', job.id, '--limit', '1']);
   const entry = history.entries?.[0];
-  if (!entry || entry.action !== 'finished' || !entry.ts || state.delivered[job.id] === entry.ts) continue;
+  if (!entry || entry.action !== 'finished' || !entry.ts || state.delivered[job.id] === entry.ts) return 0;
   const content = contentFrom(entry);
   const failed = entry.status !== 'ok' || looksOperational(content);
   const terminalStatus = !content || content === 'SKIP' ? 'skipped' : failed ? 'failed' : 'completed';
   const statusResponse = await fetch(statusEndpoint, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ id: `openclaw-cron:${job.id}:${entry.ts}`, jobId: job.id, runId: String(entry.ts), title: job.name, status: terminalStatus, finishedAt: entry.tsIso || new Date(entry.ts).toISOString(), ...(failed ? { errorCategory: 'cron_execution_failed' } : {}) }) });
   if (!statusResponse.ok) throw new Error(`PWA cron status failed for ${job.name}: ${statusResponse.status}`);
-  if (!content || content === 'SKIP') { state.delivered[job.id] = entry.ts; continue; }
+  if (!content || content === 'SKIP') { state.delivered[job.id] = entry.ts; return 0; }
   const payload = {
     id: `openclaw-cron:${job.id}:${entry.ts}`, jobId: job.id, runId: String(entry.ts), title: job.name,
     status: failed ? 'failed' : 'completed', finishedAt: entry.tsIso || new Date(entry.ts).toISOString(), deliveryBridge: 'openclaw-cron',
@@ -39,8 +39,14 @@ for (const job of jobs.filter(item => item.enabled && item.name !== 'lyra-pwa-cr
   const response = await fetch(endpoint, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(payload) });
   if (!response.ok) throw new Error(`PWA delivery failed for ${job.name}: ${response.status}`);
   state.delivered[job.id] = entry.ts;
-  delivered += 1;
+  return 1;
+}
+
+let delivered = 0;
+for (let index = 0; index < activeJobs.length; index += 4) {
+  const results = await Promise.all(activeJobs.slice(index, index + 4).map(processJob));
+  delivered += results.reduce((sum, count) => sum + count, 0);
 }
 await mkdir(path.dirname(statePath), { recursive: true });
 await writeFile(statePath, JSON.stringify(state, null, 2), { mode: 0o600 });
-console.log(JSON.stringify({ delivered, jobs: jobs.length }));
+console.log(JSON.stringify({ delivered, jobs: activeJobs.length }));
