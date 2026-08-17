@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 async function startServer() {
   const port = 19000 + Math.floor(Math.random() * 1000);
   const storeDir = await mkdtemp(path.join(os.tmpdir(), 'lyra-server-'));
-  const child = spawn(process.execPath, ['app/server.js'], { cwd: path.resolve(import.meta.dirname, '..'), env: { ...process.env, LYRA_APP_PORT: String(port), LYRA_APP_TOKEN: 'test-token', LYRA_APP_DATA_DIR: storeDir }, stdio: 'ignore' });
+  const child = spawn(process.execPath, ['app/server.js'], { cwd: path.resolve(import.meta.dirname, '..'), env: { ...process.env, LYRA_APP_PORT: String(port), LYRA_APP_TOKEN: 'test-token', LYRA_CRON_TOKEN: 'cron-token', LYRA_APP_DATA_DIR: storeDir }, stdio: 'ignore' });
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try { await fetch(`http://127.0.0.1:${port}/health`); return { child, port }; } catch { await new Promise(resolve => setTimeout(resolve, 20)); }
   }
@@ -26,6 +26,8 @@ test('server exposes health and protects API behind a session', async () => {
     assert.match(await shell.text(), /assets\/main\.js/);
     const denied = await fetch(`http://127.0.0.1:${port}/v1/today`);
     assert.equal(denied.status, 401);
+    const cronDelivery = await fetch(`http://127.0.0.1:${port}/v1/internal/cron-deliver`, { method: 'POST', headers: { authorization: 'Bearer cron-token', 'content-type': 'application/json' }, body: JSON.stringify({ id: 'cron:test:1', title: 'Cron test', text: 'A scheduled update.' }) });
+    assert.equal(cronDelivery.status, 200);
     const signIn = await fetch(`http://127.0.0.1:${port}/v1/auth/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: 'test-token' }) });
     assert.equal(signIn.status, 201);
     const cookie = signIn.headers.get('set-cookie');

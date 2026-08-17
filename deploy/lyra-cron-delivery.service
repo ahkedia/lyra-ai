@@ -1,0 +1,10 @@
+[Unit]
+Description=Deliver completed OpenClaw cron runs to Lyra PWA
+After=openclaw.service lyra-app.service
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/lyra/lyra-app.env
+Environment=LYRA_CRON_DELIVERY_STATE=/var/lib/lyra-app/openclaw-cron-delivery.json
+ExecStart=/usr/bin/node /opt/lyra-ai/scripts/deliver-openclaw-crons-to-pwa.mjs

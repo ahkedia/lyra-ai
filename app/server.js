@@ -105,17 +105,17 @@ const server = http.createServer(async (req, res) => {
       if (!authAllowed(req)) return json(res, 429, { error: 'Too many authentication attempts' });
       const input = await body(req); const result = await passkeys.verifyAuthentication(input.challengeId, input.response); const session = randomUUID(); sessions.add(session); res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': sessionCookie(session) }); return res.end(JSON.stringify({ ...result, authenticated: true }));
     }
+    if (req.method === 'POST' && req.url === '/v1/internal/cron-deliver') {
+      const cronToken = process.env.LYRA_CRON_TOKEN || '';
+      if (!cronToken || req.headers.authorization !== `Bearer ${cronToken}`) return json(res, 401, { error: 'Unauthorized' });
+      return json(res, 200, await api.ingestScheduled(await body(req)));
+    }
+
     if (!authorised(req)) return json(res, 401, { error: 'Unauthorized' });
 
     if (req.method === 'POST' && req.url === '/v1/channels/message') {
       const input = await body(req);
       return json(res, 200, await channels.handleMessage({ channel: input.channel, senderId: input.senderId, text: input.text }));
-    }
-
-    if (req.method === 'POST' && req.url === '/v1/internal/cron-deliver') {
-      const cronToken = process.env.LYRA_CRON_TOKEN || '';
-      if (!cronToken || req.headers.authorization !== `Bearer ${cronToken}`) return json(res, 401, { error: 'Unauthorized' });
-      return json(res, 200, await api.ingestScheduled(await body(req)));
     }
 
     if (req.method === 'GET' && req.url === '/v1/today') return json(res, 200, await api.today());
