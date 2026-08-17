@@ -630,21 +630,6 @@ dialog::backdrop {
 [hidden] {
   display: none !important;
 }
-@media (min-width: 700px) {
-  .tabbar {
-    position: fixed;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: 420px;
-    border: 1px solid #e8e8e8;
-    border-bottom: 0;
-    border-radius: 17px 17px 0 0;
-  }
-  .main-content {
-    padding-bottom: 120px;
-  }
-}
 @media (max-width: 520px) {
   .stream-header h1 {
     font-size: 27px;
@@ -664,6 +649,21 @@ dialog::backdrop {
     bottom: calc(68px + env(safe-area-inset-bottom));
   }
 }
+
+/* The product target is an installed iPhone PWA, not a desktop dashboard. */
+@media (max-width: 430px) {
+  .topbar { height: 62px; padding: 0 18px; }
+  .main-content { padding: 0 18px 104px; }
+  .stream-header { margin: 8px 0 20px; }
+  .tabbar { height: 70px; gap: 2px; padding-left: 6px; padding-right: 6px; }
+  .tab-button { border-radius: 12px; min-height: 54px; }
+  .tab-button small { font-size: 11px; }
+  .composer-tools { margin-bottom: 4px; }
+  .reminder-filters, .news-filters { margin-right: -18px; padding-right: 18px; }
+}
+
+.tab-button:focus:not(:focus-visible) { outline: 0; }
+.tab-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Destination surfaces */
 .list-count { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
@@ -691,8 +691,3 @@ dialog::backdrop {
 .briefing-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 12px; }
 .brief-summary { font-size: 16px !important; line-height: 1.5 !important; margin-bottom: 18px !important; }
 .news-card-footer { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 12px; font-size: 12px; }
-
-@media (min-width: 700px) {
-  .tabbar { left: 0; right: 0; transform: none; width: auto; border: 0; border-radius: 0; justify-content: center; padding-left: calc((100vw - 840px) / 2); padding-right: calc((100vw - 840px) / 2); }
-  .tab-button { max-width: 240px; }
-}
