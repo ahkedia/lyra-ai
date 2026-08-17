@@ -59,6 +59,13 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
 
   const ready = durableStore.loadState?.().then(saved => {
     if (!saved) return;
+    actions.clear();
+    captures.length = 0;
+    pushSubscriptions.length = 0;
+    deliveries.clear();
+    conversations.clear();
+    events.clear();
+    questions.clear();
     for (const conversation of saved.conversations || []) conversations.set(conversation.id, conversation);
     for (const action of saved.actions || []) actions.set(action.id, action);
     captures.push(...(saved.captures || []));

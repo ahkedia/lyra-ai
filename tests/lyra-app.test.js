@@ -257,6 +257,18 @@ test('hydrates conversations and actions from a durable store before serving req
   assert.equal(api.listConversations()[0].id, 'durable-1');
 });
 
+test('database hydration replaces local fallback state instead of duplicating deliveries or subscriptions', async () => {
+  const storeDir = await mkdtemp(path.join(os.tmpdir(), 'lyra-app-'));
+  const first = createLyraApi({ storeDir });
+  first.subscribePush({ endpoint: 'https://push.example/device-1' });
+  await first.capture({ kind: 'text', text: 'A note' });
+  const persisted = JSON.parse(await readFile(path.join(storeDir, 'state.json'), 'utf8'));
+  const second = createLyraApi({ storeDir, durableStore: { loadState: async () => persisted, writeState: async () => {}, write: async () => {} } });
+  await second.ready;
+  assert.equal(second._state.pushSubscriptions.length, 1);
+  assert.equal(second._state.captures.length, 1);
+});
+
 test('channel adapter routes a message into a stable Lyra conversation', async () => {
   const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), agentRunner: async ({ fallback }) => fallback });
   const adapter = createChannelAdapter({ api });
