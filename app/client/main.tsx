@@ -74,6 +74,18 @@ function App() {
     refreshPending(); void feed.load(); void tasks.load();
   };
   useEffect(() => { refreshPending(); void flushPending(); const online = () => { void flushPending(); }; window.addEventListener('online', online); return () => window.removeEventListener('online', online); }, []);
+  useEffect(() => {
+    if (!window.EventSource) return;
+    const stream = new EventSource('/v1/feed/stream');
+    stream.onmessage = message => {
+      try {
+        const next = JSON.parse(message.data);
+        if (next.type !== 'feed.event' || !next.event?.id) return;
+        feed.setValue(current => ({ ...current, events: [next.event, ...current.events.filter(event => event.id !== next.event.id)] }));
+      } catch { /* A malformed live frame must not remove cached content. */ }
+    };
+    return () => stream.close();
+  }, []);
   return <div class="app-shell app-next"><header class="topbar"><strong class="topbar-title">{tab === 'lyra' ? 'Lyra' : tab === 'todo' ? 'To Do' : 'News'}</strong><div class="topbar-actions"><Connection status={tab === 'lyra' ? feed.status : tab === 'todo' ? tasks.status : news.status}/><button class="icon-button" aria-label="Open settings" onClick={() => setSettings(true)}>•••</button></div></header><main class="main-content"><section hidden={tab !== 'lyra'}><LyraStream events={feed.value.events} reload={feed.load} seed={seed} storyContext={storyContext} clearSeed={() => setSeed('')} clearStoryContext={() => setStoryContext(null)} onToast={setToast}/></section><section hidden={tab !== 'todo'}><TodoScreen data={tasks.value} status={tasks.status} refresh={tasks.load} setData={tasks.setValue} onToast={setToast}/></section><section hidden={tab !== 'news'}><NewsScreen data={news.value} status={news.status} refresh={news.load} setData={news.setValue} onAsk={item => { setSeed('What matters about this story, and what should I do next?'); setStoryContext(item.id); setTab('lyra'); }} onToast={setToast}/></section></main><nav class="tabbar" aria-label="Primary navigation"><Tab label="Lyra" icon="✦" active={tab === 'lyra'} onClick={() => setTab('lyra')}/><Tab label="To Do" icon="✓" active={tab === 'todo'} onClick={() => setTab('todo')}/><Tab label="News" icon="◌" active={tab === 'news'} onClick={() => setTab('news')}/></nav>{toast && <div class="toast" role="status"><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null); }}>Undo</button>}</div>}{settings && <SettingsSheet onClose={() => setSettings(false)} pendingCount={pendingCount} onRetry={() => void flushPending()}/>}</div>;
 }
 

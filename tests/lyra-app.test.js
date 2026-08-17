@@ -42,6 +42,16 @@ test('a scheduled rich morning brief updates the Lyra stream and News from one c
   assert.equal((await api.news()).items[0].headline, 'Payment rails change');
 });
 
+test('canonical event subscribers receive each new scheduled event once', async () => {
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')) });
+  const received = [];
+  const unsubscribe = api.subscribeFeed(event => received.push(event.id));
+  await api.ingestScheduled({ id: 'live-cron-1', text: 'A scheduled update.' });
+  unsubscribe();
+  await api.ingestScheduled({ id: 'live-cron-2', text: 'Another update.' });
+  assert.deepEqual(received, ['live-cron-1']);
+});
+
 test('News read and saved states persist through an API restart', async () => {
   const storeDir = await mkdtemp(path.join(os.tmpdir(), 'lyra-app-'));
   const first = createLyraApi({ storeDir });

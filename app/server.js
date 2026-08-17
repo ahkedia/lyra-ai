@@ -118,6 +118,19 @@ const server = http.createServer(async (req, res) => {
 
     if (!await authorised(req)) return json(res, 401, { error: 'Unauthorized' });
 
+    if (req.method === 'GET' && req.url.startsWith('/v1/feed/stream')) {
+      const lastId = req.headers['last-event-id'];
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+      res.write('retry: 3000\n\n');
+      const backlog = api.listFeed({ limit: 100 }).events.reverse();
+      const start = lastId ? Math.max(0, backlog.findIndex(event => event.id === lastId) + 1) : backlog.length;
+      for (const event of backlog.slice(start)) res.write(`id: ${event.id}\ndata: ${JSON.stringify({ type: 'feed.event', event })}\n\n`);
+      const unsubscribe = api.subscribeFeed(event => res.write(`id: ${event.id}\ndata: ${JSON.stringify({ type: 'feed.event', event })}\n\n`));
+      const heartbeat = setInterval(() => res.write(': keepalive\n\n'), 20_000);
+      req.on('close', () => { clearInterval(heartbeat); unsubscribe(); });
+      return;
+    }
+
     if (req.method === 'POST' && req.url === '/v1/channels/message') {
       const input = await body(req);
       return json(res, 200, await channels.handleMessage({ channel: input.channel, senderId: input.senderId, text: input.text }));

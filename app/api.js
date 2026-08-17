@@ -25,6 +25,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
   const pushSubscriptions = [];
   const conversations = new Map();
   const events = new Map();
+  const feedListeners = new Set();
   const questions = new Map();
   let newsBrief = null;
   let newsItems = [];
@@ -97,6 +98,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     assertLyraEnvelope(normalized.envelope);
     events.set(normalized.id, normalized);
     persist();
+    for (const listener of feedListeners) listener(normalized);
     return normalized;
   }
 
@@ -414,6 +416,10 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     sendMessage,
     listFeed,
     getEvent,
+    subscribeFeed(listener) {
+      feedListeners.add(listener);
+      return () => feedListeners.delete(listener);
+    },
     clearCronBackfill,
     createQuestion,
     answerQuestion,
