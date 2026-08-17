@@ -1,28 +1,6 @@
 version: '3.8'
 
 services:
-  # Evolution API - WhatsApp bridge
-  # SECURITY: Bound to localhost only — not exposed to internet
-  evolution-api:
-    image: atserver/evolution-api:latest
-    container_name: evolution-whatsapp
-    restart: always
-    environment:
-      - EVOLUTION_INSTANCE_NAME=lyra-whatsapp
-      - EVOLUTION_INSTANCE_QRCODE=true
-    ports:
-      - "127.0.0.1:9000:9000"
-    volumes:
-      - evolution-data:/home/evolution/instances
-    networks:
-      - lyra-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/api/v1/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
   # OpenClaw Agent - Main agent
   openclaw-agent:
     build:
@@ -45,10 +23,6 @@ services:
       - TELEGRAM_USER_ID=${TELEGRAM_USER_ID}
       - TELEGRAM_PARTNER_ID=${TELEGRAM_PARTNER_ID}
 
-      # WhatsApp Configuration
-      - WHATSAPP_USER_PHONE=${WHATSAPP_USER_PHONE}
-      - EVOLUTION_API_URL=http://evolution-api:9000
-
       # Notion Configuration
       - NOTION_API_KEY=${NOTION_API_KEY}
 
@@ -66,9 +40,6 @@ services:
       - ./notion:/home/openclaw/notion
     networks:
       - lyra-network
-    depends_on:
-      evolution-api:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:18789/api/v1/health"]
       interval: 30s
@@ -99,7 +70,6 @@ services:
       retries: 5
 
 volumes:
-  evolution-data:
   openclaw-workspace:
   postgres-data:
 

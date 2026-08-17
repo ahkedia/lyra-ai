@@ -1,6 +1,6 @@
 # Lyra PWA-first migration runbook
 
-This runbook is the gate for moving daily use from Telegram/WhatsApp to Lyra PWA.
+This runbook is the gate for moving daily use from Telegram to Lyra PWA.
 Messaging remains available as recovery until every gate passes.
 
 ## 0. Deploy and establish a baseline
@@ -15,7 +15,7 @@ Messaging remains available as recovery until every gate passes.
 ## 1. PWA-first shadow period
 
 - Use the PWA for Today, planning, capture, and all reversible actions.
-- Keep Telegram/WhatsApp active and route both through the shared API.
+- Keep Telegram active and route it through the shared API.
 - Review `/v1/metrics` daily; investigate every failed action and unavailable source.
 - Do not advance while any critical action is fabricated, silently fails, or lacks provenance.
 

@@ -128,7 +128,6 @@ The irony: every tool I'd just built — structured logging, auto-recovery, the 
 
 - **Restaurant reservations** — Integrate with OpenTable/Resy APIs as a new skill
 - **Video generation** — Connect to Runway or Pika for content creation
-- **WhatsApp channel** — Alternative to Telegram for users who prefer it
 - **Webhook triggers** — Let external services trigger Lyra actions
 - **Multi-agent mode** — Specialist agents for email, calendar, content that coordinate through a central router
 

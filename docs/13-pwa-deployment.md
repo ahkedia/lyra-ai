@@ -41,12 +41,11 @@ Deployment sequence:
 3. Install the systemd unit and Caddy route.
 4. Start the service and verify `/health`.
 5. Register a passkey from the HTTPS origin.
-6. Point the WhatsApp bridge at `LYRA_APP_URL=https://lyra.example.com` and set its API token.
-7. For Telegram parity, disable the native OpenClaw Telegram transport and enable
+6. For Telegram parity, disable the native OpenClaw Telegram transport and enable
    `deploy/lyra-telegram-bridge.service`; both channels then call `/v1/channels/message`.
    Set `TELEGRAM_BRIDGE_STATE=/var/lib/lyra-app/telegram-offset.json` so the hardened
    systemd unit can persist polling progress.
-8. Run `npm test` and the physical iPhone acceptance checklist before changing messaging to fallback-only.
+7. Run `npm test` and the physical iPhone acceptance checklist before changing messaging to fallback-only.
 
 The protected `GET /v1/metrics` endpoint summarizes conversations, messages, captures,
 action outcomes, and queued push events for the migration dashboard. It contains counts,

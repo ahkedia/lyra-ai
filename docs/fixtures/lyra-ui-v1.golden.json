@@ -17,7 +17,7 @@
       "Every envelope must validate against lyra-ui-v1.schema.json before rendering.",
       "Every DOM assertion is evaluated before a screenshot is accepted.",
       "No model-authored raw HTML may become a DOM node.",
-      "Fallback text is an exact golden for Telegram and WhatsApp formatters.",
+      "Fallback text is an exact golden for the Telegram formatter.",
       "Source and action references must resolve to the envelope arrays.",
       "Screenshot differences require explicit design approval, never blind baseline replacement."
     ]

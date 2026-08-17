@@ -33,7 +33,7 @@ The current Telegram Mini App is a separate legacy shell, not the foundation of 
 - Give reminders a dedicated, fast, list-first interface.
 - Turn the morning brief into a readable news product rather than a pasted text blob.
 - Preserve provenance, freshness, confidence, and action state whenever Lyra presents external information.
-- Keep Telegram and WhatsApp available as temporary fallback channels during migration.
+- Keep Telegram available as a temporary fallback channel during migration.
 - Make each fallback message self-contained; never replace useful content with a preview or require an “Open Lyra”/Telegram Mini App link to understand or answer it.
 - Never present fabricated, silently failed, or stale data as current.
 
@@ -46,7 +46,7 @@ The current Telegram Mini App is a separate legacy shell, not the foundation of 
 - No household identity or multi-user access in the first release.
 - No chat-history sidebar, Spaces, or multiple user-managed conversation threads.
 - No direct Apple Reminders synchronization from Hetzner. The To Do interface copies the useful interaction model, while Notion remains the initial source. Native Apple Reminders sync would require a separately secured Mac relay.
-- No automatic retirement of Telegram or WhatsApp. Retirement is a later acceptance decision.
+- No automatic retirement of Telegram. Retirement is a later acceptance decision.
 - No Telegram-hosted or Telegram-framed PWA. The installed PWA and its push notifications are the primary app surface.
 - No copying of OpenAI, Apple, or Perplexity trademarks, logos, proprietary icons, or assets. The app may use familiar interaction patterns and comparable polish.
 
@@ -57,7 +57,7 @@ The current Telegram Mini App is a separate legacy shell, not the foundation of 
 | Akash, primary user | Converse, capture, act, review tasks, and read briefs from one installed app | Telegram is unstructured; the current PWA feels like a generic chatbot and misses scheduled messages | PWA is the first interface used on at least 6 of 7 days; capture and action success exceed 98% |
 | Lyra interactive agent | Return grounded answers and useful structured output | Agent text is flattened into one message format | Every answer renders safely; all external claims can expose source and freshness |
 | Lyra scheduled automation | Deliver proactive information without requiring a prompt | Cron output currently goes to a messaging channel and may never appear in the PWA | Every completed cron run creates exactly one durable PWA event; push attempt begins within 10 seconds |
-| Telegram/WhatsApp fallback | Preserve access during migration and outages | Channel-specific formatting and logic can diverge | The same canonical event/action is reused; fallback does not create a second source of truth |
+| Telegram fallback | Preserve access during migration and outages | Channel-specific formatting and logic can diverge | The same canonical event/action is reused; fallback does not create a second source of truth |
 
 ### 3.1 Release metrics
 
@@ -107,7 +107,7 @@ The current Telegram Mini App is a separate legacy shell, not the foundation of 
 │ IndexedDB +  │            └──────────┘                    │
 │ Cache API    │                                  ┌─────────┼─────────┐
 └──────────────┘                                  ▼         ▼         ▼
-                                               Push    Telegram  WhatsApp
+                                               Push    Telegram
                                                         fallback  fallback
 ```
 
@@ -132,7 +132,7 @@ flows:
     terminal_states: [answered, expired, cancelled, failed]
   scheduled_message:
     steps: [receive_webhook, authenticate, deduplicate, normalize_blocks, persist_event, enqueue_deliveries]
-    deliveries: [pwa_feed, web_push, telegram_optional, whatsapp_optional]
+    deliveries: [pwa_feed, web_push, telegram_optional]
     terminal_states: [completed, skipped, failed]
   task_mutation:
     steps: [optimistic_client_state, validate, preview_if_destructive, provider_commit, persist_audit, reconcile]
@@ -372,7 +372,7 @@ The iOS system font stack is deliberate. It produces SF Pro in the installed PWA
 
 ## 8. Rich content component contract
 
-All Lyra output is represented as validated content blocks. The PWA renders the full component. Telegram and WhatsApp format the same block into their supported subset. Every block requires the common fields `id` and `type`; the table lists the remaining required fields.
+All Lyra output is represented as validated content blocks. The PWA renders the full component. Telegram formats the same block into its supported subset. Every block requires the common fields `id` and `type`; the table lists the remaining required fields.
 
 ### 8.1 Block types
 
@@ -419,7 +419,7 @@ All Lyra output is represented as validated content blocks. The PWA renders the 
 The component contract is executable and versioned in two files:
 
 - [`docs/fixtures/lyra-ui-v1.schema.json`](fixtures/lyra-ui-v1.schema.json) is the normative JSON Schema for the complete response envelope and all 17 block types.
-- [`docs/fixtures/lyra-ui-v1.golden.json`](fixtures/lyra-ui-v1.golden.json) contains one validated golden case per component, including component variants, exact DOM assertions, required text, interaction sizing, error states, network mocks, screenshot names, and exact Telegram/WhatsApp fallback text.
+- [`docs/fixtures/lyra-ui-v1.golden.json`](fixtures/lyra-ui-v1.golden.json) contains one validated golden case per component, including component variants, exact DOM assertions, required text, interaction sizing, error states, network mocks, screenshot names, and exact Telegram fallback text.
 
 Every block has a stable `id` and `type`. Every reference is by stable ID:
 
@@ -494,7 +494,7 @@ type RenderContext = {
 };
 
 renderBlocks(envelope.blocks, context): DocumentFragment;
-formatBlocksForFallback(envelope, { channel: "telegram" | "whatsapp" }): string;
+formatBlocksForFallback(envelope, { channel: "telegram" }): string;
 ```
 
 No component may fetch source or action data independently. This keeps the rendered PWA and fallback text tied to the same canonical event.
@@ -720,7 +720,7 @@ type NewsBrief = {
 type DeliveryRecord = {
   id: string;
   eventId: string;
-  channel: "push" | "telegram" | "whatsapp";
+  channel: "push" | "telegram";
   targetKey: string;
   status: "pending" | "delivering" | "delivered" | "failed" | "suppressed";
   attempts: number;
@@ -1078,7 +1078,7 @@ Persistence must precede notification. This prevents “Telegram got it but the 
 
 ### 14.2 OpenClaw configuration change
 
-Update the live private cron definitions so user-facing jobs deliver their webhook to the Lyra app endpoint instead of directly to WhatsApp or Telegram. `scripts/restore-crons.py` must restore webhook delivery modes rather than converting every non-announce delivery to `--no-deliver`.
+Update the live private cron definitions so user-facing jobs deliver their webhook to the Lyra app endpoint instead of directly to Telegram. `scripts/restore-crons.py` must restore webhook delivery modes rather than converting every non-announce delivery to `--no-deliver`.
 
 The public `config/cron-jobs.example.json` may show placeholder URLs only. Live recipients and secrets remain in `lyra-private` and host environment files.
 
@@ -1092,7 +1092,7 @@ The public `config/cron-jobs.example.json` may show placeholder URLs only. Live 
 - A startup sweep returns stranded `delivering` rows older than five minutes to `pending`.
 - Disable an expired Web Push subscription on HTTP 404 or 410.
 - Fallback formatting is generated from canonical blocks at send time.
-- Telegram and WhatsApp fallback payloads contain the complete useful content. They must not contain a Telegram `web_app` button, an automatic PWA/Mini App link, or a one-line preview substituted for the event body.
+- Telegram fallback payloads contain the complete useful content. They must not contain a Telegram `web_app` button, an automatic PWA/Mini App link, or a one-line preview substituted for the event body.
 
 ### 14.4 Notification policy
 
@@ -1213,7 +1213,7 @@ Telegram cutover acceptance is exact:
 | Task source conflict | Expected version mismatch | Show current task and `Review changes` | Stale edit returns 409 and preserves both states |
 | Push denied | Browser permission | App continues; settings explains alerts are off | Denied state does not retry permission prompt |
 | Push endpoint expired | 404/410 from push service | Subscription disabled; in-app feed remains authoritative | Endpoint disabled after one terminal response |
-| Telegram/WhatsApp rejection | Adapter error | PWA unaffected; fallback delivery marked failed | Retry does not duplicate PWA event |
+| Telegram rejection | Adapter error | PWA unaffected; fallback delivery marked failed | Retry does not duplicate PWA event |
 | Legacy Mini App rewrite reappears | Outbound payload/menu conformance check | Block deployment; keep full fallback content | No fixture or live synthetic send contains `web_app`, Mini App/PWA URL, or shortened body |
 | Structured question expires | Server timestamp check | Keep the question visible as expired; do not accept or silently drop the answer | Boundary and late-answer tests return deterministic `410 question_expired` |
 | Duplicate/stale question answer | Idempotency key and expected version | Return the settled state; resume OpenClaw at most once | Concurrent PWA/Telegram answers create one settlement and one continuation |
@@ -1238,7 +1238,7 @@ Telegram cutover acceptance is exact:
 - Cron envelope extraction for `summary`, `output`, `text`, `message`, and existing OpenClaw formats.
 - Idempotency-key derivation and duplicate detection.
 - Delivery eligibility, push suppression, retry schedule, and terminal subscription errors.
-- Telegram and WhatsApp block formatters must equal every fixture's exact `fallbackText`.
+- Telegram block formatters must equal every fixture's exact `fallbackText`.
 - Structured-question mapping, option normalization, sequential `when` evaluation, required/optional fields, allow-other behavior, expiry boundary, recipient policy, and deterministic fallback parsing.
 - Outbound Telegram conformance rejects automatic `web_app`, Mini App/PWA links, and preview-only substitution.
 - Session hashing and expiry.
@@ -1325,7 +1325,6 @@ The implementation should be sequential in one goal. The backend contracts must 
    - `LYRA_CRON_INGEST_V2`
    - `LYRA_DELIVERY_WORKER`
    - `LYRA_FALLBACK_TELEGRAM`
-   - `LYRA_FALLBACK_WHATSAPP`
 
 **Gate:** Existing tests pass, rollback commit/version is recorded, Telegram slash commands remain available, and a synthetic fallback contains its complete body with no automatic app link or `web_app` control.
 
@@ -1358,7 +1357,7 @@ The implementation should be sequential in one goal. The backend contracts must 
 1. Replace index/sidebar shell with Lyra, To Do, News tabs.
 2. Add native-module frontend structure and IndexedDB cache.
 3. Build `/app/dev/components` from `docs/fixtures/lyra-ui-v1.golden.json`; return 404 in production.
-4. Add all 17 rich block renderers and exact Telegram/WhatsApp formatters, including the inline structured-question form.
+4. Add all 17 rich block renderers and exact Telegram formatters, including the inline structured-question form.
 5. Pass fixture DOM, accessibility, error-state, target-size, and fallback-text assertions.
 6. Run design review on the complete gallery, then create the 51 approved screenshot baselines.
 7. Add settings sheet and operational controls.
@@ -1444,7 +1443,7 @@ The implementation goal is complete only when all statements are true:
 - News is populated from a real morning brief with sources and a stale-data fallback.
 - Passkeys, sessions, push subscriptions, feed, actions, tasks, news, and deliveries survive a service restart.
 - Offline launch and queued safe mutations work on a physical iPhone.
-- Telegram/WhatsApp use canonical events/actions when enabled and remain fallback only.
+- Telegram uses canonical events/actions when enabled and remains fallback only.
 - Structured questions render and settle through the canonical PWA/API, preserve expiry and cold-resume behavior, and remain answerable through self-contained Telegram fallback during migration.
 - The Telegram bot menu is command-based, no outgoing message contains an automatic Mini App/PWA link or Web App button, and the PWA is not framed inside Telegram.
 - The legacy FastAPI Mini App, port-8092 proxy route, Telegram-only auth/session path, and duplicate writable message store are absent from active production architecture.

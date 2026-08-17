@@ -45,7 +45,6 @@ Postgres alongside the audit ledger. Passkey/WebAuthn registration, sign-in, and
 push subscription are implemented; production still requires HTTPS and real VAPID
 credentials.
 
-WhatsApp can route messages through `LYRA_APP_URL` into the same conversation API;
 `app/channels.js` provides the shared adapter contract for Telegram or other bridges.
 The existing native OpenClaw Telegram transport still requires a deployment-side bridge
 to call this endpoint before Telegram reaches full parity. Commitment events are written to `push-outbox.jsonl`

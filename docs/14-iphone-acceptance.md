@@ -29,7 +29,7 @@ the date, iOS version, device model, and app URL with the result.
 
 - [ ] Push permission can be granted; “Send test alert” reports delivery and a notification arrives.
 - [ ] Tapping a notification opens Lyra.
-- [ ] Telegram and WhatsApp messages produce the same conversation/action result as PWA requests.
+- [ ] Telegram messages produce the same conversation/action result as PWA requests.
 - [ ] Scheduled delivery and recovery paths are tested before messaging becomes fallback-only.
 
 Migration advances only when every critical checkbox passes on the physical device.

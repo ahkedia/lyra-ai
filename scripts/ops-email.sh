@@ -16,9 +16,8 @@ now_utc() { date -u '+%Y-%m-%d %H:%M UTC'; }
 
 # ---- fresh health probes (point-in-time, at send) ----
 health_block() {
-  local gw wa cron_count billing watoken
+  local gw cron_count billing
   curl -sf --max-time 6 http://localhost:18789/health >/dev/null 2>&1 && gw="✅ up" || gw="🔴 DOWN"
-  curl -sf --max-time 6 http://127.0.0.1:8091/wa/health >/dev/null 2>&1 && wa="✅ up" || wa="🔴 DOWN"
   cron_count=$(openclaw cron list --json 2>/dev/null | python3 -c 'import sys,json
 try: print(len(json.load(sys.stdin).get("jobs",[])))
 except Exception: print("?")' 2>/dev/null)
@@ -26,12 +25,8 @@ except Exception: print("?")' 2>/dev/null)
   # state files maintained by the monitors
   if [ -f /tmp/lyra-anthropic-balance-state ] && [ "$(cat /tmp/lyra-anthropic-balance-state 2>/dev/null)" = "billing" ]; then
     billing="🔴 credit balance exhausted"; else billing="✅ OK"; fi
-  [ -f /tmp/lyra-wa-bridge-down ] && wa="🔴 DOWN (flagged)"
-  if [ -f /tmp/lyra-wa-token-bad ]; then watoken="🔴 token invalid"; else watoken="✅ valid"; fi
   printf 'SYSTEM HEALTH (as of %s)\n' "$(now_utc)"
   printf '  OpenClaw gateway : %s\n' "$gw"
-  printf '  WhatsApp bridge  : %s\n' "$wa"
-  printf '  WA Graph token   : %s\n' "$watoken"
   printf '  Cron jobs        : %s scheduled\n' "$cron_count"
   printf '  Anthropic billing: %s\n' "$billing"
 }

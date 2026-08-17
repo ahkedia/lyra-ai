@@ -4,8 +4,8 @@
 > match the live cron set. Source of truth is `config/cron-jobs.json` in the
 > **private** repo (`lyra-private`). Currently 4 jobs run: `morning-digest`
 > (7am Berlin daily), `move-checklist-digest` (8am), `morning-weight-nudge`
-> (9am), `weekly-review` (Sun 6pm). Delivery is WhatsApp Cloud API + Telegram
-> in parallel, not Telegram alone. A rewrite is tracked in the Phase 6 doc plan.
+> (9am), `weekly-review` (Sun 6pm). Delivery is Telegram. A rewrite is tracked
+> in the Phase 6 doc plan.
 
 Lyra does not wait to be asked. Cron jobs fire on schedule and deliver whether or not you have messaged the bot that day.
 

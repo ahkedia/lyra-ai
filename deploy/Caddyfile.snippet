@@ -24,7 +24,6 @@ wa.akashkedia.com {
     }
   }
 
-  # Existing WhatsApp webhook and legacy API remain untouched.
   handle /api* { reverse_proxy 127.0.0.1:8092 }
   handle { reverse_proxy localhost:8091 }
 }

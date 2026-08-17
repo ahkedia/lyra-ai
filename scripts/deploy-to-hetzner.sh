@@ -80,8 +80,8 @@ ssh "$SSH_USER@$VPS_IP" << 'EOF'
     ufw default allow outgoing
     ufw allow 22/tcp comment "SSH"
     ufw allow 18789/tcp comment "OpenClaw Gateway"
-    # Postgres (5432) and Evolution API (9000) are NOT allowed from outside
-    # They are bound to 127.0.0.1 in docker-compose.yml
+    # Postgres (5432) is not allowed from outside.
+    # It is bound to 127.0.0.1 in docker-compose.yml.
     echo "y" | ufw enable
     ufw status verbose
     echo "✅ Firewall configured — only SSH (22) and Gateway (18789) open"
@@ -91,16 +91,6 @@ EOF
 echo "⏳ Waiting for services to be healthy..."
 ssh "$SSH_USER@$VPS_IP" << 'EOF'
     cd /opt/lyra-agent
-
-    # Wait for Evolution API (localhost only)
-    for i in {1..30}; do
-        if curl -f http://localhost:9000/api/v1/health &>/dev/null; then
-            echo "✅ Evolution API is healthy"
-            break
-        fi
-        echo "Waiting for Evolution API... ($i/30)"
-        sleep 2
-    done
 
     # Wait for OpenClaw
     for i in {1..30}; do
@@ -150,13 +140,11 @@ ssh "$SSH_USER@$VPS_IP" << 'EOF'
     cat > /opt/lyra-agent/scripts/health-check.sh << 'HEALTH'
 #!/bin/bash
 OPENCLAW_URL="http://localhost:18789/api/v1/health"
-EVOLUTION_URL="http://localhost:9000/api/v1/health"
 
 openclaw_status=$(curl -s -o /dev/null -w "%{http_code}" "$OPENCLAW_URL")
-evolution_status=$(curl -s -o /dev/null -w "%{http_code}" "$EVOLUTION_URL")
 
-if [ "$openclaw_status" != "200" ] || [ "$evolution_status" != "200" ]; then
-    echo "❌ Health check failed - OpenClaw: $openclaw_status, Evolution: $evolution_status"
+if [ "$openclaw_status" != "200" ]; then
+    echo "❌ Health check failed - OpenClaw: $openclaw_status"
     docker-compose -f /opt/lyra-agent/docker-compose.yml restart
     exit 1
 else
@@ -184,12 +172,10 @@ echo "1. SSH into your VPS: ssh $SSH_USER@$VPS_IP"
 echo "2. Edit .env with your secrets: nano /opt/lyra-agent/.env"
 echo "3. Restart containers: docker-compose -f /opt/lyra-agent/docker-compose.yml restart"
 echo "4. Check logs: docker-compose -f /opt/lyra-agent/docker-compose.yml logs -f"
-echo "5. Scan WhatsApp QR code: curl http://localhost:9000/api/v1/messages/qrcode?instance=lyra-whatsapp"
 echo ""
 echo "🔒 Security:"
 echo "   Firewall: Only SSH (22) and Gateway (18789) open"
 echo "   Postgres: localhost only (127.0.0.1:5432)"
-echo "   Evolution API: localhost only (127.0.0.1:9000)"
 echo "   OpenClaw Gateway: http://$VPS_IP:18789 (token auth required)"
 echo ""
 echo "⚠️  IMPORTANT: Set up TLS with Caddy for production:"

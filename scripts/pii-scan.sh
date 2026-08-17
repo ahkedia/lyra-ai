@@ -20,7 +20,7 @@ FORBIDDEN_PATHS='^(config/SOUL\.md|config/MEMORY\.md|config/HEARTBEAT\.md|config
 CONTENT_PATTERNS='cron-deliver\?to=[0-9]|[?&]to=[0-9]{10,15}|\+[0-9]{10,15}\b|sk-[a-zA-Z0-9]{20,}|ntn_[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{20,}|xoxb-[0-9]|AKIA[0-9A-Z]{16}'
 # Placeholders that are allowed to look number-ish (kept narrow on purpose —
 # a broad allow like "example.com" would mask real numbers on the same line).
-ALLOW='XXXXXXXXXX|123456789|987654321|\$\{WA_TO_|\$\{TELEGRAM_'
+ALLOW='XXXXXXXXXX|123456789|987654321|\$\{TELEGRAM_'
 
 ZERO="0000000000000000000000000000000000000000"
 
