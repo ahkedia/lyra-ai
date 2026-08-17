@@ -11,8 +11,8 @@ type Toast = { text: string; undo?: () => void };
 type FeedEvent = { id: string; actor: 'user' | 'assistant' | 'automation'; title?: string; occurredAt: string; status?: string; envelope: LyraEnvelope };
 type Feed = { events: FeedEvent[]; nextCursor?: string | null };
 type Task = { id: string; title: string; detail?: string; notes?: string; dueAt?: string; source?: string; list?: string; completed?: boolean; flagged?: boolean; pending?: boolean };
-type NewsItem = { id: string; headline: string; summary?: string; whyItMatters?: string; topic?: string; source?: string; sourceUrl?: string; imageUrl?: string; publishedAt?: string; read?: boolean; saved?: boolean; sources?: Array<{ title?: string; source?: string; url?: string }> };
-type News = { items: NewsItem[]; brief?: { title?: string; summary?: string; date?: string; themes?: string[] }; refreshedAt?: string; stale?: boolean; topics?: string[] };
+type NewsItem = { id: string; headline: string; summary?: string; whyItMatters?: string; topic?: string; source?: string; sourceUrl?: string; imageUrl?: string; publishedAt?: string; read?: boolean; saved?: boolean; sources?: Array<{ title?: string; source?: string; url?: string; publishedAt?: string }> };
+type News = { items: NewsItem[]; brief?: { title?: string; summary?: string; date?: string; themes?: string[]; kind?: 'live_feed' }; refreshedAt?: string; stale?: boolean; topics?: string[] };
 
 const token = () => localStorage.getItem('lyra_token') || '';
 const authHeaders = (base: HeadersInit = {}) => ({ ...(token() ? { authorization: `Bearer ${token()}` } : {}), ...base });
@@ -267,7 +267,7 @@ function NewsScreen({ data, status, refresh, setData, onAsk, onToast }: { data: 
   const toggleSaved = (item: NewsItem) => { const saved = !item.saved; update(item.id, { saved }); void request(`/v1/news/items/${encodeURIComponent(item.id)}/save`, { method: saved ? 'POST' : 'DELETE', body: '{}' }).catch(() => onToast({ text: 'Saved state will retry when you reconnect.' })); };
   return <div class="news-screen">
     <header class="screen-heading"><div><h1>News</h1><p>{data.refreshedAt ? `Updated ${clock(data.refreshedAt)}` : 'Your focused briefing'}</p></div><button class="text-button" onClick={() => void refresh(true)}>Refresh</button></header>
-    {data.brief && <article class="news-lead"><p class="block-eyebrow">{data.brief.date || 'Morning brief'}</p><h2>{data.brief.title || 'Your briefing'}</h2><p>{data.brief.summary}</p>{data.brief.themes?.length ? <div class="topic-row">{data.brief.themes.map(theme => <span>{theme}</span>)}</div> : null}</article>}
+    {data.brief && <article class="news-lead"><p class="block-eyebrow">{data.brief.kind === 'live_feed' ? 'Live sources' : data.brief.date || 'Morning brief'}</p><h2>{data.brief.title || 'Your briefing'}</h2><p>{data.brief.summary}</p>{data.brief.themes?.length ? <div class="topic-row">{data.brief.themes.map(theme => <span>{theme}</span>)}</div> : null}</article>}
     <div class="smart-lists news-topics">{topics.map(value => <button class={topic === value ? 'active' : ''} onClick={() => setTopic(value)}>{value}</button>)}</div>
     {(status === 'offline' || data.stale) && <div class="state-banner">Showing the last available brief.</div>}
     <div class="news-feed">{items.length ? items.map(item => <article class={`news-card ${item.read ? 'read' : ''}`}>

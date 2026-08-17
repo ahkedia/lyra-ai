@@ -21,10 +21,19 @@ test('golden rich UI fixture conforms to the canonical envelope', async () => {
 });
 
 test('morning briefs become stable rich News items', () => {
-  const [item] = normaliseNewsBrief({ date: '2026-08-17', items: [{ headline: 'Payment rails change', summary: 'A concise update.', topic: 'Fintech', sourceUrl: 'https://example.com/news' }] });
+  const [item] = normaliseNewsBrief({ date: '2026-08-17', items: [{ headline: 'Payment rails change', summary: 'A concise update.', topic: 'Fintech', sourceUrl: 'https://example.com/news', sources: [{ source: 'Example News', title: 'Payment rails change', url: 'https://example.com/news' }] }] });
   assert.equal(item.headline, 'Payment rails change');
   assert.equal(item.topic, 'Fintech');
   assert.match(item.id, /^[a-f0-9]{24}$/);
+  assert.equal(item.sources[0].source, 'Example News');
+});
+
+test('a populated live source feed has an honest lead state before the morning brief arrives', async () => {
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), newsFetcher: async () => [{ id: 'source-item', headline: 'Source item', summary: 'Summary', topic: 'AI', source: 'Example', sourceUrl: 'https://example.com/source' }] });
+  const news = await api.news({ refresh: true });
+  assert.equal(news.brief.title, 'Latest for you');
+  assert.equal(news.brief.kind, 'live_feed');
+  assert.equal(news.items[0].headline, 'Source item');
 });
 
 test('a scheduled rich morning brief updates the Lyra stream and News from one canonical event', async () => {

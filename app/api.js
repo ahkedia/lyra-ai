@@ -19,7 +19,7 @@ function evidence({ id, title, kind, status = 'open', dueAt, source = 'Lyra', as
   return { id, title, kind, status, dueAt, source, asOf, confidence, detail, actions };
 }
 
-export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner = defaultAgentRunner, actionHandler = async () => ({ status: 'completed', mode: 'ledger-only' }), storeDir = DEFAULT_STORE, durableStore = createDurableAuditStore(), pushSender = createPushSender() } = {}) {
+export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner = defaultAgentRunner, actionHandler = async () => ({ status: 'completed', mode: 'ledger-only' }), newsFetcher = fetchNewsSources, storeDir = DEFAULT_STORE, durableStore = createDurableAuditStore(), pushSender = createPushSender() } = {}) {
   const actions = new Map();
   const captures = [];
   const pushSubscriptions = [];
@@ -314,7 +314,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
   }
 
   async function refreshNews() {
-    const fetched = await fetchNewsSources();
+    const fetched = await newsFetcher();
     if (fetched.length) {
       const byId = new Map(newsItems.map(item => [item.id, item]));
       for (const item of fetched) byId.set(item.id, { ...byId.get(item.id), ...item });
@@ -329,7 +329,14 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     const due = !newsRefreshedAt || Date.now() - Date.parse(newsRefreshedAt) > 30 * 60_000;
     if (refresh || (due && newsItems.length < 12)) await refreshNews().catch(() => {});
     const topics = [...new Set(newsItems.map(item => item.topic).filter(Boolean))];
-    return { items: newsItems, brief: newsBrief, topics, generatedAt: now(), refreshedAt: newsRefreshedAt, stale: !newsRefreshedAt || Date.now() - Date.parse(newsRefreshedAt) > 4 * 60 * 60_000 };
+    const brief = newsBrief || (newsItems.length ? {
+      date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
+      title: 'Latest for you',
+      summary: `A source-backed read across ${topics.length || 'your'} interests. This is a live feed, not a generated morning briefing.`,
+      themes: topics,
+      kind: 'live_feed',
+    } : null);
+    return { items: newsItems, brief, topics, generatedAt: now(), refreshedAt: newsRefreshedAt, stale: !newsRefreshedAt || Date.now() - Date.parse(newsRefreshedAt) > 4 * 60 * 60_000 };
   }
 
   async function updateNewsItem(id, patch) {

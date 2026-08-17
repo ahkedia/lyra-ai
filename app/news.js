@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 const SOURCES = [
   { name: 'TechCrunch', topic: 'Fintech', url: 'https://techcrunch.com/category/fintech/feed/' },
+  { name: 'Sifted', topic: 'European startups', url: 'https://sifted.eu/feed' },
+  { name: 'Finextra', topic: 'Fintech', url: 'https://www.finextra.com/rss/headlines.aspx' },
   { name: 'GitHub Blog', topic: 'Technology', url: 'https://github.blog/feed/' },
   { name: "Lenny's Newsletter", topic: 'Product', url: 'https://www.lennysnewsletter.com/feed' },
   { name: 'arXiv AI', topic: 'AI', url: 'https://export.arxiv.org/api/query?search_query=cat:cs.AI&start=0&max_results=8&sortBy=submittedDate&sortOrder=descending' },
@@ -19,7 +21,8 @@ function parseFeed(xml, source) {
     const summary = field(entry, 'description') || field(entry, 'summary') || field(entry, 'content');
     const publishedAt = field(entry, 'pubDate') || field(entry, 'published') || field(entry, 'updated');
     const imageUrl = entry.match(/<(?:media:content|media:thumbnail|enclosure)[^>]+(?:url|href)=["']([^"']+)["']/i)?.[1];
-    return [{ id: stableId(sourceUrl), headline: headline.slice(0, 300), summary: summary.slice(0, 620), topic: source.topic, source: source.name, sourceUrl, imageUrl, publishedAt: Number.isNaN(Date.parse(publishedAt)) ? undefined : new Date(publishedAt).toISOString(), whyItMatters: '' }];
+    const date = Number.isNaN(Date.parse(publishedAt)) ? undefined : new Date(publishedAt).toISOString();
+    return [{ id: stableId(sourceUrl), headline: headline.slice(0, 300), summary: summary.slice(0, 620), topic: source.topic, source: source.name, sourceUrl, imageUrl, publishedAt: date, whyItMatters: '', sources: [{ source: source.name, title: headline.slice(0, 300), url: sourceUrl, publishedAt: date }] }];
   });
 }
 
@@ -39,6 +42,7 @@ export function normaliseNewsBrief(brief) {
   return (brief.items || []).flatMap((item, index) => {
     const headline = String(item.headline || item.title || '').trim(); const sourceUrl = item.sourceUrl || item.url;
     if (!headline) return [];
-    return [{ id: item.id || stableId(sourceUrl || `${brief.date || brief.generatedAt || 'brief'}:${headline}:${index}`), headline, summary: String(item.summary || '').slice(0, 620), whyItMatters: String(item.whyItMatters || '').slice(0, 480), topic: item.topic || 'For you', source: item.source || 'Lyra morning brief', sourceUrl, imageUrl: item.imageUrl, publishedAt: item.publishedAt || brief.generatedAt || brief.date }];
+    const sources = Array.isArray(item.sources) ? item.sources : [{ source: item.source || 'Lyra morning brief', title: item.sourceTitle || headline, url: sourceUrl, publishedAt: item.publishedAt || brief.generatedAt || brief.date }];
+    return [{ id: item.id || stableId(sourceUrl || `${brief.date || brief.generatedAt || 'brief'}:${headline}:${index}`), headline, summary: String(item.summary || '').slice(0, 620), whyItMatters: String(item.whyItMatters || '').slice(0, 480), topic: item.topic || 'For you', source: item.source || sources[0]?.source || 'Lyra morning brief', sourceUrl, imageUrl: item.imageUrl || item.image?.url, publishedAt: item.publishedAt || brief.generatedAt || brief.date, sources }];
   });
 }
