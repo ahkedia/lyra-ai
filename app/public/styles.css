@@ -57,5 +57,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 /* Mobile controls are never smaller than the iPhone touch-target contract. */
 .icon-button, .text-button, .share-button { min-width: 44px; min-height: 44px; }
 .smart-lists button { min-height: 44px; padding-inline: 14px; }
+.send-button { width: 44px; height: 44px; flex-basis: 44px; }
+.composer-tools { min-height: 44px; align-items: center; }
+.composer-tools button { min-height: 44px; padding-inline: 0; }
 @media (max-width: 390px) { .main-content { padding: 0 14px; }.composer-wrap { left: 10px; right: 10px; }.user-message { margin-left: 40px; }.composer-tools span { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 1ms !important; animation-duration: 1ms !important; } }
