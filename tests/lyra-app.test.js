@@ -9,6 +9,26 @@ import { createChannelAdapter } from '../app/channels.js';
 import { createPasskeyAuth } from '../app/auth.js';
 import { createActionHandler } from '../app/integrations.js';
 import { extractText, senderId } from '../scripts/telegram-lyra-bridge.mjs';
+import { assertLyraEnvelope, normalizeAgentOutput } from '../app/schemas.js';
+
+test('structured content rejects unknown references and falls back safely', () => {
+  assert.throws(() => assertLyraEnvelope({ schemaVersion: 1, blocks: [{ id: 'x', type: 'action_group', actionRefs: ['missing'] }], actions: [], provenance: [] }), /Unknown action reference/);
+  const fallback = normalizeAgentOutput('<script>no</script>', { eventId: 'safe' });
+  assert.equal(fallback.blocks[0].type, 'rich_text');
+  assert.equal(fallback.blocks[0].markdown, '<script>no</script>');
+});
+
+test('canonical feed and structured question settle once', async () => {
+  const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), agentRunner: async ({ fallback }) => fallback });
+  const conversation = api.createConversation('Lyra', 'primary');
+  await api.sendMessage(conversation.id, 'hello');
+  const feed = api.listFeed();
+  assert.equal(feed.events.length, 2);
+  const question = await api.createQuestion({ preview: 'Choose a day', composite: 'single', ttlSeconds: 3600, resumeContext: { task: 'demo' }, questions: [{ id: 'day', type: 'single_select', question: 'Which day?', options: ['Tue', 'Wed'] }] });
+  const answered = await api.answerQuestion(question.questionId, { expectedVersion: 1, answers: { day: 'Tue' } });
+  assert.equal(answered.status, 'answered');
+  assert.deepEqual((await api.answerQuestion(question.questionId, { answers: { day: 'Wed' } })).answers, { day: 'Tue' });
+});
 
 test('today preserves evidence and does not invent data', async () => {
   const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), dataProvider: async () => ({ items: [evidence({ id: 'r1', title: 'Call dentist', kind: 'reminder', source: 'Notion', detail: 'Due today', actions: ['complete'] })], sources: [] }) });

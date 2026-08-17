@@ -6,12 +6,13 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createDurableAuditStore } from './storage.js';
 import { createPushSender } from './push.js';
+import { normalizeAgentOutput, safeTextEnvelope, assertLyraEnvelope } from './schemas.js';
 
 const DEFAULT_STORE = path.resolve(process.env.LYRA_APP_DATA_DIR || '.lyra-app');
 
 const now = () => new Date().toISOString();
 const runFile = promisify(execFile);
-const ACTION_TYPES = new Set(['complete', 'dismiss', 'snooze', 'reply', 'create_reminder', 'schedule']);
+const ACTION_TYPES = new Set(['complete', 'reopen', 'dismiss', 'snooze', 'reply', 'create_reminder', 'schedule', 'open', 'retry', 'undo', 'submit_answer']);
 
 function evidence({ id, title, kind, status = 'open', dueAt, source = 'Lyra', asOf = now(), confidence = 'verified', detail, actions = [] }) {
   return { id, title, kind, status, dueAt, source, asOf, confidence, detail, actions };
@@ -22,6 +23,9 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
   const captures = [];
   const pushSubscriptions = [];
   const conversations = new Map();
+  const events = new Map();
+  const questions = new Map();
+  let newsBrief = null;
   const stateFile = path.join(storeDir, 'state.json');
 
   if (existsSync(stateFile)) {
@@ -30,11 +34,14 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
       for (const conversation of saved.conversations || []) conversations.set(conversation.id, conversation);
       for (const action of saved.actions || []) actions.set(action.id, action);
       captures.push(...(saved.captures || []));
+      for (const event of saved.events || []) events.set(event.id, event);
+      for (const question of saved.questions || []) questions.set(question.questionId, question);
+      newsBrief = saved.newsBrief || null;
     } catch { /* Corrupt local state is ignored; source data remains authoritative. */ }
   }
 
   function persist() {
-    const state = { conversations: [...conversations.values()], actions: [...actions.values()], captures };
+    const state = { conversations: [...conversations.values()], actions: [...actions.values()], captures, events: [...events.values()], questions: [...questions.values()], newsBrief };
     mkdir(storeDir, { recursive: true }).then(() => writeFileSync(stateFile, JSON.stringify(state, null, 2), { mode: 0o600 })).catch(() => {});
     const stateWrite = durableStore.writeState?.(state);
     stateWrite?.catch(() => {});
@@ -45,6 +52,9 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     for (const conversation of saved.conversations || []) conversations.set(conversation.id, conversation);
     for (const action of saved.actions || []) actions.set(action.id, action);
     captures.push(...(saved.captures || []));
+    for (const event of saved.events || []) events.set(event.id, event);
+    for (const question of saved.questions || []) questions.set(question.questionId, question);
+    newsBrief = saved.newsBrief || null;
   }).catch(() => {});
 
   async function audit(event) {
@@ -63,6 +73,111 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
 
   async function testPush() {
     return queuePush({ type: 'push.test', title: 'Lyra alerts are working', body: 'This is a test notification from Lyra.' });
+  }
+
+  function addEvent(event) {
+    const normalized = {
+      id: event.id || randomUUID(),
+      streamId: 'primary',
+      eventType: event.eventType || 'message',
+      actor: event.actor || 'assistant',
+      occurredAt: event.occurredAt || now(),
+      status: event.status || 'completed',
+      title: event.title || '',
+      envelope: event.envelope || safeTextEnvelope(event.text || '', { eventId: event.id || 'event' }),
+      metadata: event.metadata || {},
+    };
+    assertLyraEnvelope(normalized.envelope);
+    events.set(normalized.id, normalized);
+    persist();
+    return normalized;
+  }
+
+  function listFeed({ cursor, limit = 40 } = {}) {
+    const ordered = [...events.values()].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id.localeCompare(a.id));
+    const start = cursor ? Math.max(0, ordered.findIndex(item => item.id === cursor) + 1) : 0;
+    const page = ordered.slice(start, start + Math.min(100, Math.max(1, Number(limit) || 40)));
+    return { events: page, nextCursor: page.length === Math.min(100, Math.max(1, Number(limit) || 40)) ? page.at(-1)?.id : null, generatedAt: now() };
+  }
+
+  function getEvent(id) {
+    const event = events.get(id);
+    if (!event) throw new Error('Event not found');
+    return event;
+  }
+
+  async function createQuestion(payload, { eventId = randomUUID() } = {}) {
+    const question = { ...payload, questionId: payload.questionId || randomUUID(), status: 'pending', version: 1, createdAt: payload.createdAt || now(), answers: {} };
+    question.expiresAt ||= new Date(Date.parse(question.createdAt) + Number(question.ttlSeconds || 86400) * 1000).toISOString();
+    if (!question.preview || !Array.isArray(question.questions) || question.questions.length < 1 || question.questions.length > 4) throw new Error('Invalid structured question');
+    const envelope = normalizeAgentOutput({ schemaVersion: 1, blocks: [{ id: `${question.questionId}-form`, type: 'question_form', questionId: question.questionId, preview: question.preview, mode: question.composite || 'single', status: 'pending', questions: question.questions.map(field => ({ id: field.id, inputType: field.type, label: field.question, optional: Boolean(field.optional), allowOther: Boolean(field.allow_other), options: field.options?.map(option => typeof option === 'string' ? { id: option.toLowerCase().replace(/[^a-z0-9]+/g, '-'), label: option } : option), when: field.when ? conditionFromLegacy(field.when) : undefined })), expiresAt: question.expiresAt, submitActionId: `${question.questionId}-submit` }], actions: [{ id: `${question.questionId}-submit`, label: 'Send answer', actionType: 'submit_answer', targetId: question.questionId, status: 'available', requiresConfirmation: false }], provenance: [] });
+    question.eventId = eventId;
+    question.envelope = envelope;
+    questions.set(question.questionId, question);
+    addEvent({ id: eventId, eventType: 'question', actor: 'assistant', title: question.preview, envelope, metadata: { questionId: question.questionId } });
+    return question;
+  }
+
+  async function answerQuestion(questionId, input = {}) {
+    const question = questions.get(questionId);
+    if (!question) throw new Error('Question not found');
+    if (question.status !== 'pending') return question;
+    if (Date.now() > Date.parse(question.expiresAt)) { question.status = 'expired'; question.version += 1; persist(); throw new Error('Question expired'); }
+    if (input.expectedVersion && Number(input.expectedVersion) !== question.version) throw new Error('Question version conflict');
+    const answers = input.answers || {};
+    for (const field of question.questions) {
+      const visible = !field.when || conditionMatches(field.when, answers);
+      if (visible && !field.optional && (answers[field.id] === undefined || answers[field.id] === '')) throw new Error(`Missing answer: ${field.id}`);
+      if (!visible && answers[field.id] !== undefined) throw new Error(`Inapplicable answer: ${field.id}`);
+      if (field.type !== 'free_text' && answers[field.id] !== undefined) {
+        const values = Array.isArray(answers[field.id]) ? answers[field.id] : [answers[field.id]];
+        const labels = (field.options || []).map(option => typeof option === 'string' ? option : option.label);
+        if (!field.allow_other && values.some(value => !labels.includes(value))) throw new Error(`Invalid answer: ${field.id}`);
+      }
+    }
+    question.answers = { ...answers };
+    question.status = 'answered';
+    question.version += 1;
+    question.answeredAt = now();
+    question.continuationStatus = 'queued';
+    persist();
+    const event = events.get(question.eventId);
+    if (event) event.envelope.blocks[0].status = 'answered';
+    await audit({ type: 'question.answered', questionId, eventId: question.eventId });
+    return question;
+  }
+
+  function conditionFromLegacy(value) {
+    const match = String(value).match(/^([^!=]+)(==|!=)(.+)$/);
+    if (!match) return undefined;
+    return { questionId: match[1].trim(), operator: match[2] === '==' ? 'equals' : 'not_equals', value: match[3].trim() };
+  }
+
+  function conditionMatches(condition, answers) {
+    const actual = String(answers[condition.questionId] ?? '').trim().toLowerCase();
+    const expected = String(condition.value).trim().toLowerCase();
+    return condition.operator === 'equals' ? actual === expected : actual !== expected;
+  }
+
+  async function ingestScheduled(input = {}) {
+    const id = input.id || input.runId || input.jobId && `${input.jobId}:${input.runId || input.scheduledAt || input.finishedAt}`;
+    if (!id) throw new Error('Scheduled event needs an id');
+    const existing = events.get(String(id));
+    if (existing) return existing;
+    const envelope = normalizeAgentOutput(input.envelope || input.output || input.text || input.message || input.summary || '', { eventId: String(id), source: 'OpenClaw' });
+    const event = addEvent({ id: String(id), eventType: input.status === 'failed' ? 'scheduled.failure' : 'scheduled', actor: 'automation', title: input.title || input.jobId || 'Lyra update', status: input.status || 'completed', envelope, metadata: { jobId: input.jobId, runId: input.runId } });
+    if (input.newsBrief) { newsBrief = input.newsBrief; persist(); }
+    await queuePush({ type: 'feed.event', eventId: event.id, title: event.title });
+    return event;
+  }
+
+  async function tasks() {
+    const data = await dataProvider();
+    return { items: (data.items || []).filter(item => ['reminder', 'task'].includes(item.kind) || item.source?.toLowerCase().includes('notion')).map(item => ({ ...item, completed: item.status === 'done' })), sources: data.sources || [], warnings: data.warnings || [], generatedAt: now() };
+  }
+
+  async function news() {
+    return { brief: newsBrief, generatedAt: now(), stale: Boolean(newsBrief && Date.now() - Date.parse(newsBrief.generatedAt || newsBrief.date || now()) > 86_400_000) };
   }
 
   async function today() {
@@ -193,6 +308,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     conversation.messages.push(userMessage);
     conversation.updatedAt = now();
     persist();
+    addEvent({ id: userMessage.id, eventType: 'message', actor: 'user', title: 'You', envelope: safeTextEnvelope(text, { eventId: userMessage.id, source: 'User' }) });
     await onEvent({ type: 'message.started', message: userMessage });
     await onEvent({ type: 'tool.started', name: 'lyra-context', label: 'Checking trusted context' });
     const data = await dataProvider();
@@ -201,10 +317,11 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
       ? `I’m here. ${data.warnings.join(' ')}`
       : `I found ${data.items?.length || 0} items in your current Lyra context. Ask me to prioritise, explain, or act on one of them.`;
     const content = await agentRunner({ conversation, text, context: data, fallback });
-    const assistantMessage = { id: randomUUID(), role: 'assistant', content, createdAt: now(), sources: data.sources || [] };
+    const assistantMessage = { id: randomUUID(), role: 'assistant', content, createdAt: now(), sources: data.sources || [], envelope: normalizeAgentOutput(content, { eventId: id, source: 'OpenClaw' }) };
     conversation.messages.push(assistantMessage);
     conversation.updatedAt = now();
     persist();
+    addEvent({ id: assistantMessage.id, eventType: 'message', actor: 'assistant', title: 'Lyra', envelope: assistantMessage.envelope, metadata: { conversationId: id } });
     await onEvent({ type: 'message.delta', content });
     await onEvent({ type: 'message.completed', message: assistantMessage });
     return assistantMessage;
@@ -221,6 +338,13 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     listConversations,
     getConversation,
     sendMessage,
+    listFeed,
+    getEvent,
+    createQuestion,
+    answerQuestion,
+    ingestScheduled,
+    tasks,
+    news,
     subscribePush(subscription) {
       pushSubscriptions.push({ subscription, createdAt: now() });
       persist();
@@ -229,7 +353,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     pushPublicKey: pushSender.publicKey,
     queuePush,
     testPush,
-    _state: { actions, captures, pushSubscriptions, conversations },
+    _state: { actions, captures, pushSubscriptions, conversations, events, questions },
     ready,
   };
 }

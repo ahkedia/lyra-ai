@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { formatEnvelopeForFallback } from '../app/schemas.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const appUrl = process.env.LYRA_APP_URL;
@@ -29,8 +30,8 @@ export async function handleUpdate(update) {
   const response = await fetch(`${appUrl}/v1/channels/message`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${appToken}` }, body: JSON.stringify({ channel: 'telegram', senderId: chat, text }) });
   if (!response.ok) throw new Error(`Lyra API ${response.status}`);
   const payload = await response.json();
-  const content = payload.content || payload.message?.content || 'Lyra did not return a message.';
-  await telegram('sendMessage', { chat_id: chat, text: String(content).slice(0, 4096) });
+  const content = payload.message?.envelope ? formatEnvelopeForFallback(payload.message.envelope) : payload.content || payload.message?.content || 'Lyra did not return a message.';
+  await telegram('sendMessage', { chat_id: chat, text: String(content).slice(0, 4096), disable_web_page_preview: true });
   return content;
 }
 

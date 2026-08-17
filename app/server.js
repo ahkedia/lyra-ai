@@ -60,7 +60,8 @@ function authAllowed(req) {
 }
 
 async function serveStatic(req, res) {
-  const requested = req.url === '/' ? '/index.html' : req.url.split('?')[0];
+  const rawPath = req.url.split('?')[0];
+  const requested = rawPath === '/' || rawPath === '/app' || rawPath === '/app/' ? '/index.html' : rawPath.startsWith('/app/') ? rawPath.slice(4) : rawPath;
   const file = path.resolve(publicDir, `.${requested}`);
   if (!file.startsWith(publicDir)) return json(res, 404, { error: 'Not found' });
   try { await stat(file); } catch { return json(res, 404, { error: 'Not found' }); }
@@ -111,8 +112,32 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, await channels.handleMessage({ channel: input.channel, senderId: input.senderId, text: input.text }));
     }
 
+    if (req.method === 'POST' && req.url === '/v1/internal/cron-deliver') {
+      const cronToken = process.env.LYRA_CRON_TOKEN || '';
+      if (!cronToken || req.headers.authorization !== `Bearer ${cronToken}`) return json(res, 401, { error: 'Unauthorized' });
+      return json(res, 200, await api.ingestScheduled(await body(req)));
+    }
+
     if (req.method === 'GET' && req.url === '/v1/today') return json(res, 200, await api.today());
     if (req.method === 'GET' && req.url === '/v1/metrics') return json(res, 200, await api.metrics());
+    if (req.method === 'GET' && req.url.startsWith('/v1/feed')) {
+      const parsed = new URL(req.url, 'http://lyra.local');
+      if (parsed.pathname === '/v1/feed') return json(res, 200, api.listFeed({ cursor: parsed.searchParams.get('cursor') || undefined, limit: parsed.searchParams.get('limit') || 40 }));
+      const eventId = parsed.pathname.match(/^\/v1\/feed\/events\/([^/]+)$/)?.[1] || parsed.pathname.match(/^\/v1\/feed\/([^/]+)$/)?.[1];
+      if (eventId) return json(res, 200, api.getEvent(eventId));
+    }
+    if (req.method === 'GET' && req.url === '/v1/tasks') return json(res, 200, await api.tasks());
+    if (req.method === 'GET' && req.url.startsWith('/v1/news')) return json(res, 200, await api.news());
+    if (req.method === 'GET' && /^\/v1\/questions\/[^/]+$/.test(req.url)) return json(res, 200, api._state.questions.get(req.url.split('/')[3]));
+    if (req.method === 'POST' && /^\/v1\/questions\/[^/]+\/answer$/.test(req.url)) return json(res, 200, await api.answerQuestion(req.url.split('/')[3], await body(req)));
+    if (req.method === 'POST' && req.url === '/v1/messages') {
+      const input = await body(req);
+      const conversationId = 'primary';
+      if (!api._state.conversations.has(conversationId)) api.createConversation('Lyra', conversationId);
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+      try { await api.sendMessage(conversationId, input.text || '', event => { sse(res, event); }); } catch (error) { sse(res, { type: 'error', message: error.message }); }
+      return res.end();
+    }
     if (req.method === 'GET' && req.url === '/v1/conversations') return json(res, 200, { conversations: api.listConversations() });
     if (req.method === 'POST' && req.url === '/v1/conversations') {
       const input = await body(req);

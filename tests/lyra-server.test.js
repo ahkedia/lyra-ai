@@ -21,6 +21,9 @@ test('server exposes health and protects API behind a session', async () => {
   try {
     const health = await fetch(`http://127.0.0.1:${port}/health`);
     assert.equal(health.status, 200);
+    const shell = await fetch(`http://127.0.0.1:${port}/app/`);
+    assert.equal(shell.status, 200);
+    assert.match(await shell.text(), /To Do/);
     const denied = await fetch(`http://127.0.0.1:${port}/v1/today`);
     assert.equal(denied.status, 401);
     const signIn = await fetch(`http://127.0.0.1:${port}/v1/auth/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: 'test-token' }) });
@@ -29,6 +32,11 @@ test('server exposes health and protects API behind a session', async () => {
     const today = await fetch(`http://127.0.0.1:${port}/v1/today`, { headers: { cookie } });
     assert.equal(today.status, 200);
     assert.ok(Array.isArray((await today.json()).warnings));
+    const feed = await fetch(`http://127.0.0.1:${port}/v1/feed`, { headers: { cookie } });
+    assert.equal(feed.status, 200);
+    assert.ok(Array.isArray((await feed.json()).events));
+    const tasks = await fetch(`http://127.0.0.1:${port}/v1/tasks`, { headers: { cookie } });
+    assert.equal(tasks.status, 200);
     const metrics = await fetch(`http://127.0.0.1:${port}/v1/metrics`, { headers: { cookie } });
     assert.equal(metrics.status, 200);
     assert.equal(typeof (await metrics.json()).messages, 'number');
