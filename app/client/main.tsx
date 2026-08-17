@@ -225,7 +225,19 @@ function LyraStream({ events, hasOlder, loadOlder, reload, seed, storyContext, c
     else setNewMessages(count => count + incoming.length);
   }, [events, atNewest]);
   const jumpToLatest = () => { bottom.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }); setNewMessages(0); };
-  const older = async () => { setLoadingOlder(true); try { await loadOlder(); } finally { setLoadingOlder(false); } };
+  const older = async () => {
+    const anchor = [...document.querySelectorAll<HTMLElement>('[data-feed-event-id]')].find(item => item.getBoundingClientRect().bottom > 0 && item.getBoundingClientRect().top < window.innerHeight);
+    const anchorId = anchor?.dataset.feedEventId; const anchorTop = anchor?.getBoundingClientRect().top;
+    setLoadingOlder(true);
+    try {
+      await loadOlder();
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      if (anchorId && anchorTop !== undefined) {
+        const next = document.querySelector<HTMLElement>(`[data-feed-event-id="${CSS.escape(anchorId)}"]`);
+        if (next) window.scrollBy({ top: next.getBoundingClientRect().top - anchorTop });
+      }
+    } finally { setLoadingOlder(false); }
+  };
   const onAction = async (action: LyraAction) => { const preview = await request<{ id: string }>('/v1/actions', { method: 'POST', body: JSON.stringify({ type: action.actionType, targetId: action.targetId || action.id, payload: action.payload || {}, idempotencyKey: `block:${action.id}:${crypto.randomUUID()}` }) }); const result = await request<{ status: string }>(`/v1/actions/${preview.id}/commit`, { method: 'POST', body: '{}' }); if (result.status === 'failed') throw new Error('Lyra could not complete that action.'); onToast({ text: 'Action completed' }); void reload(); };
   const onAnswer = async (block: Record<string, any>, answers: Record<string, string | string[]>) => { await request(`/v1/questions/${block.questionId}/answer`, { method: 'POST', body: JSON.stringify({ answers, expectedVersion: block.version, idempotencyKey: crypto.randomUUID() }) }); onToast({ text: 'Answer sent' }); void reload(); };
   const send = async (event: Event) => {
@@ -255,7 +267,7 @@ function LyraStream({ events, hasOlder, loadOlder, reload, seed, storyContext, c
 
 function Message({ event, onAction, onAnswer, onToast }: { event: FeedEvent; onAction: (action: LyraAction) => Promise<void>; onAnswer: (block: Record<string, any>, answers: Record<string, string | string[]>) => Promise<void>; onToast: (next: Toast) => void }) {
   const scheduled = event.actor === 'automation'; const title = scheduled ? friendlyTitle(event.title) : event.actor === 'user' ? 'You' : 'Lyra'; const share = async () => { try { const outcome = await shareLyraContent({ title, text: envelopeText(event.envelope) }); onToast({ text: outcome === 'copied' ? 'Copied to clipboard' : 'Shared' }); } catch { /* cancelled */ } };
-  return <article class={`message ${event.actor === 'user' ? 'user-message' : 'assistant-message'} ${scheduled ? 'scheduled-message' : ''}`}><div class="message-rail">{event.actor === 'user' ? null : <span class="lyra-avatar">✦</span>}</div><div class="message-content"><header><strong>{event.actor === 'user' ? 'You' : 'Lyra'}</strong><time>{clock(event.occurredAt)}</time><button class="share-button" aria-label="Share this message" onClick={() => void share()}>↗</button></header>{scheduled && <p class="scheduled-label">{title} · {clock(event.occurredAt)}</p>}{event.status === 'failed' ? <aside class="message-failure"><strong>Update unavailable</strong><p>Lyra recorded this update but could not complete it.</p></aside> : <BlockList blocks={event.envelope.blocks} context={{ envelope: event.envelope, onAction, onQuestionAnswer: onAnswer, onShare: share }}/>}</div></article>;
+  return <article data-feed-event-id={event.id} class={`message ${event.actor === 'user' ? 'user-message' : 'assistant-message'} ${scheduled ? 'scheduled-message' : ''}`}><div class="message-rail">{event.actor === 'user' ? null : <span class="lyra-avatar">✦</span>}</div><div class="message-content"><header><strong>{event.actor === 'user' ? 'You' : 'Lyra'}</strong><time>{clock(event.occurredAt)}</time><button class="share-button" aria-label="Share this message" onClick={() => void share()}>↗</button></header>{scheduled && <p class="scheduled-label">{title} · {clock(event.occurredAt)}</p>}{event.status === 'failed' ? <aside class="message-failure"><strong>Update unavailable</strong><p>Lyra recorded this update but could not complete it.</p></aside> : <BlockList blocks={event.envelope.blocks} context={{ envelope: event.envelope, onAction, onQuestionAnswer: onAnswer, onShare: share }}/>}</div></article>;
 }
 
 function friendlyTitle(value?: string) { return ({ 'morning-digest-news': 'Morning news', 'morning-digest-combine': 'Morning briefing', 'health-morning-bundle': 'Morning health', 'health-evening-checkin': 'Health check-in', 'reading-nudge': 'Reading reminder' } as Record<string, string>)[value || ''] || value || 'Lyra update'; }
