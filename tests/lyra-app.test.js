@@ -11,6 +11,7 @@ import { createActionHandler } from '../app/integrations.js';
 import { extractText, senderId } from '../scripts/telegram-lyra-bridge.mjs';
 import { assertLyraEnvelope, formatEnvelopeForFallback, normalizeAgentOutput } from '../app/schemas.js';
 import { normaliseNewsBrief } from '../app/news.js';
+import { buildMorningEnvelope } from '../scripts/deliver-morning-brief-to-pwa.mjs';
 
 test('golden rich UI fixture conforms to the canonical envelope', async () => {
   const fixture = JSON.parse(await readFile(new URL('../docs/fixtures/lyra-ui-v1.golden.json', import.meta.url), 'utf8'));
@@ -49,6 +50,13 @@ test('a scheduled rich morning brief updates the Lyra stream and News from one c
   assert.equal(api.listFeed().events[0].id, 'morning-brief-1');
   assert.equal((await api.news()).brief.title, 'Morning news');
   assert.equal((await api.news()).items[0].headline, 'Payment rails change');
+});
+
+test('the real morning briefing builder emits validated source-backed News and no raw operational content', () => {
+  const envelope = buildMorningEnvelope({ date: '2026-08-17', email: '📧 Email\nOne urgent reply.', health: '🏃 Health\nGym day.', news: [{ topic: 'AI', headline: 'A source-backed story', summary: 'A concise summary.', source: 'Example News', sourceUrl: 'https://example.com/story', publishedAt: '2026-08-17T06:00:00.000Z' }] });
+  assert.doesNotThrow(() => assertLyraEnvelope(envelope));
+  assert.equal(envelope.blocks[1].type, 'news_brief');
+  assert.equal(envelope.blocks[1].items[0].sourceRefs[0], 'morning-source-1');
 });
 
 test('canonical event subscribers receive each new scheduled event once', async () => {

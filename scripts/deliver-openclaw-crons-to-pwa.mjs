@@ -29,7 +29,7 @@ async function processJob(job) {
   const terminalStatus = !content || content === 'SKIP' ? 'skipped' : failed ? 'failed' : 'completed';
   const statusResponse = await fetch(statusEndpoint, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ id: `openclaw-cron:${job.id}:${entry.ts}`, jobId: job.id, runId: String(entry.ts), title: job.name, status: terminalStatus, finishedAt: entry.tsIso || new Date(entry.ts).toISOString(), ...(failed ? { errorCategory: 'cron_execution_failed' } : {}) }) });
   if (!statusResponse.ok) throw new Error(`PWA cron status failed for ${job.name}: ${statusResponse.status}`);
-  if (!content || content === 'SKIP') { state.delivered[job.id] = entry.ts; return 0; }
+  if (!content || content === 'SKIP' || (job.name === 'morning-digest-combine' && content.toLowerCase() === 'sent')) { state.delivered[job.id] = entry.ts; return 0; }
   const payload = {
     id: `openclaw-cron:${job.id}:${entry.ts}`, jobId: job.id, runId: String(entry.ts), title: job.name,
     status: failed ? 'failed' : 'completed', finishedAt: entry.tsIso || new Date(entry.ts).toISOString(), deliveryBridge: 'openclaw-cron',
