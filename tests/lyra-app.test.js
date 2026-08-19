@@ -199,6 +199,22 @@ test('a retried message idempotency key creates one user and one assistant event
   assert.equal(api.listFeed().events.length, 2);
 });
 
+test('a source failure never leaks its raw operational error into a chat reply', async () => {
+  const api = createLyraApi({
+    storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')),
+    agentRunner: async ({ fallback }) => fallback,
+    dataProvider: async () => ({
+      items: [],
+      sources: [{ name: 'Gmail', status: 'unavailable', asOf: '2026-08-19T00:00:00.000Z' }],
+      warnings: ['Email unavailable: command failed: cannot prompt boolean; the input device is not a TTY'],
+    }),
+  });
+  const conversation = api.createConversation('Lyra', 'source-failure');
+  const response = await api.sendMessage(conversation.id, 'What should I do today?');
+  assert.match(response.content, /Gmail is temporarily unavailable/i);
+  assert.doesNotMatch(response.content, /cannot prompt|TTY|command failed/i);
+});
+
 test('today preserves evidence and does not invent data', async () => {
   const api = createLyraApi({ storeDir: await mkdtemp(path.join(os.tmpdir(), 'lyra-app-')), dataProvider: async () => ({ items: [evidence({ id: 'r1', title: 'Call dentist', kind: 'reminder', source: 'Notion', detail: 'Due today', actions: ['complete'] })], sources: [] }) });
   const result = await api.today();

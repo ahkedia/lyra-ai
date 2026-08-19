@@ -10,7 +10,9 @@ export function createLiveProvider({ repoRoot = process.cwd(), snapshotPath = pr
   const providers = snapshotPath ? [createSnapshotProvider(snapshotPath)] : [];
   if (process.env.NOTION_API_KEY) providers.push(createNotionReminderProvider());
   if (process.env.LYRA_ENABLE_CALENDAR === '1') providers.push(createCalendarProvider(repoRoot));
-  if (process.env.LYRA_ENABLE_EMAIL === '1') providers.push(createEmailProvider());
+  // Himalaya needs a non-interactive configuration for the service account. Do
+  // not expose a half-configured mailbox as a live Lyra source.
+  if (process.env.LYRA_ENABLE_EMAIL === '1' && process.env.LYRA_EMAIL_CONFIGURED === '1') providers.push(createEmailProvider());
   if (!providers.length) providers.push(createSnapshotProvider(null));
   return createCompositeProvider(providers);
 }
@@ -161,7 +163,13 @@ export function createEmailProvider() {
     try {
       const { stdout } = await exec('himalaya', ['envelope', 'list', '--page-size', '20'], { timeout: Number(process.env.LYRA_SOURCE_TIMEOUT_MS || 1800), maxBuffer: 2 * 1024 * 1024 });
       return { items: stdout.trim() ? [{ id: 'email-inbox', title: 'Unread email inbox', kind: 'email', status: 'open', source: 'Gmail via himalaya', asOf: now(), confidence: 'verified', detail: stdout.trim().slice(0, 500), actions: [] }] : [], sources: [{ name: 'Gmail', status: 'current', asOf: now() }], warnings: [] };
-    } catch (error) { return { items: [], sources: [{ name: 'Gmail', status: 'unavailable', asOf: now() }], warnings: [`Email unavailable: ${error.message}`] }; }
+    } catch {
+      return {
+        items: [],
+        sources: [{ name: 'Gmail', status: 'unavailable', asOf: now() }],
+        warnings: ['Gmail is temporarily unavailable.'],
+      };
+    }
   };
 }
 

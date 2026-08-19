@@ -573,8 +573,9 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     const selectedNews = context.newsItemId ? newsItems.find(item => item.id === context.newsItemId) : null;
     const groundedContext = selectedNews ? { ...data, selectedNews: { id: selectedNews.id, headline: selectedNews.headline, summary: selectedNews.summary, whyItMatters: selectedNews.whyItMatters, source: selectedNews.source, sourceUrl: selectedNews.sourceUrl, publishedAt: selectedNews.publishedAt } } : data;
     await emit('tool.completed', { name: 'lyra-context', label: 'Context ready', sourceCount: (data.sources || []).length });
-    const fallback = data.warnings?.length
-      ? `I’m here. ${data.warnings.join(' ')}`
+    const unavailableSources = (data.sources || []).filter(source => source.status === 'unavailable').map(source => source.name).filter(Boolean);
+    const fallback = unavailableSources.length
+      ? `I can still help with your available Lyra context. ${unavailableSources.join(', ')} is temporarily unavailable, so I will not rely on it.`
       : `I found ${data.items?.length || 0} items in your current Lyra context. Ask me to prioritise, explain, or act on one of them.`;
     const content = await agentRunner({ conversation, text, context: groundedContext, fallback });
     const assistantMessage = { id: assistantMessageId, role: 'assistant', content, createdAt: now(), sources: data.sources || [], envelope: normalizeAgentOutput(content, { eventId: id, source: 'OpenClaw' }) };
