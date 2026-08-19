@@ -1,4 +1,4 @@
-const CACHE = 'lyra-shell-v9';
+const CACHE = 'lyra-shell-v10';
 const SHELL = ['/app/', '/app/styles.css', '/app/assets/main.js', '/app/manifest.webmanifest', '/app/icon.svg'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', event => event.waitUntil(Promise.all([self.clients.claim(), caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('lyra-shell-') && key !== CACHE).map(key => caches.delete(key))))])));

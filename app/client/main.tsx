@@ -85,6 +85,26 @@ function App() {
   const tasks = useResource<{ items: Task[]; capabilities?: TaskCapabilities }>('tasks', '/v1/tasks', { items: [] });
   const news = useResource<News>('news', '/v1/news', { items: [] });
   const [toast, setToast] = useState<Toast | null>(null); const [settings, setSettings] = useState(false); const [signIn, setSignIn] = useState(false); const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const updateKeyboardLayout = () => {
+      const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
+      const keyboardOffset = Math.max(0, layoutHeight - viewport.height - viewport.offsetTop);
+      document.documentElement.style.setProperty('--keyboard-offset', `${Math.round(keyboardOffset)}px`);
+      if (keyboardOffset > 80) document.documentElement.dataset.keyboardOpen = 'true';
+      else delete document.documentElement.dataset.keyboardOpen;
+    };
+    updateKeyboardLayout();
+    viewport.addEventListener('resize', updateKeyboardLayout);
+    viewport.addEventListener('scroll', updateKeyboardLayout);
+    return () => {
+      viewport.removeEventListener('resize', updateKeyboardLayout);
+      viewport.removeEventListener('scroll', updateKeyboardLayout);
+      document.documentElement.style.removeProperty('--keyboard-offset');
+      delete document.documentElement.dataset.keyboardOpen;
+    };
+  }, []);
   useEffect(() => { document.title = tab === 'lyra' ? 'Lyra' : `${tab === 'todo' ? 'To Do' : 'News'} · Lyra`; history.replaceState({}, '', `/app/?tab=${tab}`); }, [tab]);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 4800); return () => clearTimeout(id); }, [toast]);
   const refreshPending = () => void pendingMutations().then(items => setPendingCount(items.length));
