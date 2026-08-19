@@ -105,7 +105,7 @@ const server = http.createServer(async (req, res) => {
   try {
     await Promise.all([api.ready, sessions.ready]);
     if (req.url === '/health') return json(res, 200, { ok: true, service: 'lyra-app', at: new Date().toISOString() });
-    const onboardingTicket = req.url.match(/^\/app\/connect\/([A-Za-z0-9_.-]+)$/)?.[1];
+    const onboardingTicket = req.url.match(/^\/(?:app\/)?connect\/([A-Za-z0-9_.-]+)$/)?.[1];
     if (req.method === 'GET' && onboardingTicket) {
       const [expiresAt, nonce, signature] = onboardingTicket.split('.');
       const expected = createHmac('sha256', token).update(`${expiresAt}.${nonce}`).digest('base64url');
