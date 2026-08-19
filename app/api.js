@@ -670,7 +670,10 @@ async function defaultAgentRunner({ conversation, text, context, fallback, stric
     return fallback;
   }
   try {
-    const args = ['agent', '--channel', 'pwa', '--session-key', `agent:main:pwa-${conversation.id}`, '-m', text, '--json', '--timeout', String(process.env.LYRA_AGENT_TIMEOUT || 120)];
+    // `pwa` is an application surface, not an OpenClaw delivery channel. The
+    // explicit session key keeps PWA history separate without asking the
+    // gateway to route through a non-existent channel.
+    const args = ['agent', '--session-key', `agent:main:pwa-${conversation.id}`, '-m', text, '--json', '--timeout', String(process.env.LYRA_AGENT_TIMEOUT || 120)];
     const { stdout } = await runFile(process.env.OPENCLAW_BIN || 'openclaw', args, { timeout: (Number(process.env.LYRA_AGENT_TIMEOUT || 120) + 15) * 1000, maxBuffer: 16 * 1024 * 1024 });
     const payload = JSON.parse(stdout);
     const texts = payload?.result?.payloads?.map(item => item?.text).filter(Boolean) || [];
