@@ -577,7 +577,7 @@ export function createLyraApi({ dataProvider = defaultDataProvider, agentRunner 
     const fallback = unavailableSources.length
       ? `I can still help with your available Lyra context. ${unavailableSources.join(', ')} is temporarily unavailable, so I will not rely on it.`
       : `I found ${data.items?.length || 0} items in your current Lyra context. Ask me to prioritise, explain, or act on one of them.`;
-    const content = await agentRunner({ conversation, text, context: groundedContext, fallback });
+    const content = await agentRunner({ conversation, text, context: groundedContext, fallback, messageKey: idempotencyKey || assistantMessageId });
     const assistantMessage = { id: assistantMessageId, role: 'assistant', content, createdAt: now(), sources: data.sources || [], envelope: normalizeAgentOutput(content, { eventId: id, source: 'OpenClaw' }) };
     conversation.messages.push(assistantMessage);
     conversation.updatedAt = now();
@@ -664,16 +664,16 @@ async function defaultDataProvider() {
   }
 }
 
-async function defaultAgentRunner({ conversation, text, context, fallback, strict = false }) {
+async function defaultAgentRunner({ conversation, text, context, fallback, strict = false, messageKey = randomUUID() }) {
   if (process.env.LYRA_DISABLE_OPENCLAW === '1') {
     if (strict) throw new Error('Lyra continuation is unavailable');
     return fallback;
   }
   try {
-    // `pwa` is an application surface, not an OpenClaw delivery channel. The
-    // explicit session key keeps PWA history separate without asking the
-    // gateway to route through a non-existent channel.
-    const args = ['agent', '--session-key', `agent:main:pwa-${conversation.id}`, '-m', text, '--json', '--timeout', String(process.env.LYRA_AGENT_TIMEOUT || 120)];
+    // `pwa` is an application surface, not an OpenClaw delivery channel. Each
+    // message gets an isolated gateway session: retries retain the same key,
+    // while parallel sends cannot take over each other's session file.
+    const args = ['agent', '--session-key', `agent:main:pwa-${conversation.id}-${messageKey}`, '-m', text, '--json', '--timeout', String(process.env.LYRA_AGENT_TIMEOUT || 120)];
     const { stdout } = await runFile(process.env.OPENCLAW_BIN || 'openclaw', args, { timeout: (Number(process.env.LYRA_AGENT_TIMEOUT || 120) + 15) * 1000, maxBuffer: 16 * 1024 * 1024 });
     const payload = JSON.parse(stdout);
     const texts = payload?.result?.payloads?.map(item => item?.text).filter(Boolean) || [];
