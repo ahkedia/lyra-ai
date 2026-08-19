@@ -1,5 +1,5 @@
 import { createReadStream, readFileSync } from 'node:fs';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { stat } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
@@ -22,7 +22,6 @@ const sessions = createSessionStore({ storeDir: process.env.LYRA_APP_DATA_DIR ||
 const passkeys = createPasskeyAuth({ storeDir: process.env.LYRA_APP_DATA_DIR || path.resolve(process.cwd(), '.lyra-app') });
 const channels = createChannelAdapter({ api });
 const authAttempts = new Map();
-const onboardingTickets = new Map();
 const MAX_BODY_BYTES = 20 * 1024 * 1024;
 setInterval(() => {
   void api.deliverDue().catch(() => {});
@@ -106,12 +105,13 @@ const server = http.createServer(async (req, res) => {
   try {
     await Promise.all([api.ready, sessions.ready]);
     if (req.url === '/health') return json(res, 200, { ok: true, service: 'lyra-app', at: new Date().toISOString() });
-    const onboardingTicket = req.url.match(/^\/app\/connect\/([a-f0-9]{48})$/)?.[1];
+    const onboardingTicket = req.url.match(/^\/app\/connect\/([A-Za-z0-9_.-]+)$/)?.[1];
     if (req.method === 'GET' && onboardingTicket) {
-      const ticket = onboardingTickets.get(onboardingTicket);
-      onboardingTickets.delete(onboardingTicket);
-      if (!ticket || ticket.expiresAt < Date.now()) { res.writeHead(303, { location: '/app/?sign-in=expired' }); return res.end(); }
-      const session = await sessions.create(ticket.userId);
+      const [expiresAt, nonce, signature] = onboardingTicket.split('.');
+      const expected = createHmac('sha256', token).update(`${expiresAt}.${nonce}`).digest('base64url');
+      const valid = Boolean(token && expiresAt && nonce && signature && signature.length === expected.length && timingSafeEqual(Buffer.from(signature), Buffer.from(expected)) && Number(expiresAt) > Date.now());
+      if (!valid) { res.writeHead(303, { location: '/app/?sign-in=expired' }); return res.end(); }
+      const session = await sessions.create('akash');
       res.writeHead(303, { location: '/app/', 'set-cookie': sessionCookie(session) });
       return res.end();
     }
@@ -176,9 +176,9 @@ const server = http.createServer(async (req, res) => {
 
     if (!await authorised(req)) return json(res, 401, { error: 'Unauthorized' });
     if (req.method === 'POST' && req.url === '/v1/auth/onboarding-link') {
-      const ticket = randomBytes(24).toString('hex');
-      onboardingTickets.set(ticket, { userId: 'akash', expiresAt: Date.now() + 15 * 60_000 });
-      return json(res, 201, { path: `/app/connect/${ticket}`, expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() });
+      const expiry = String(Date.now() + 15 * 60_000); const nonce = randomBytes(16).toString('base64url');
+      const signature = createHmac('sha256', token).update(`${expiry}.${nonce}`).digest('base64url');
+      return json(res, 201, { path: `/app/connect/${expiry}.${nonce}.${signature}`, expiresAt: new Date(Number(expiry)).toISOString() });
     }
 
     if (req.method === 'GET' && req.url.startsWith('/v1/feed/stream')) {
