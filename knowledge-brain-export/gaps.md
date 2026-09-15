@@ -40,6 +40,10 @@ This document provides a rigorous disclosure of runtime features, background dae
 
 ## 3. Recommended Migration Bridge for Downstream Agents
 
-To maintain synchronization between the live Hetzner host and this Google Drive corpus:
-1. **Periodic Dump**: A shell script on Hetzner can run `scripts/brain-sync.sh` followed by a localized dump of `/root/gbrain-brain` into this Google Drive directory using `rclone`.
-2. **Delta Reconciliation**: When new entries are detected in `Second Brain`, the receiving agent should append them to `source-content/` and update `relationships.csv` using the predicates defined in `schema.md`.
+This export represents a **one-time, complete historical export** intended to preserve all existing knowledge prior to decommissioning the Hetzner production host.
+
+1. **Extraction & Merge Process**:
+   - Run `scripts/extract-production-brain.sh` on the Hetzner host to perform a read-only dump of Notion, `gbrain-brain`, PGLite, and sanitized configs without stopping live services.
+   - Run `scripts/merge-production-corpus.py --prod-dir <path>` to reconcile production-only items, update `entities/`, `source-content/`, and `sources.csv`, and execute benchmark validations.
+2. **Post-Decommission Operations**:
+   - Once the one-time extraction is merged and stored in Google Drive, the receiving AI operates completely autonomously on this static corpus without requiring any ongoing live sync or live server connections.

@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-09-15T11:28:06.927188Z",
+  "counts": {
+    "repository": {
+      "entities_count": 12,
+      "sources_count": 22,
+      "source_content_count": 6
+    },
+    "production": {
+      "scanned_files": 0,
+      "notion_pages_scanned": 0,
+      "gbrain_markdown_scanned": 0,
+      "pglite_found": false
+    },
+    "merged": {
+      "entities_count": 12,
+      "sources_count": 22,
+      "source_content_count": 6,
+      "imported_items_count": 0
+    }
+  },
+  "classification_summary": {
+    "duplicate_count": 0,
+    "production_only_count": 0,
+    "conflicting_count": 0
+  },
+  "eval_summary": {
+    "total_queries": 28,
+    "passed": 28,
+    "failed": 0,
+    "pass_rate": "100.0%"
+  },
+  "conflicts": []
+}

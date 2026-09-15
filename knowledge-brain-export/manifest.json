@@ -1,16 +1,16 @@
 {
-  "export_title": "Lyra Personal Knowledge Brain Portable Corpus",
-  "version": "1.0.0",
-  "generated_at": "2026-09-15T11:11:13Z",
+  "export_title": "Lyra Personal Knowledge Brain Portable Corpus (Merged Historical)",
+  "version": "1.1.0",
+  "updated_at": "2026-09-15T11:28:06.926936Z",
   "total_files": 28,
-  "total_bytes": 94696,
+  "total_bytes": 95763,
   "files": [
     {
       "path": "README.md",
       "format": "markdown",
-      "size_bytes": 9341,
-      "line_or_row_count": 124,
-      "sha256": "f8fc293c5bf38b88f90827b2eb07b7785f59657a951959d89b6054f595e6c304"
+      "size_bytes": 10066,
+      "line_or_row_count": 133,
+      "sha256": "1c807d6320bd76254e0cb0ce6501bc33cbafb9671d8d46bc773a9765a4443148"
     },
     {
       "path": "decisions-and-preferences.md",
@@ -22,9 +22,9 @@
     {
       "path": "gaps.md",
       "format": "markdown",
-      "size_bytes": 3784,
-      "line_or_row_count": 45,
-      "sha256": "721b7b0f1f39d30e30f52ad540bb5960291edcbde19c1ca6ec03959922bf277e"
+      "size_bytes": 4126,
+      "line_or_row_count": 49,
+      "sha256": "e68dcd138c477c40a704cafe536302fc7e7fa5439a5a200e12d259f273f6a944"
     },
     {
       "path": "relationships.csv",

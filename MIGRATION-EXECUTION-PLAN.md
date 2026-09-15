@@ -62,8 +62,10 @@ To operationalize this export inside a new environment:
 2. **Target Agent Ingestion**:
    - Direct the target AI (e.g., Claude, GPT-4, or a custom RAG agent) to read `README.md`, `schema.md`, `semantic-rules.md`, and `retrieval-and-ranking.md` as its primary system prompt / context layer.
    - For semantic search, ingest `entities/` and `source-content/` into the target model's retrieval engine (vector database, local chunk index, or full-context memory).
-3. **Syncing Live Daily Changes from Hetzner (Optional Ongoing Maintenance)**:
-   - If updates continue on the Hetzner host, an rsync or git export script can periodically dump newly authored Markdown files from `/root/gbrain-brain` into this Google Drive folder.
+3. **One-Time Historical Production Extraction & Merge**:
+   - The repository export contains all schemas, ontologies, rules, benchmarks, and repository-derived data. To capture the full historical knowledge corpus before Hetzner shutdown, execute `scripts/extract-production-brain.sh` on the Hetzner host. This read-only script extracts live Notion pages/databases (JSON + Markdown), `/root/gbrain-brain`, PGLite snapshots, and sanitized configurations without stopping any services.
+   - Run `python3 scripts/merge-production-corpus.py --prod-dir <extract_path>` to reconcile and import production-only items into `entities/`, `sources.csv`, and `source-content/`, and validate the 28 benchmark queries.
+   - Once merged, the corpus in Google Drive is completely self-contained; no ongoing sync is required.
 
 ---
 

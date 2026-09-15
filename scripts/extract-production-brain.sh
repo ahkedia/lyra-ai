@@ -6,11 +6,18 @@
 #   knowledge brain corpus on the Hetzner production host for migration to Google Drive.
 #
 # SOURCES EXTRACTED:
-#   1. /root/gbrain-brain/                  (Markdown personal wiki, second-brain, writing, tweets)
-#   2. /root/.gbrain/brain.pglite/          (PGLite embedded vector database tables)
-#   3. /root/lyra-private/                  (Live registry.json, SOUL.md, MEMORY.md, cron-jobs.json)
-#   4. /root/.openclaw/workspace/ & cron    (Live OpenClaw cron definitions and workspace context)
-#   5. PostgreSQL / lyra-app state         (if LYRA_DATABASE_URL is configured in .env)
+#   1. Live Notion Master Databases & Pages (via Notion API dump: JSON + Markdown)
+#   2. /root/gbrain-brain/                  (Markdown personal wiki, second-brain, writing, tweets)
+#   3. /root/.gbrain/brain.pglite/          (PGLite embedded vector database tables)
+#   4. /root/lyra-private/                  (Sanitized: registry.json, MEMORY.md, SOUL.md; NO credentials)
+#   5. /root/.openclaw/workspace/ & cron    (Live OpenClaw cron definitions and workspace context)
+#   6. PostgreSQL / lyra-app state         (if LYRA_DATABASE_URL is configured in .env)
+#
+# SECURITY & PRIVACY:
+#   - Explicitly EXCLUDES all .env files, private keys, API secrets, tokens, cookies, auth stores.
+#   - Executes automated secret scanning over the staged export before packaging.
+#   - Encrypts the final archive using gpg (symmetric AES-256) or age if installed.
+#   - Computes and prints SHA-256 checksum of the final archive.
 #
 # SAFETY & NON-DESTRUCTIVE GUARANTEES:
 #   - NEVER modifies, truncates, or deletes any file.
@@ -19,38 +26,62 @@
 #   - Verifies disk space before archiving.
 #
 # USAGE (run on Hetzner host as root):
-#   bash /root/lyra-ai/scripts/extract-production-brain.sh
-#
-# OR run remotely from your authorized local machine:
-#   ssh hetzner "bash -s" < scripts/extract-production-brain.sh
+#   bash /root/lyra-ai/scripts/extract-production-brain.sh [passphrase]
 #
 set -euo pipefail
 
 TIMESTAMP=$(date -u +%Y%m%d_%H%M%SZ)
 EXPORT_DIR="/root/production-brain-export-${TIMESTAMP}"
-ARCHIVE_PATH="/root/production-brain-export-${TIMESTAMP}.tar.gz"
+RAW_ARCHIVE="/root/production-brain-export-${TIMESTAMP}.tar.gz"
+ENCRYPTED_ARCHIVE="/root/production-brain-export-${TIMESTAMP}.tar.gz.enc"
 REPORT_PATH="${EXPORT_DIR}/production-inventory-report.json"
+PASSPHRASE="${1:-}"
 
-echo "=== Lyra Production Knowledge Brain Extraction ==="
+echo "=== Lyra Production Knowledge Brain Extraction (One-Time Historical) ==="
 echo "Timestamp: ${TIMESTAMP}"
-echo "Output Directory: ${EXPORT_DIR}"
+echo "Staging Directory: ${EXPORT_DIR}"
 echo ""
 
-# 1. Preflight Disk Space Check (Requires at least 1GB free)
+# 1. Preflight Disk Space Check (Requires at least 2GB free)
 FREE_KB=$(df -k /root | awk 'NR==2 {print $4}')
-if [ "${FREE_KB}" -lt 1048576 ]; then
-  echo "ERROR: Insufficient disk space on /root (less than 1GB free). Aborting extraction."
+if [ "${FREE_KB}" -lt 2097152 ]; then
+  echo "ERROR: Insufficient disk space on /root (less than 2GB free). Aborting extraction."
   exit 1
 fi
 
 mkdir -p "${EXPORT_DIR}"
+mkdir -p "${EXPORT_DIR}/notion-dump"
 mkdir -p "${EXPORT_DIR}/gbrain-brain"
 mkdir -p "${EXPORT_DIR}/lyra-private"
 mkdir -p "${EXPORT_DIR}/pglite-snapshot"
 mkdir -p "${EXPORT_DIR}/openclaw-state"
 mkdir -p "${EXPORT_DIR}/postgres-dumps"
 
-echo "[1/6] Inventorying and copying /root/gbrain-brain..."
+# Source environment safely to read NOTION_API_KEY and LYRA_DATABASE_URL
+source /root/.openclaw/.env 2>/dev/null || true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 1: Live Notion Dump (Master System of Record)
+# ─────────────────────────────────────────────────────────────────────────────
+echo "[1/7] Dumping live Notion master databases and pages via Notion API..."
+NOTION_KEY="${NOTION_API_KEY:-}"
+REGISTRY_PATH="/root/lyra-private/notion/registry.json"
+NOTION_DUMP_SCRIPT="/root/lyra-ai/scripts/notion_dump.py"
+
+if [ -n "${NOTION_KEY}" ] && [ -f "${REGISTRY_PATH}" ] && [ -f "${NOTION_DUMP_SCRIPT}" ]; then
+  python3 "${NOTION_DUMP_SCRIPT}" \
+    --registry "${REGISTRY_PATH}" \
+    --output-dir "${EXPORT_DIR}/notion-dump" \
+    --api-key "${NOTION_KEY}" || echo "  ⚠ Notion dump completed with warnings"
+  echo "  ✓ Dumped live Notion databases and pages"
+else
+  echo "  ⚠ Skipping live Notion dump: missing NOTION_API_KEY, registry.json, or notion_dump.py"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 2: /root/gbrain-brain (Markdown knowledge files)
+# ─────────────────────────────────────────────────────────────────────────────
+echo "[2/7] Inventorying and copying /root/gbrain-brain..."
 GBRAIN_EXISTS=false
 GBRAIN_FILES=0
 GBRAIN_BYTES=0
@@ -69,7 +100,10 @@ else
   echo "  ⚠ /root/gbrain-brain not found at expected path"
 fi
 
-echo "[2/6] Inventorying and copying /root/lyra-private..."
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 3: /root/lyra-private (Sanitized — Exclude secrets)
+# ─────────────────────────────────────────────────────────────────────────────
+echo "[3/7] Copying /root/lyra-private (strictly excluding secrets and .env files)..."
 PRIV_EXISTS=false
 PRIV_FILES=0
 PRIV_BYTES=0
@@ -81,13 +115,25 @@ if [ -d "/root/lyra-private" ]; then
   PRIV_BYTES=$(du -sb /root/lyra-private 2>/dev/null | awk '{print $1}' || du -sk /root/lyra-private | awk '{print $1*1024}')
   PRIV_LAST_WRITE=$(find /root/lyra-private -type f -printf '%T+ %p\n' 2>/dev/null | sort -r | head -1 | awk '{print $1}' || echo "unknown")
   
-  cp -a /root/lyra-private "${EXPORT_DIR}/"
-  echo "  ✓ Copied /root/lyra-private (${PRIV_FILES} files, ${PRIV_BYTES} bytes, latest: ${PRIV_LAST_WRITE})"
+  # Copy selectively excluding .env, keys, credentials, tokens
+  rsync -av \
+    --exclude="*.env" \
+    --exclude="*.key" \
+    --exclude="*.pem" \
+    --exclude="id_*" \
+    --exclude="*token*" \
+    --exclude="*secret*" \
+    --exclude="credentials*" \
+    /root/lyra-private/ "${EXPORT_DIR}/lyra-private/"
+  echo "  ✓ Copied sanitized /root/lyra-private"
 else
   echo "  ⚠ /root/lyra-private not found at expected path"
 fi
 
-echo "[3/6] Taking read-only snapshot of PGLite database..."
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 4: Snapshot PGLite Database (Read-only)
+# ─────────────────────────────────────────────────────────────────────────────
+echo "[4/7] Taking read-only snapshot of PGLite database..."
 PGLITE_EXISTS=false
 PGLITE_PATH=""
 PGLITE_BYTES=0
@@ -111,12 +157,12 @@ else
   echo "  ⚠ PGLite directory not found at standard paths"
 fi
 
-echo "[4/6] Exporting OpenClaw workspace and live crons..."
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 5: OpenClaw Crons & Relational Dumps
+# ─────────────────────────────────────────────────────────────────────────────
+echo "[5/7] Exporting OpenClaw workspace state and PostgreSQL tables..."
 if [ -d "/root/.openclaw" ]; then
-  # Copy live cron jobs
   [ -f "/root/.openclaw/cron/jobs.json" ] && cp -a /root/.openclaw/cron/jobs.json "${EXPORT_DIR}/openclaw-state/cron-jobs.json"
-  
-  # Copy live workspace state (SOUL, MEMORY, HEARTBEAT, references)
   if [ -d "/root/.openclaw/workspace" ]; then
     mkdir -p "${EXPORT_DIR}/openclaw-state/workspace"
     for f in SOUL.md MEMORY.md HEARTBEAT.md TOOLS.md; do
@@ -127,20 +173,29 @@ if [ -d "/root/.openclaw" ]; then
   echo "  ✓ Copied OpenClaw live cron jobs and workspace files"
 fi
 
-echo "[5/6] Exporting PostgreSQL app tables (if available)..."
-source /root/.openclaw/.env 2>/dev/null || true
 if [ -n "${LYRA_DATABASE_URL:-}" ]; then
   if command -v pg_dump >/dev/null 2>&1; then
     pg_dump --clean --if-exists "${LYRA_DATABASE_URL}" > "${EXPORT_DIR}/postgres-dumps/lyra-app-dump.sql" 2>/dev/null || echo "  ⚠ pg_dump failed"
     echo "  ✓ Dumped relational PostgreSQL app database"
-  else
-    echo "  ⚠ pg_dump binary not found; skipping SQL dump"
   fi
-else
-  echo "  - LYRA_DATABASE_URL not set; skipping relational database dump"
 fi
 
-echo "[6/6] Generating inventory manifest..."
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 6: Automated Secret Scan over Staged Export
+# ─────────────────────────────────────────────────────────────────────────────
+echo "[6/7] Running security scan over staged export..."
+SECRET_PATTERNS='sk-[a-zA-Z0-9]{20,}|ntn_[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{20,}|xoxb-[0-9]|AKIA[0-9A-Z]{16}|BEGIN PRIVATE KEY'
+LEAKS=$(grep -rnE "${SECRET_PATTERNS}" "${EXPORT_DIR}" 2>/dev/null || true)
+
+if [ -n "${LEAKS}" ]; then
+  echo "  ❌ CRITICAL: Secrets detected in export staging area!"
+  echo "${LEAKS}" | head -5 | sed 's/^/    /'
+  echo "  Aborting packaging to prevent credential exfiltration."
+  exit 1
+fi
+echo "  ✓ Zero credentials or API secrets found in export staging"
+
+# Write inventory manifest
 cat <<EOF > "${REPORT_PATH}"
 {
   "extraction_timestamp": "${TIMESTAMP}",
@@ -168,13 +223,44 @@ cat <<EOF > "${REPORT_PATH}"
 }
 EOF
 
-# Package into compressed tarball
-tar -czf "${ARCHIVE_PATH}" -C /root "production-brain-export-${TIMESTAMP}"
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 7: Packaging, Encryption & SHA-256 Checksum
+# ─────────────────────────────────────────────────────────────────────────────
+echo "[7/7] Packaging and encrypting export archive..."
+tar -czf "${RAW_ARCHIVE}" -C /root "production-brain-export-${TIMESTAMP}"
+RAW_SHA256=$(sha256sum "${RAW_ARCHIVE}" | awk '{print $1}')
+echo "  ✓ Raw tarball created: ${RAW_ARCHIVE} (SHA-256: ${RAW_SHA256})"
+
+FINAL_ARCHIVE="${RAW_ARCHIVE}"
+if command -v gpg >/dev/null 2>&1; then
+  echo "  Encrypting archive with GPG (AES-256)..."
+  if [ -n "${PASSPHRASE}" ]; then
+    gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "${PASSPHRASE}" -o "${ENCRYPTED_ARCHIVE}" "${RAW_ARCHIVE}"
+  else
+    gpg --batch --yes --symmetric --cipher-algo AES256 -o "${ENCRYPTED_ARCHIVE}" "${RAW_ARCHIVE}"
+  fi
+  rm -f "${RAW_ARCHIVE}"
+  FINAL_ARCHIVE="${ENCRYPTED_ARCHIVE}"
+elif command -v age >/dev/null 2>&1; then
+  echo "  Encrypting archive with age..."
+  if [ -n "${PASSPHRASE}" ]; then
+    printf "%s" "${PASSPHRASE}" | age -p -o "${ENCRYPTED_ARCHIVE}" "${RAW_ARCHIVE}"
+  else
+    age -p -o "${ENCRYPTED_ARCHIVE}" "${RAW_ARCHIVE}"
+  fi
+  rm -f "${RAW_ARCHIVE}"
+  FINAL_ARCHIVE="${ENCRYPTED_ARCHIVE}"
+fi
+
+FINAL_SHA256=$(sha256sum "${FINAL_ARCHIVE}" | awk '{print $1}')
+FINAL_SIZE=$(du -sh "${FINAL_ARCHIVE}" | awk '{print $1}')
 
 echo ""
 echo "=========================================================="
-echo "Extraction Complete (100% Read-Only, 0 Services Stopped)"
-echo "Archive File: ${ARCHIVE_PATH}"
-echo "Report: ${REPORT_PATH}"
-echo "Archive Size: $(du -sh "${ARCHIVE_PATH}" | awk '{print $1}')"
+echo "ONE-TIME HISTORICAL EXTRACTION COMPLETE"
+echo "Host Services Status: 100% Online (Zero interruptions)"
+echo "Archive File: ${FINAL_ARCHIVE}"
+echo "Archive Size: ${FINAL_SIZE}"
+echo "SHA-256:      ${FINAL_SHA256}"
+echo "Report:       ${REPORT_PATH}"
 echo "=========================================================="

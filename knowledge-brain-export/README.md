@@ -119,6 +119,15 @@ To navigate this corpus effectively, follow this dependency and relationship mod
 ## 5. System Limitations & Boundaries
 
 Any AI operating on this corpus must recognize the following inherent boundaries:
-1. **Static Snapshot**: This export represents a static point-in-time snapshot. It does not auto-poll Telegram or execute live cron jobs unless an external scheduler is attached.
+1. **One-Time Historical Archive**: This export represents a one-time historical preservation prior to decommissioning the Hetzner host. It does not auto-poll Telegram or execute live cron jobs.
 2. **Provenance Isolation**: External readings, frameworks from Lenny's Newsletter, and saved tweets must **never** be cited as Akash's personal achievements or professional history.
 3. **Absence of Proof is Not Proof of Absence**: If a specific metric or date is unrecorded in the `canonical` tier, the AI must explicitly state "I don't have that on record" rather than extrapolating or inventing data.
+
+---
+
+## 6. One-Time Historical Export & Extraction Instructions
+
+To finalize the full historical export before shutting down Hetzner:
+1. Run `scripts/extract-production-brain.sh` on the Hetzner host. It connects to the live Notion API, exports databases and blocks as Markdown/JSON, copies `/root/gbrain-brain`, snapshots PGLite, scans for secrets, and creates an encrypted archive without stopping any host services.
+2. Run `scripts/merge-production-corpus.py --prod-dir <path>` to import production-only items into `entities/`, `sources.csv`, and `source-content/`, and evaluate benchmark queries.
+3. The resulting corpus in Google Drive is completely self-contained and ready for downstream query agents.
