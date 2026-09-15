@@ -74,6 +74,7 @@ class Item:
     content: bytes
     content_type: str
     explicit_type: str = ""
+    semantic_hash: str = ""
 
 
 class ReconciliationError(RuntimeError):
@@ -95,6 +96,8 @@ class Reconciler:
         self.errors: list[str] = []
         self.store_counts: dict[str, Any] = {}
         self.benchmark: dict[str, Any] | None = None
+        self.canonical_semantic_hashes: set[str] = set()
+        self.quarantined_markdown: list[dict[str, Any]] = []
         self.imported = {"sources": 0, "entities": 0, "relationships": 0, "decisions": 0}
 
     def load_json_complete(self, path: Path, label: str) -> dict[str, Any]:
@@ -134,6 +137,20 @@ class Reconciler:
         gbrain_files = sorted((self.production / "gbrain-brain").rglob("*.md"))
         if not gbrain_files:
             raise ReconciliationError("gbrain export contains zero Markdown files")
+        exclusions = self.load_json_complete(
+            self.production / "gbrain-exclusions.json", "gbrain exclusion"
+        )
+        copied_gbrain_files = sum(
+            path.is_file() or path.is_symlink()
+            for path in (self.production / "gbrain-brain").rglob("*")
+        )
+        if (
+            copied_gbrain_files + exclusions.get("skipped_file_count", -1)
+            != exclusions.get("source_file_count")
+        ):
+            raise ReconciliationError(
+                "gbrain copied plus excluded file counts do not match source inventory"
+            )
         registry = self.production / "registry.json"
         if not registry.is_file():
             raise ReconciliationError("registry.json is missing from production export")
@@ -143,7 +160,12 @@ class Reconciler:
                 "blocks": notion.get("total_blocks_exported", 0),
                 "databases": notion.get("registered_database_count", 0),
             },
-            "gbrain": {"markdown_files": len(gbrain_files)},
+            "gbrain": {
+                "markdown_files": len(gbrain_files),
+                "copied_files": copied_gbrain_files,
+                "excluded_files": exclusions["skipped_file_count"],
+                "excluded_bytes": exclusions.get("skipped_bytes", 0),
+            },
             "pglite": {
                 "tables": pglite["table_count"],
                 "rows": pglite.get("row_count", 0),
@@ -179,6 +201,13 @@ class Reconciler:
                         explicit_type = (prop.get("select") or {}).get("name", "")
                     elif prop_type == "status":
                         explicit_type = (prop.get("status") or {}).get("name", "")
+            markdown_path = path.with_suffix(".md")
+            semantic_hash = ""
+            if markdown_path.is_file():
+                semantic_hash = hash_bytes(
+                    normalize_markdown(markdown_path.read_text(encoding="utf-8", errors="strict"))
+                )
+                self.canonical_semantic_hashes.add(semantic_hash)
             self.items.append(
                 Item(
                     durable_identity=f"notion-page:{page['id']}",
@@ -189,26 +218,44 @@ class Reconciler:
                     content=content,
                     content_type="json",
                     explicit_type=explicit_type,
+                    semantic_hash=semantic_hash,
                 )
             )
 
         for path in sorted((self.production / "gbrain-brain").rglob("*.md")):
-            text = path.read_text(encoding="utf-8", errors="strict")
-            frontmatter = read_frontmatter(text)
+            raw_content = path.read_bytes()
             relative = path.relative_to(self.production / "gbrain-brain").as_posix()
+            try:
+                text = raw_content.decode("utf-8", errors="strict")
+            except UnicodeDecodeError as exc:
+                self.quarantined_markdown.append(
+                    {
+                        "source_path": f"gbrain-brain/{relative}",
+                        "size_bytes": len(raw_content),
+                        "sha256": hash_bytes(raw_content),
+                        "reason": (
+                            f"invalid UTF-8 at byte {exc.start}; raw file preserved in quarantine"
+                        ),
+                        "_source_file": str(path),
+                    }
+                )
+                continue
+            frontmatter = read_frontmatter(text)
             notion_id = frontmatter.get("notion_page_id") or frontmatter.get("notion_id")
             identity = f"notion-page:{notion_id}" if notion_id else f"gbrain-path:{relative}"
             normalized = normalize_markdown(text)
+            semantic_hash = hash_bytes(normalized)
             self.items.append(
                 Item(
                     durable_identity=identity,
-                    content_hash=hash_bytes(normalized),
+                    content_hash=semantic_hash,
                     title=frontmatter.get("title") or safe_title(text, path.stem),
                     origin="gbrain",
                     source_path=f"gbrain-brain/{relative}",
                     content=text.encode("utf-8"),
                     content_type="markdown",
                     explicit_type=frontmatter.get("type", ""),
+                    semantic_hash=semantic_hash,
                 )
             )
 
@@ -249,6 +296,29 @@ class Reconciler:
                 )
         if not self.items:
             raise ReconciliationError("production scan yielded zero durable items")
+        self.store_counts.setdefault("gbrain", {}).update(
+            {
+                "utf8_markdown_files": sum(item.origin == "gbrain" for item in self.items),
+                "quarantined_non_utf8_files": len(self.quarantined_markdown),
+                "canonical_notion_mirrors": sum(
+                    item.origin == "gbrain"
+                    and bool(item.semantic_hash)
+                    and item.semantic_hash in self.canonical_semantic_hashes
+                    for item in self.items
+                ),
+            }
+        )
+
+    def authority_for_item(self, item: Item) -> str:
+        if item.origin == "notion":
+            return "canonical"
+        if (
+            item.origin == "gbrain"
+            and item.semantic_hash
+            and item.semantic_hash in self.canonical_semantic_hashes
+        ):
+            return "canonical"
+        return "reference"
 
     def repository_index(self) -> tuple[dict[str, set[str]], set[str]]:
         by_identity: dict[str, set[str]] = {}
@@ -318,6 +388,30 @@ class Reconciler:
                 extension = path.suffix if path.suffix else ".txt"
                 shutil.copy2(path, source_content / f"{source_id}{extension}")
 
+        quarantine_root = self.output / "quarantine" / "non-utf8" / "gbrain"
+        public_quarantine = []
+        for record in self.quarantined_markdown:
+            relative = Path(record["source_path"]).relative_to("gbrain-brain")
+            target = quarantine_root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(record["_source_file"], target)
+            public_quarantine.append(
+                {key: value for key, value in record.items() if not key.startswith("_")}
+            )
+        (self.output / "quarantine-report.json").write_text(
+            json.dumps(
+                {
+                    "status": "COMPLETE_WITH_QUARANTINE" if public_quarantine else "COMPLETE",
+                    "file_count": len(public_quarantine),
+                    "files": public_quarantine,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     def import_items(self) -> None:
         importable_keys = {
             (record["durable_identity"], record["content_hash"])
@@ -375,7 +469,7 @@ class Reconciler:
                     "author": "",
                     "url_or_path": item.source_path,
                     "content_type": item.content_type,
-                    "authority_level": "canonical" if item.origin == "notion" else "reference",
+                    "authority_level": self.authority_for_item(item),
                     "entities_referenced": entity_id,
                 }
             )
@@ -504,6 +598,10 @@ class Reconciler:
                 **self.imported,
             },
             "classification": self.classified,
+            "quarantined_non_utf8_markdown": [
+                {key: value for key, value in record.items() if not key.startswith("_")}
+                for record in self.quarantined_markdown
+            ],
             "benchmark_validation": benchmark,
             "errors": self.errors,
         }

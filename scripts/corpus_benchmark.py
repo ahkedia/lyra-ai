@@ -72,6 +72,8 @@ class Document:
     identifier: str
     text: str
     authority: str = ""
+    origin: str = ""
+    source_path: str = ""
 
 
 def parse_tests(path: Path) -> list[dict[str, Any]]:
@@ -116,6 +118,8 @@ def build_documents(export_dir: Path, repo_root: Path | None = None) -> dict[str
                         f"{source_id}\n{row.get('title', '')}\n"
                         + content_path.read_text(encoding="utf-8", errors="replace"),
                         row.get("authority_level", ""),
+                        row.get("original_system", ""),
+                        row.get("url_or_path", ""),
                     )
 
     for path in sorted((export_dir / "entities").glob("*.md")):
@@ -194,6 +198,24 @@ def _contains_group(text: str, group: tuple[str, ...]) -> bool:
     return any(value.lower() in lowered for value in group)
 
 
+def is_third_party_reference(document: Document) -> bool:
+    """Distinguish external reference material from first-party mirrored records."""
+    if document.authority != "reference":
+        return False
+    metadata = " ".join(
+        (document.identifier, document.origin, document.source_path)
+    ).lower()
+    third_party_markers = (
+        "lenny",
+        "wiki/lenny",
+        "third-party",
+        "third party",
+        "external reference",
+        "newsletter",
+    )
+    return any(marker in metadata for marker in third_party_markers)
+
+
 def evaluate_case(case: dict[str, Any], documents: dict[str, Document]) -> dict[str, Any]:
     retrieved = retrieve(case["query"], documents)
     # Required sources must exist and be retrievable. Include required documents in
@@ -225,7 +247,10 @@ def evaluate_case(case: dict[str, Any], documents: dict[str, Document]) -> dict[
                 forbidden_assertions.append(f"forbidden employer asserted: {company}")
     elif case["number"] == 8:
         for document in evidence_docs:
-            if document.authority == "reference" and document.identifier not in case["required_sources"]:
+            if (
+                is_third_party_reference(document)
+                and document.identifier not in case["required_sources"]
+            ):
                 forbidden_assertions.append(f"reference-tier career attribution: {document.identifier}")
     elif case["number"] == 13:
         acl = documents.get("person-abhigna", Document("", "")).text.lower()

@@ -215,11 +215,13 @@ echo "Exact disk headroom: required=${REQUIRED_BYTES} free=${FREE_BYTES}"
   || fail "insufficient disk: required=${REQUIRED_BYTES} free=${FREE_BYTES}"
 
 CURRENT_STEP="gbrain and registry snapshot"
-rsync -a --delete-excluded \
-  --exclude='.git/' \
-  --exclude='.env' --exclude='.env.*' \
-  --exclude='*.pem' --exclude='*.key' --exclude='*.p12' --exclude='*.pfx' \
-  --exclude='credentials*' --exclude='*token*' --exclude='*secret*' \
+RSYNC_EXCLUDES="${STAGING_DIR}/gbrain-rsync-excludes.txt"
+python3 "${ROOT_DIR}/scripts/inventory-export-exclusions.py" \
+  --source "${GBRAIN_PATH}" \
+  --inventory "${PRODUCTION}/gbrain-exclusions.json" \
+  --rsync-excludes "${RSYNC_EXCLUDES}"
+rsync -a \
+  --exclude-from="${RSYNC_EXCLUDES}" \
   "${GBRAIN_PATH}/" "${PRODUCTION}/gbrain-brain/"
 [[ -n "$(find "${PRODUCTION}/gbrain-brain" -type f -name '*.md' -print -quit)" ]] \
   || fail "gbrain snapshot contains no Markdown"
@@ -231,7 +233,7 @@ for path in "${PRIVATE_FILES[@]}"; do
     cp --preserve=mode,timestamps "${path}" "${PRODUCTION}/private-context/${relative}"
   fi
 done
-echo "[COMPLETE] gbrain and explicit private knowledge files copied; no private tree copy used"
+echo "[COMPLETE] gbrain copied, all excluded paths inventoried, and no private tree copy used"
 
 CURRENT_STEP="consistent PGlite snapshot"
 node "${ROOT_DIR}/scripts/snapshot-pglite.mjs" \

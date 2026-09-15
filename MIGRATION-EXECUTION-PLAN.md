@@ -52,6 +52,10 @@ Due to the transition from an active live Linux daemon to an offline, portable G
    - Raw Telegram voice note `.ogg`/`.mp3` audio files and transient sub-minute conversational turns are omitted. Only the verified verbatim transcriptions, classified takeaways, and synthesized conversation logs are preserved.
 3. **Dynamic Hetzner Lock State**:
    - Linux process locks (`/tmp/brain-write.lock`, `flock`, PID handles) and in-memory token caches are system-level runtime artifacts and are not applicable to Google Drive.
+4. **Unreadable Markdown Encoding**:
+   - A gbrain `.md` file that is not valid UTF-8 is preserved byte-for-byte under `quarantine/non-utf8/gbrain/` and listed with path, byte size, hash, and decode offset in `quarantine-report.json`. It is not silently dropped or parsed as text.
+5. **Secret-Named Source Files**:
+   - Files omitted by the shared rsync exclusion list are listed in `gbrain-exclusions.json` with path, size, and matched rule. Copied plus excluded counts must equal the source inventory.
 
 ---
 
@@ -106,6 +110,25 @@ Do not run these commands until the operator has reviewed the PGLite preconditio
 - Read access to `/root/gbrain-brain`, `/root/.gbrain/brain.pglite`, the Notion registry, explicit private context files, and OpenClaw state
 - Database access through `LYRA_DATABASE_URL`
 - Notion read access through `NOTION_API_KEY`
+
+### Dependency installation on Ubuntu
+
+Run only as an explicit operator-approved setup step; the extractor itself never installs software:
+
+```bash
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  age golang-go postgresql-client rsync lsof util-linux
+
+GOBIN=/usr/local/bin go install github.com/gitleaks/gitleaks/v8@latest
+GOBIN=/usr/local/bin go install github.com/trufflesecurity/trufflehog/v3@latest
+
+age --version
+gitleaks version
+trufflehog --version
+```
+
+If any install or version command fails, do not start extraction.
 
 ### Protected environment setup
 
