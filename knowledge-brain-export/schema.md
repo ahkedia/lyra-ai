@@ -18,6 +18,7 @@ All identifiers across this corpus are immutable, case-sensitive (strictly lower
 | **Framework** | `frame-<slug>` | `frame-voice-canon` | Mental models, evaluation heuristics |
 | **Decision** | `dec-<YYYYMMDD>-<slug>` | `dec-20260421-whatsapp-removal` | Architectural or life commitments |
 | **Preference** | `pref-<category>-<slug>` | `pref-tone-concise` | Operating heuristics & communication styles |
+| **Note** | `note-prod-<identity-hash>[-<variant-hash>]` | `note-prod-a1b2c3d4` | Mechanically imported production record; hash-derived and collision-safe |
 | **Source** | `SRC-<CATEGORY>-<SLUG>` | `SRC-WIKI-CAREER-N26` | Bibliographic citation handles |
 | **Edge / Relationship** | `rel-<num>` | `rel-001` | Graph connection instances |
 
@@ -94,6 +95,16 @@ Represents explicit commitments, architectural selections, or behavioral guideli
   - `supersedes` (string, optional): ID of older item replaced by this decision.
   - `evidence_sources` (list[string]): Source citations.
 
+### 2.7 Entity: `Note`
+Represents a production record imported without inferring a person, organisation, project, or domain classification.
+- **Fields**:
+  - `id` (string, required): Hash-derived `note-prod-*` identifier.
+  - `name` (string, required): Verbatim source title.
+  - `durable_identity` (string, required): Source-system identity such as a Notion page UUID or gbrain relative path.
+  - `content_sha256` (string, required): Hash of the normalized source content.
+  - `origin` (enum): `notion`, `gbrain`, `registry`, `pglite`, or `postgresql`.
+  - `sources` (list[string]): Collision-safe `SRC-PROD-*` evidence IDs.
+
 ---
 
 ## 3. Relationship Types (Predicates)
@@ -112,6 +123,7 @@ The semantic knowledge graph uses directed edges: `(Subject Entity) --[ Predicat
 | `competitor_of` | `Organisation` | `Organisation` | Direct competitive market positioning |
 | `built_with` | `Project` | `Project` / `Organisation`| Technological dependency or platform underpinning |
 | `supersedes` | `Decision` | `Decision` | Explicit temporal replacement of an older decision |
+| `sourced_from` | `Note` | `Source` | Mechanical provenance edge; makes no semantic claim beyond origin |
 
 ---
 

@@ -1,29 +1,5 @@
 #!/usr/bin/env python3
-"""
-notion_dump.py — Comprehensive Dump of Live Notion Master Databases & Pages
-
-PURPOSE:
-  Connects to the official Notion API (version 2025-09-03) using the host's
-  NOTION_API_KEY. Reads live database entries from registry.json (or queries
-  discoverable databases in the workspace), dumps every row/page as structured JSON,
-  extracts all page blocks as markdown, and compiles full page and row counts.
-
-OUTPUT:
-  <output_dir>/
-    summary.json             (inventory of all databases, page counts, row counts)
-    databases/
-      <db_key>/
-        schema.json          (raw Notion database schema definition)
-        rows.json            (all rows/pages as raw structured JSON)
-        pages/
-          <page_id>_<slug>.json  (single page properties JSON)
-          <page_id>_<slug>.md    (page body blocks converted to Markdown)
-
-SAFETY:
-  - 100% READ-ONLY (GET and POST to /query endpoints only).
-  - Handles pagination with start_cursor.
-  - Exponential backoff on rate limits (HTTP 429).
-"""
+"""Fail-closed, read-only export of every Notion object visible to the integration."""
 
 from __future__ import annotations
 
@@ -34,291 +10,447 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
 NOTION_VERSION = "2025-09-03"
 
 
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 def slugify(text: str, fallback: str) -> str:
-    s = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
-    return s[:80] or fallback
+    value = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
+    return value[:80] or fallback
 
 
-def extract_plain_text(prop: dict) -> str:
-    """Best-effort plain text extraction across Notion property types."""
-    if not isinstance(prop, dict):
-        return ""
-    ptype = prop.get("type", "")
-    if ptype == "title":
-        return "".join(t.get("plain_text", "") for t in prop.get("title", [])).strip()
-    if ptype == "rich_text":
-        return "".join(t.get("plain_text", "") for t in prop.get("rich_text", [])).strip()
-    if ptype == "select":
-        return (prop.get("select") or {}).get("name", "")
-    if ptype == "multi_select":
-        return ", ".join(o.get("name", "") for o in prop.get("multi_select", []))
-    if ptype == "date":
-        d = prop.get("date") or {}
-        return d.get("start", "") + (f" -> {d.get('end')}" if d.get("end") else "")
-    if ptype == "url":
-        return prop.get("url") or ""
-    if ptype == "email":
-        return prop.get("email") or ""
-    if ptype == "phone_number":
-        return prop.get("phone_number") or ""
-    if ptype == "number":
-        return str(prop.get("number") or "")
-    if ptype == "checkbox":
-        return "true" if prop.get("checkbox") else "false"
-    if ptype == "status":
-        return (prop.get("status") or {}).get("name", "")
+def normalize_notion_id(value: str) -> str:
+    return value.replace("-", "").lower()
+
+
+def rich_text(items: list[dict[str, Any]]) -> str:
+    return "".join(item.get("plain_text", "") for item in items).strip()
+
+
+def page_title(page: dict[str, Any]) -> str:
+    for prop in page.get("properties", {}).values():
+        if prop.get("type") == "title":
+            return rich_text(prop.get("title", []))
+    if page.get("object") == "page":
+        return page.get("url", "").rsplit("/", 1)[-1]
     return ""
 
 
-class NotionClient:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
+def object_title(obj: dict[str, Any]) -> str:
+    title = obj.get("title", [])
+    return rich_text(title) if isinstance(title, list) else str(title or "")
 
-    def req(self, method: str, path: str, body: dict | None = None, retries: int = 5) -> dict:
+
+class NotionReadError(RuntimeError):
+    pass
+
+
+class NotionClient:
+    def __init__(self, token: str) -> None:
+        self._token = token
+
+    def request(
+        self,
+        method: str,
+        path: str,
+        body: dict[str, Any] | None = None,
+        retries: int = 5,
+    ) -> dict[str, Any]:
         url = f"https://api.notion.com/v1{path}"
-        data = json.dumps(body).encode() if body is not None else None
+        data = json.dumps(body).encode("utf-8") if body is not None else None
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {self._token}",
             "Notion-Version": NOTION_VERSION,
             "Content-Type": "application/json",
         }
         for attempt in range(retries):
-            req = urllib.request.Request(url, data=data, headers=headers, method=method)
+            request = urllib.request.Request(url, data=data, headers=headers, method=method)
             try:
-                with urllib.request.urlopen(req, timeout=60) as resp:
-                    return json.loads(resp.read().decode())
-            except urllib.error.HTTPError as e:
-                err_body = e.read().decode()
-                if e.code == 429 or e.code >= 500:
-                    wait_s = (2 ** attempt) * 1.5
-                    print(f"  [Notion API {e.code}] Retrying in {wait_s:.1f}s...", file=sys.stderr)
-                    time.sleep(wait_s)
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except urllib.error.HTTPError as exc:
+                payload = exc.read().decode("utf-8", errors="replace")
+                if exc.code == 429 or exc.code >= 500:
+                    if attempt + 1 < retries:
+                        retry_after = float(exc.headers.get("Retry-After", 2**attempt))
+                        time.sleep(max(1.0, retry_after))
+                        continue
+                try:
+                    detail = json.loads(payload).get("message", payload)
+                except json.JSONDecodeError:
+                    detail = payload
+                raise NotionReadError(f"{method} {path}: HTTP {exc.code}: {detail}") from exc
+            except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+                if attempt + 1 < retries:
+                    time.sleep(2**attempt)
                     continue
-                try:
-                    msg = json.loads(err_body).get("message", err_body)
-                except Exception:
-                    msg = err_body
-                raise RuntimeError(f"Notion API error {e.code} on {path}: {msg}") from e
-            except Exception as e:
-                if attempt == retries - 1:
-                    raise
-                time.sleep(2)
-        raise RuntimeError(f"Failed Notion request to {path} after {retries} retries")
+                raise NotionReadError(f"{method} {path}: {exc}") from exc
+        raise NotionReadError(f"{method} {path}: exhausted retries")
 
-    def query_database_or_datasource(self, ds_id: str | None, db_id: str | None) -> list[dict]:
-        """Queries either via data_source_id or fallback database_id."""
-        results = []
-        cursor = None
+    def paginated_post(self, path: str, body: dict[str, Any]) -> list[dict[str, Any]]:
+        results: list[dict[str, Any]] = []
+        cursor: str | None = None
         while True:
-            body: dict = {"page_size": 100}
+            request_body = {**body, "page_size": 100}
             if cursor:
-                body["start_cursor"] = cursor
-            if ds_id:
-                try:
-                    resp = self.req("POST", f"/data_sources/{ds_id}/query", body)
-                except Exception as e:
-                    if db_id:
-                        resp = self.req("POST", f"/databases/{db_id}/query", body)
-                    else:
-                        raise e
-            elif db_id:
-                resp = self.req("POST", f"/databases/{db_id}/query", body)
-            else:
-                break
+                request_body["start_cursor"] = cursor
+            response = self.request("POST", path, request_body)
+            results.extend(response.get("results", []))
+            if not response.get("has_more"):
+                return results
+            cursor = response.get("next_cursor")
+            if not cursor:
+                raise NotionReadError(f"{path}: has_more=true without next_cursor")
 
-            results.extend(resp.get("results", []))
-            if not resp.get("has_more"):
-                break
-            cursor = resp.get("next_cursor")
-        return results
+    def search_all(self) -> list[dict[str, Any]]:
+        return self.paginated_post("/search", {"sort": {"direction": "ascending", "timestamp": "last_edited_time"}})
 
-    def fetch_database_metadata(self, db_id: str) -> dict:
-        try:
-            return self.req("GET", f"/databases/{db_id}")
-        except Exception as e:
-            return {"id": db_id, "error": str(e)}
-
-    def fetch_page_blocks(self, page_id: str, max_blocks: int = 500) -> list[dict]:
-        blocks = []
-        cursor = None
-        while len(blocks) < max_blocks:
-            path = f"/blocks/{page_id}/children?page_size=100"
-            if cursor:
-                path += f"&start_cursor={cursor}"
+    def query_store(self, database_id: str | None, data_source_id: str | None) -> list[dict[str, Any]]:
+        errors: list[str] = []
+        if data_source_id:
             try:
-                resp = self.req("GET", path)
-            except Exception:
-                break
-            blocks.extend(resp.get("results", []))
-            if not resp.get("has_more"):
-                break
-            cursor = resp.get("next_cursor")
-        return blocks
+                return self.paginated_post(f"/data_sources/{data_source_id}/query", {})
+            except NotionReadError as exc:
+                errors.append(str(exc))
+        if database_id:
+            try:
+                return self.paginated_post(f"/databases/{database_id}/query", {})
+            except NotionReadError as exc:
+                errors.append(str(exc))
+        raise NotionReadError("; ".join(errors) or "registry entry has neither database_id nor data_source_id")
+
+    def get_object(self, object_id: str, object_type: str) -> dict[str, Any]:
+        endpoint = "data_sources" if object_type == "data_source" else "databases"
+        return self.request("GET", f"/{endpoint}/{object_id}")
+
+    def get_page(self, page_id: str) -> dict[str, Any]:
+        return self.request("GET", f"/pages/{page_id}")
+
+    def block_children(self, block_id: str) -> list[dict[str, Any]]:
+        results: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            query = {"page_size": "100"}
+            if cursor:
+                query["start_cursor"] = cursor
+            path = f"/blocks/{block_id}/children?{urllib.parse.urlencode(query)}"
+            response = self.request("GET", path)
+            results.extend(response.get("results", []))
+            if not response.get("has_more"):
+                return results
+            cursor = response.get("next_cursor")
+            if not cursor:
+                raise NotionReadError(f"{path}: has_more=true without next_cursor")
+
+    def block_tree(self, root_id: str) -> tuple[list[dict[str, Any]], int]:
+        """Return the complete recursive block tree and total descendant count."""
+        children = self.block_children(root_id)
+        count = len(children)
+        for child in children:
+            if child.get("has_children"):
+                nested, nested_count = self.block_tree(child["id"])
+                child["children"] = nested
+                count += nested_count
+        return children, count
 
 
-def blocks_to_markdown(blocks: list[dict]) -> str:
-    lines = []
-    for b in blocks:
-        btype = b.get("type", "")
-        data = b.get(btype, {})
-        rt = data.get("rich_text", [])
-        text = "".join(t.get("plain_text", "") for t in rt).strip()
-        
-        if btype == "paragraph":
-            lines.append(f"{text}\n")
-        elif btype == "heading_1":
-            lines.append(f"# {text}\n")
-        elif btype == "heading_2":
-            lines.append(f"## {text}\n")
-        elif btype == "heading_3":
-            lines.append(f"### {text}\n")
-        elif btype == "bulleted_list_item":
-            lines.append(f"- {text}")
-        elif btype == "numbered_list_item":
-            lines.append(f"1. {text}")
-        elif btype == "to_do":
-            checked = "[x]" if data.get("checked") else "[ ]"
-            lines.append(f"- {checked} {text}")
-        elif btype == "quote":
-            lines.append(f"> {text}\n")
-        elif btype == "code":
-            lang = data.get("language", "")
-            lines.append(f"```{lang}\n{text}\n```\n")
-        elif btype == "divider":
-            lines.append("\n---\n")
-    return "\n".join(lines).strip()
+def block_text(block: dict[str, Any]) -> str:
+    block_type = block.get("type", "")
+    payload = block.get(block_type, {})
+    return rich_text(payload.get("rich_text", []))
 
 
-def dump_all_notion(registry_path: str, output_dir: str, api_key: str):
-    client = NotionClient(api_key)
-    os.makedirs(output_dir, exist_ok=True)
-    dbs_dir = os.path.join(output_dir, "databases")
-    os.makedirs(dbs_dir, exist_ok=True)
+def blocks_to_markdown(blocks: list[dict[str, Any]], depth: int = 0) -> str:
+    lines: list[str] = []
+    prefix = "  " * depth
+    for block in blocks:
+        block_type = block.get("type", "")
+        payload = block.get(block_type, {})
+        text = block_text(block)
+        if block_type == "paragraph":
+            lines.append(f"{prefix}{text}")
+        elif block_type in {"heading_1", "heading_2", "heading_3"}:
+            level = int(block_type[-1])
+            lines.append(f"{'#' * level} {text}")
+        elif block_type == "bulleted_list_item":
+            lines.append(f"{prefix}- {text}")
+        elif block_type == "numbered_list_item":
+            lines.append(f"{prefix}1. {text}")
+        elif block_type == "to_do":
+            lines.append(f"{prefix}- [{'x' if payload.get('checked') else ' '}] {text}")
+        elif block_type == "quote":
+            lines.append(f"{prefix}> {text}")
+        elif block_type == "code":
+            lines.extend([f"```{payload.get('language', '')}", text, "```"])
+        elif block_type == "divider":
+            lines.append("---")
+        elif text:
+            lines.append(f"{prefix}{text}")
+        if block.get("children"):
+            lines.append(blocks_to_markdown(block["children"], depth + 1))
+    return "\n\n".join(line for line in lines if line).strip()
 
-    with open(registry_path) as f:
-        registry = json.load(f)
 
-    databases = registry.get("databases", {})
-    summary = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "total_databases": len(databases),
-        "total_pages_dumped": 0,
-        "database_summaries": {}
-    }
+class NotionExporter:
+    def __init__(self, client: NotionClient, registry: dict[str, Any], output_dir: Path) -> None:
+        self.client = client
+        self.registry = registry
+        self.output_dir = output_dir
+        self.errors: list[dict[str, str]] = []
+        self.page_reports: dict[str, dict[str, Any]] = {}
+        self.exported_page_ids: set[str] = set()
 
-    print(f"=== Starting Live Notion Dump ({len(databases)} registered databases) ===")
+    def record_error(self, scope: str, object_id: str, error: Exception) -> None:
+        self.errors.append({"scope": scope, "object_id": object_id, "error": str(error)})
 
-    for db_key, entry in databases.items():
-        db_id = entry.get("database_id")
-        ds_id = entry.get("data_source_id")
-        status = entry.get("status", "active")
-        print(f"\nProcessing database [{db_key}] (status: {status})...")
-
-        db_out_dir = os.path.join(dbs_dir, slugify(db_key, "db"))
-        pages_out_dir = os.path.join(db_out_dir, "pages")
-        os.makedirs(pages_out_dir, exist_ok=True)
-
-        meta = client.fetch_database_metadata(db_id) if db_id else {}
-        with open(os.path.join(db_out_dir, "schema.json"), "w") as sf:
-            json.dump({"registry_entry": entry, "notion_metadata": meta}, sf, indent=2)
-
-        try:
-            pages = client.query_database_or_datasource(ds_id, db_id)
-        except Exception as e:
-            print(f"  ❌ Query failed for [{db_key}]: {e}", file=sys.stderr)
-            summary["database_summaries"][db_key] = {
-                "status": "error",
-                "error": str(e),
-                "row_count": 0
-            }
-            continue
-
-        with open(os.path.join(db_out_dir, "rows.json"), "w") as rf:
-            json.dump(pages, rf, indent=2)
-
-        row_count = len(pages)
-        summary["total_pages_dumped"] += row_count
-        summary["database_summaries"][db_key] = {
-            "status": "success",
-            "row_count": row_count,
-            "database_id": db_id,
-            "data_source_id": ds_id
+    def export_page(self, page: dict[str, Any], destination: Path, origin: str) -> None:
+        page_id = page["id"]
+        normalized_id = page_id.replace("-", "")
+        title = page_title(page)
+        slug = slugify(title, normalized_id[:12])
+        destination.mkdir(parents=True, exist_ok=True)
+        report: dict[str, Any] = {
+            "page_id": page_id,
+            "title": title,
+            "origin": origin,
+            "status": "INCOMPLETE",
+            "block_count": 0,
         }
-        print(f"  ✓ Fetched {row_count} rows/pages. Dumping block contents...")
+        try:
+            blocks, block_count = self.client.block_tree(page_id)
+            structured = {"page": page, "blocks": blocks, "block_count": block_count}
+            (destination / f"{normalized_id}-{slug}.json").write_text(
+                json.dumps(structured, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            markdown = blocks_to_markdown(blocks)
+            header = (
+                "---\n"
+                f'notion_id: "{page_id}"\n'
+                f'title: {json.dumps(title, ensure_ascii=False)}\n'
+                f'origin: {json.dumps(origin)}\n'
+                f'created_time: "{page.get("created_time", "")}"\n'
+                f'last_edited_time: "{page.get("last_edited_time", "")}"\n'
+                f'url: "{page.get("url", "")}"\n'
+                f"block_count: {block_count}\n"
+                "---\n\n"
+            )
+            (destination / f"{normalized_id}-{slug}.md").write_text(
+                f"{header}# {title or '(untitled)'}\n\n{markdown or '(No body blocks)'}\n",
+                encoding="utf-8",
+            )
+            report.update({"status": "COMPLETE", "block_count": block_count})
+            self.exported_page_ids.add(page_id)
+        except Exception as exc:  # continue solely to produce a complete error report
+            report["error"] = str(exc)
+            self.record_error("page", page_id, exc)
+        self.page_reports[page_id] = report
 
-        for idx, p in enumerate(pages):
-            pid = p["id"].replace("-", "")
-            props = p.get("properties", {})
-            title = ""
-            for v in props.values():
-                if v.get("type") == "title":
-                    title = "".join(t.get("plain_text", "") for t in v.get("title", [])).strip()
-                    break
-            slug = slugify(title, fallback=pid[:8])
+    def run(self) -> dict[str, Any]:
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        discovered = self.client.search_all()
+        discovered_pages = {item["id"]: item for item in discovered if item.get("object") == "page"}
+        discovered_stores = {
+            item["id"]: item
+            for item in discovered
+            if item.get("object") in {"database", "data_source"}
+        }
 
-            with open(os.path.join(pages_out_dir, f"{pid}_{slug}.json"), "w") as pf:
-                json.dump(p, pf, indent=2)
+        registered_db_ids: set[str] = set()
+        registered_ds_ids: set[str] = set()
+        database_reports: dict[str, dict[str, Any]] = {}
+        queried_page_ids: set[str] = set()
+        databases_dir = self.output_dir / "databases"
 
-            blocks = client.fetch_page_blocks(p["id"])
-            md_content = blocks_to_markdown(blocks)
-            
-            # YAML frontmatter
-            prop_lines = []
-            for pname, pval in props.items():
-                ptext = extract_plain_text(pval)
-                if ptext:
-                    clean_val = ptext.replace('"', '\\"').replace('\n', ' ')
-                    prop_lines.append(f'notion_{slugify(pname, "prop")}: "{clean_val}"')
+        databases = self.registry.get("databases")
+        if not isinstance(databases, dict) or not databases:
+            raise NotionReadError("registry.databases is missing or empty")
 
-            escaped_title = title.replace('"', '\\"')
-            header = [
-                "---",
-                f'notion_id: "{p["id"]}"',
-                f'title: "{escaped_title}"',
-                f'database_key: "{db_key}"',
-                f'created_time: "{p.get("created_time", "")}"',
-                f'last_edited_time: "{p.get("last_edited_time", "")}"',
-                f'url: "{p.get("url", "")}"',
-            ] + prop_lines + ["---", ""]
-            
-            full_md = "\n".join(header) + f"\n# {title}\n\n" + (md_content or "(No body blocks)") + "\n"
-            with open(os.path.join(pages_out_dir, f"{pid}_{slug}.md"), "w") as mf:
-                mf.write(full_md)
+        for key, entry in sorted(databases.items()):
+            db_id = entry.get("database_id")
+            ds_id = entry.get("data_source_id")
+            if db_id:
+                registered_db_ids.add(normalize_notion_id(db_id))
+            if ds_id:
+                registered_ds_ids.add(normalize_notion_id(ds_id))
+            report: dict[str, Any] = {
+                "status": "INCOMPLETE",
+                "database_id": db_id,
+                "data_source_id": ds_id,
+                "row_count": 0,
+                "pages_complete": 0,
+            }
+            target = databases_dir / slugify(key, "database")
+            pages_dir = target / "pages"
+            try:
+                metadata_id = ds_id or db_id
+                metadata_type = "data_source" if ds_id else "database"
+                if not metadata_id:
+                    raise NotionReadError("registry entry has no database or data-source ID")
+                metadata = self.client.get_object(metadata_id, metadata_type)
+                rows = self.client.query_store(db_id, ds_id)
+                target.mkdir(parents=True, exist_ok=True)
+                (target / "schema.json").write_text(
+                    json.dumps(
+                        {"registry_key": key, "registry_entry": entry, "notion_metadata": metadata},
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                (target / "rows.json").write_text(
+                    json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                for page in rows:
+                    queried_page_ids.add(normalize_notion_id(page["id"]))
+                    self.export_page(page, pages_dir, f"registry-database:{key}")
+                page_errors = [
+                    self.page_reports[page["id"]]
+                    for page in rows
+                    if self.page_reports[page["id"]]["status"] != "COMPLETE"
+                ]
+                report.update(
+                    {
+                        "status": "COMPLETE" if not page_errors else "INCOMPLETE",
+                        "row_count": len(rows),
+                        "pages_complete": len(rows) - len(page_errors),
+                        "page_errors": page_errors,
+                    }
+                )
+            except Exception as exc:
+                report["error"] = str(exc)
+                self.record_error("database", key, exc)
+            database_reports[key] = report
 
-    with open(os.path.join(output_dir, "summary.json"), "w") as sum_f:
-        json.dump(summary, sum_f, indent=2)
+        registry_pages = self.registry.get("pages", {})
+        if not isinstance(registry_pages, dict):
+            raise NotionReadError("registry.pages must be an object")
+        registry_page_ids: set[str] = set()
+        for key, entry in sorted(registry_pages.items()):
+            page_id = entry.get("page_id") if isinstance(entry, dict) else entry
+            if not page_id:
+                self.record_error("registry-page", key, NotionReadError("missing page_id"))
+                continue
+            registry_page_ids.add(normalize_notion_id(page_id))
+            try:
+                page = self.client.get_page(page_id)
+                self.export_page(page, self.output_dir / "registry-pages", f"registry-page:{key}")
+            except Exception as exc:
+                self.record_error("registry-page", page_id, exc)
 
-    print(f"\n==========================================")
-    print(f"Notion Dump Complete")
-    print(f"Total Databases: {summary['total_databases']}")
-    print(f"Total Pages Extracted: {summary['total_pages_dumped']}")
-    print(f"Summary written to: {os.path.join(output_dir, 'summary.json')}")
-    print(f"==========================================")
+        standalone_ids = {
+            page_id
+            for page_id in discovered_pages
+            if normalize_notion_id(page_id) not in queried_page_ids
+            and normalize_notion_id(page_id) not in registry_page_ids
+        }
+        for page_id in sorted(standalone_ids):
+            self.export_page(
+                discovered_pages[page_id],
+                self.output_dir / "standalone-pages",
+                "search-discovered-standalone",
+            )
+
+        unregistered_stores = []
+        for object_id, obj in sorted(discovered_stores.items()):
+            normalized_object_id = normalize_notion_id(object_id)
+            if normalized_object_id not in registered_db_ids and normalized_object_id not in registered_ds_ids:
+                unregistered_stores.append(
+                    {
+                        "id": object_id,
+                        "object": obj.get("object"),
+                        "title": object_title(obj),
+                        "url": obj.get("url"),
+                    }
+                )
+
+        if unregistered_stores:
+            self.errors.append(
+                {
+                    "scope": "registry-coverage",
+                    "object_id": "*",
+                    "error": f"{len(unregistered_stores)} discoverable stores are absent from registry",
+                }
+            )
+
+        incomplete_pages = [
+            report for report in self.page_reports.values() if report["status"] != "COMPLETE"
+        ]
+        status = "COMPLETE" if not self.errors and not incomplete_pages else "INCOMPLETE"
+        summary = {
+            "status": status,
+            "timestamp": utc_now(),
+            "notion_api_version": NOTION_VERSION,
+            "coverage_scope": "all objects visible to the configured Notion integration",
+            "registered_database_count": len(databases),
+            "discoverable_store_count": len(discovered_stores),
+            "unregistered_discoverable_stores": unregistered_stores,
+            "registry_page_count": len(registry_page_ids),
+            "standalone_page_gap_count": len(standalone_ids),
+            "standalone_page_ids": sorted(standalone_ids),
+            "total_unique_pages_exported": len(self.exported_page_ids),
+            "total_blocks_exported": sum(
+                report["block_count"]
+                for report in self.page_reports.values()
+                if report["status"] == "COMPLETE"
+            ),
+            "database_summaries": database_reports,
+            "page_summaries": self.page_reports,
+            "errors": self.errors,
+        }
+        (self.output_dir / "summary.json").write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return summary
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Live Notion Master Database Extractor")
-    parser.add_argument("--registry", required=True, help="Path to registry.json")
-    parser.add_argument("--output-dir", required=True, help="Output directory for dump")
-    parser.add_argument("--api-key", default=os.environ.get("NOTION_API_KEY", ""), help="Notion API Key")
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--registry", required=True, type=Path)
+    parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args()
 
-    if not args.api_key:
-        print("ERROR: NOTION_API_KEY not provided via --api-key or environment variable.", file=sys.stderr)
-        sys.exit(1)
+    token = os.environ.get("NOTION_API_KEY")
+    if not token:
+        print("INCOMPLETE: NOTION_API_KEY must be present in the process environment", file=sys.stderr)
+        return 1
+    if not args.registry.is_file():
+        print(f"INCOMPLETE: registry not found: {args.registry}", file=sys.stderr)
+        return 1
 
-    if not os.path.isfile(args.registry):
-        print(f"ERROR: Registry file not found at {args.registry}", file=sys.stderr)
-        sys.exit(1)
+    try:
+        registry = json.loads(args.registry.read_text(encoding="utf-8"))
+        summary = NotionExporter(NotionClient(token), registry, args.output_dir).run()
+    except Exception as exc:
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        failure = {"status": "INCOMPLETE", "timestamp": utc_now(), "fatal_error": str(exc)}
+        (args.output_dir / "summary.json").write_text(
+            json.dumps(failure, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"INCOMPLETE: Notion export failed: {exc}", file=sys.stderr)
+        return 1
 
-    dump_all_notion(args.registry, args.output_dir, args.api_key)
+    print(
+        f"Notion export {summary['status']}: "
+        f"{summary['registered_database_count']} registered databases, "
+        f"{summary['total_unique_pages_exported']} pages, "
+        f"{summary['total_blocks_exported']} blocks, "
+        f"{len(summary['errors'])} errors"
+    )
+    return 0 if summary["status"] == "COMPLETE" else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

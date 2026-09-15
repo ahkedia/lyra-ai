@@ -21,3 +21,8 @@ SRC-SCRIPTS-BRAIN-CAPTURE,Operational Script,Serialized gbrain Capture Path,2026
 SRC-SCRIPTS-PII-SCAN,Security Script,Pre-push PII Scanner & Git Guard,2026-04-10,Akash Kedia,scripts/pii-scan.sh,bash,boot,proj-lyra-ai
 SRC-ROUTER-PLUGIN,OpenClaw Plugin,Lyra Model Router Plugin with Brain Injection,2026-06-20,Akash Kedia,plugins/lyra-model-router/index.js,javascript,boot,proj-lyra-ai;person-abhigna
 SRC-CRUD-WIKI-PROMOTE,Codebase CRUD,News Inbox to Second Brain Auto-Promotion,2026-06-01,Akash Kedia,crud/wiki_promote.py,python,canonical,person-akash-kedia;domain-fintech
+SRC-CLAUDE-RULES,Repository Policy,Canonical Repository and Production Writer Rules,2026-06-20,Akash Kedia,CLAUDE.md,markdown,boot,proj-lyra-ai
+SRC-GIT-WORKFLOW,Repository Policy,Git and Deployment Workflow,2026-06-20,Akash Kedia,docs/GIT-WORKFLOW.md,markdown,boot,proj-lyra-ai
+SRC-DOCS-HOUSEHOLD,Architecture Docs,Household Coordination and Access Boundaries,2026-04-01,Akash Kedia,docs/4-household-coordination.md,markdown,canonical,person-akash-kedia;person-abhigna;proj-lyra-ai
+SRC-EVAL-TIER3,Eval Harness,Tier 3 Judgment and Security Evaluation Cases,2026-06-07,Akash Kedia,evals/cases/tier3-judgment.yaml,yaml,canonical,proj-lyra-ai
+SRC-CONFIG-CRON,OpenClaw Production State,Live OpenClaw Cron Definitions,,Akash Kedia,openclaw-state/cron-jobs.json,json,canonical,proj-lyra-ai

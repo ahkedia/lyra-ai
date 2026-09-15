@@ -1,266 +1,314 @@
 #!/usr/bin/env bash
-# extract-production-brain.sh — Read-Only One-Time Historical Production Extraction
-#
-# PURPOSE:
-#   Performs a non-destructive, read-only extraction of the complete historical
-#   knowledge brain corpus on the Hetzner production host for migration to Google Drive.
-#
-# SOURCES EXTRACTED:
-#   1. Live Notion Master Databases & Pages (via Notion API dump: JSON + Markdown)
-#   2. /root/gbrain-brain/                  (Markdown personal wiki, second-brain, writing, tweets)
-#   3. /root/.gbrain/brain.pglite/          (PGLite embedded vector database tables)
-#   4. /root/lyra-private/                  (Sanitized: registry.json, MEMORY.md, SOUL.md; NO credentials)
-#   5. /root/.openclaw/workspace/ & cron    (Live OpenClaw cron definitions and workspace context)
-#   6. PostgreSQL / lyra-app state         (if LYRA_DATABASE_URL is configured in .env)
-#
-# SECURITY & PRIVACY:
-#   - Explicitly EXCLUDES all .env files, private keys, API secrets, tokens, cookies, auth stores.
-#   - Executes automated secret scanning over the staged export before packaging.
-#   - Encrypts the final archive using gpg (symmetric AES-256) or age if installed.
-#   - Computes and prints SHA-256 checksum of the final archive.
-#
-# SAFETY & NON-DESTRUCTIVE GUARANTEES:
-#   - NEVER modifies, truncates, or deletes any file.
-#   - NEVER stops systemd services (openclaw, gbrain-http, lyra-app stay online).
-#   - Reads files directly or copies snapshots to a temporary scratchpad.
-#   - Verifies disk space before archiving.
-#
-# USAGE (run on Hetzner host as root):
-#   bash /root/lyra-ai/scripts/extract-production-brain.sh [passphrase]
-#
-set -euo pipefail
+# Fail-closed, read-only, one-time historical export. This script never stops services.
+set -Eeuo pipefail
+umask 077
 
-TIMESTAMP=$(date -u +%Y%m%d_%H%M%SZ)
-EXPORT_DIR="/root/production-brain-export-${TIMESTAMP}"
-RAW_ARCHIVE="/root/production-brain-export-${TIMESTAMP}.tar.gz"
-ENCRYPTED_ARCHIVE="/root/production-brain-export-${TIMESTAMP}.tar.gz.enc"
-REPORT_PATH="${EXPORT_DIR}/production-inventory-report.json"
-PASSPHRASE="${1:-}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+STATUS_PATH="${EXPORT_STATUS_PATH:-/root/production-brain-export-${TIMESTAMP}.status.json}"
+FINAL_ARCHIVE="${EXPORT_ARCHIVE_PATH:-/root/production-brain-export-${TIMESTAMP}.tar.age}"
+PARTIAL_ARCHIVE="${FINAL_ARCHIVE}.partial"
+STAGING_DIR=""
+CURRENT_STEP="preflight"
+RUN_STATUS="INCOMPLETE"
 
-echo "=== Lyra Production Knowledge Brain Extraction (One-Time Historical) ==="
-echo "Timestamp: ${TIMESTAMP}"
-echo "Staging Directory: ${EXPORT_DIR}"
-echo ""
+write_status() {
+  local detail="${1:-run has not completed}"
+  python3 - "${STATUS_PATH}" "${RUN_STATUS}" "${CURRENT_STEP}" "${detail}" "${FINAL_ARCHIVE}" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
 
-# 1. Preflight Disk Space Check (Requires at least 2GB free)
-FREE_KB=$(df -k /root | awk 'NR==2 {print $4}')
-if [ "${FREE_KB}" -lt 2097152 ]; then
-  echo "ERROR: Insufficient disk space on /root (less than 2GB free). Aborting extraction."
-  exit 1
-fi
+path, status, step, detail, archive = sys.argv[1:]
+Path(path).write_text(json.dumps({
+    "status": status,
+    "timestamp": datetime.now(timezone.utc).isoformat(),
+    "step": step,
+    "detail": detail,
+    "encrypted_archive": archive if status == "COMPLETE" else None,
+}, indent=2) + "\n", encoding="utf-8")
+PY
+}
 
-mkdir -p "${EXPORT_DIR}"
-mkdir -p "${EXPORT_DIR}/notion-dump"
-mkdir -p "${EXPORT_DIR}/gbrain-brain"
-mkdir -p "${EXPORT_DIR}/lyra-private"
-mkdir -p "${EXPORT_DIR}/pglite-snapshot"
-mkdir -p "${EXPORT_DIR}/openclaw-state"
-mkdir -p "${EXPORT_DIR}/postgres-dumps"
-
-# Source environment safely to read NOTION_API_KEY and LYRA_DATABASE_URL
-source /root/.openclaw/.env 2>/dev/null || true
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 1: Live Notion Dump (Master System of Record)
-# ─────────────────────────────────────────────────────────────────────────────
-echo "[1/7] Dumping live Notion master databases and pages via Notion API..."
-NOTION_KEY="${NOTION_API_KEY:-}"
-REGISTRY_PATH="/root/lyra-private/notion/registry.json"
-NOTION_DUMP_SCRIPT="/root/lyra-ai/scripts/notion_dump.py"
-
-if [ -n "${NOTION_KEY}" ] && [ -f "${REGISTRY_PATH}" ] && [ -f "${NOTION_DUMP_SCRIPT}" ]; then
-  python3 "${NOTION_DUMP_SCRIPT}" \
-    --registry "${REGISTRY_PATH}" \
-    --output-dir "${EXPORT_DIR}/notion-dump" \
-    --api-key "${NOTION_KEY}" || echo "  ⚠ Notion dump completed with warnings"
-  echo "  ✓ Dumped live Notion databases and pages"
-else
-  echo "  ⚠ Skipping live Notion dump: missing NOTION_API_KEY, registry.json, or notion_dump.py"
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 2: /root/gbrain-brain (Markdown knowledge files)
-# ─────────────────────────────────────────────────────────────────────────────
-echo "[2/7] Inventorying and copying /root/gbrain-brain..."
-GBRAIN_EXISTS=false
-GBRAIN_FILES=0
-GBRAIN_BYTES=0
-GBRAIN_LAST_WRITE=""
-
-if [ -d "/root/gbrain-brain" ]; then
-  GBRAIN_EXISTS=true
-  GBRAIN_FILES=$(find /root/gbrain-brain -type f | wc -l)
-  GBRAIN_BYTES=$(du -sb /root/gbrain-brain 2>/dev/null | awk '{print $1}' || du -sk /root/gbrain-brain | awk '{print $1*1024}')
-  GBRAIN_LAST_WRITE=$(find /root/gbrain-brain -type f -printf '%T+ %p\n' 2>/dev/null | sort -r | head -1 | awk '{print $1}' || echo "unknown")
-  
-  # Read-only copy of markdown and git commit log (preserving all history)
-  cp -a /root/gbrain-brain "${EXPORT_DIR}/"
-  echo "  ✓ Copied /root/gbrain-brain (${GBRAIN_FILES} files, ${GBRAIN_BYTES} bytes, latest: ${GBRAIN_LAST_WRITE})"
-else
-  echo "  ⚠ /root/gbrain-brain not found at expected path"
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 3: /root/lyra-private (Sanitized — Exclude secrets)
-# ─────────────────────────────────────────────────────────────────────────────
-echo "[3/7] Copying /root/lyra-private (strictly excluding secrets and .env files)..."
-PRIV_EXISTS=false
-PRIV_FILES=0
-PRIV_BYTES=0
-PRIV_LAST_WRITE=""
-
-if [ -d "/root/lyra-private" ]; then
-  PRIV_EXISTS=true
-  PRIV_FILES=$(find /root/lyra-private -type f | wc -l)
-  PRIV_BYTES=$(du -sb /root/lyra-private 2>/dev/null | awk '{print $1}' || du -sk /root/lyra-private | awk '{print $1*1024}')
-  PRIV_LAST_WRITE=$(find /root/lyra-private -type f -printf '%T+ %p\n' 2>/dev/null | sort -r | head -1 | awk '{print $1}' || echo "unknown")
-  
-  # Copy selectively excluding .env, keys, credentials, tokens
-  rsync -av \
-    --exclude="*.env" \
-    --exclude="*.key" \
-    --exclude="*.pem" \
-    --exclude="id_*" \
-    --exclude="*token*" \
-    --exclude="*secret*" \
-    --exclude="credentials*" \
-    /root/lyra-private/ "${EXPORT_DIR}/lyra-private/"
-  echo "  ✓ Copied sanitized /root/lyra-private"
-else
-  echo "  ⚠ /root/lyra-private not found at expected path"
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 4: Snapshot PGLite Database (Read-only)
-# ─────────────────────────────────────────────────────────────────────────────
-echo "[4/7] Taking read-only snapshot of PGLite database..."
-PGLITE_EXISTS=false
-PGLITE_PATH=""
-PGLITE_BYTES=0
-PGLITE_LAST_WRITE=""
-
-if [ -d "/root/.gbrain/brain.pglite" ]; then
-  PGLITE_PATH="/root/.gbrain/brain.pglite"
-elif [ -d "/root/gbrain-brain/.pglite" ]; then
-  PGLITE_PATH="/root/gbrain-brain/.pglite"
-fi
-
-if [ -n "${PGLITE_PATH}" ] && [ -d "${PGLITE_PATH}" ]; then
-  PGLITE_EXISTS=true
-  PGLITE_BYTES=$(du -sb "${PGLITE_PATH}" 2>/dev/null | awk '{print $1}' || du -sk "${PGLITE_PATH}" | awk '{print $1*1024}')
-  PGLITE_LAST_WRITE=$(find "${PGLITE_PATH}" -type f -printf '%T+ %p\n' 2>/dev/null | sort -r | head -1 | awk '{print $1}' || echo "unknown")
-  
-  # Snapshot copy without stopping gbrain-http
-  cp -a "${PGLITE_PATH}" "${EXPORT_DIR}/pglite-snapshot/"
-  echo "  ✓ Snapshotted PGLite at ${PGLITE_PATH} (${PGLITE_BYTES} bytes, latest: ${PGLITE_LAST_WRITE})"
-else
-  echo "  ⚠ PGLite directory not found at standard paths"
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 5: OpenClaw Crons & Relational Dumps
-# ─────────────────────────────────────────────────────────────────────────────
-echo "[5/7] Exporting OpenClaw workspace state and PostgreSQL tables..."
-if [ -d "/root/.openclaw" ]; then
-  [ -f "/root/.openclaw/cron/jobs.json" ] && cp -a /root/.openclaw/cron/jobs.json "${EXPORT_DIR}/openclaw-state/cron-jobs.json"
-  if [ -d "/root/.openclaw/workspace" ]; then
-    mkdir -p "${EXPORT_DIR}/openclaw-state/workspace"
-    for f in SOUL.md MEMORY.md HEARTBEAT.md TOOLS.md; do
-      [ -f "/root/.openclaw/workspace/$f" ] && cp -a "/root/.openclaw/workspace/$f" "${EXPORT_DIR}/openclaw-state/workspace/"
-    done
-    [ -d "/root/.openclaw/workspace/references" ] && cp -a "/root/.openclaw/workspace/references" "${EXPORT_DIR}/openclaw-state/workspace/"
+cleanup() {
+  local exit_code=$?
+  if [[ "${RUN_STATUS}" != "COMPLETE" ]]; then
+    write_status "failed at ${CURRENT_STEP}; inspect stderr"
   fi
-  echo "  ✓ Copied OpenClaw live cron jobs and workspace files"
-fi
-
-if [ -n "${LYRA_DATABASE_URL:-}" ]; then
-  if command -v pg_dump >/dev/null 2>&1; then
-    pg_dump --clean --if-exists "${LYRA_DATABASE_URL}" > "${EXPORT_DIR}/postgres-dumps/lyra-app-dump.sql" 2>/dev/null || echo "  ⚠ pg_dump failed"
-    echo "  ✓ Dumped relational PostgreSQL app database"
+  if [[ -n "${STAGING_DIR}" && "${STAGING_DIR}" == /root/.production-brain-export.* ]]; then
+    python3 - "${STAGING_DIR}" <<'PY'
+import shutil
+import sys
+shutil.rmtree(sys.argv[1], ignore_errors=True)
+PY
   fi
-fi
+  if [[ -f "${PARTIAL_ARCHIVE}" ]]; then
+    python3 - "${PARTIAL_ARCHIVE}" <<'PY'
+from pathlib import Path
+import sys
+Path(sys.argv[1]).unlink(missing_ok=True)
+PY
+  fi
+  exit "${exit_code}"
+}
+trap cleanup EXIT
+trap 'CURRENT_STEP="${CURRENT_STEP} (line ${LINENO})"' ERR
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 6: Automated Secret Scan over Staged Export
-# ─────────────────────────────────────────────────────────────────────────────
-echo "[6/7] Running security scan over staged export..."
-SECRET_PATTERNS='sk-[a-zA-Z0-9]{20,}|ntn_[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{20,}|xoxb-[0-9]|AKIA[0-9A-Z]{16}|BEGIN PRIVATE KEY'
-LEAKS=$(grep -rnE "${SECRET_PATTERNS}" "${EXPORT_DIR}" 2>/dev/null || true)
-
-if [ -n "${LEAKS}" ]; then
-  echo "  ❌ CRITICAL: Secrets detected in export staging area!"
-  echo "${LEAKS}" | head -5 | sed 's/^/    /'
-  echo "  Aborting packaging to prevent credential exfiltration."
+fail() {
+  echo "INCOMPLETE [${CURRENT_STEP}]: $*" >&2
   exit 1
-fi
-echo "  ✓ Zero credentials or API secrets found in export staging"
+}
 
-# Write inventory manifest
-cat <<EOF > "${REPORT_PATH}"
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "required command is missing: $1"
+}
+
+directory_bytes() {
+  du -sb "$1" | awk '{print $1}'
+}
+
+selected_private_bytes() {
+  python3 - "$@" <<'PY'
+import os
+import sys
+print(sum(os.path.getsize(path) for path in sys.argv[1:] if os.path.isfile(path)))
+PY
+}
+
+echo "=== Lyra one-time historical export ==="
+echo "Status file: ${STATUS_PATH}"
+write_status "preflight started"
+
+# Encryption and scanners are mandatory before any knowledge is extracted.
+CURRENT_STEP="encryption preflight"
+[[ $# -eq 0 ]] || fail "arguments are forbidden; do not pass a passphrase in argv"
+[[ -n "${AGE_RECIPIENT:-}" ]] || fail "AGE_RECIPIENT must be set in the environment"
+[[ -n "${AGE_IDENTITY_FILE:-}" ]] || fail "AGE_IDENTITY_FILE must be set in the environment"
+[[ -f "${AGE_IDENTITY_FILE}" ]] || fail "AGE_IDENTITY_FILE does not exist"
+IDENTITY_MODE="$(stat -c '%a' "${AGE_IDENTITY_FILE}")"
+(( 8#${IDENTITY_MODE} & 8#077 == 0 )) || fail "AGE_IDENTITY_FILE must not be group/world accessible"
+
+for command in age gitleaks trufflehog rsync flock lsof node npm python3 psql pg_dump pg_restore tar sha256sum; do
+  require_command "${command}"
+done
+printf 'encryption-preflight' \
+  | age --encrypt --recipient "${AGE_RECIPIENT}" \
+  | age --decrypt --identity "${AGE_IDENTITY_FILE}" \
+  | grep -qx 'encryption-preflight' \
+  || fail "AGE_RECIPIENT cannot be validated with AGE_IDENTITY_FILE"
+echo "[COMPLETE] Encryption recipient and protected identity validated"
+
+CURRENT_STEP="mandatory source preflight"
+[[ -n "${NOTION_API_KEY:-}" ]] || fail "NOTION_API_KEY must be set in the process environment"
+[[ -n "${LYRA_DATABASE_URL:-}" ]] || fail "LYRA_DATABASE_URL must be set in the process environment"
+export PGDATABASE="${LYRA_DATABASE_URL}"
+REGISTRY_PATH="${NOTION_REGISTRY_PATH:-/root/lyra-private/notion/registry.json}"
+GBRAIN_PATH="${GBRAIN_BRAIN_REPO:-/root/gbrain-brain}"
+PGLITE_PATH="${PGLITE_PATH:-/root/.gbrain/brain.pglite}"
+[[ -r "${REGISTRY_PATH}" ]] || fail "mandatory registry is unreadable: ${REGISTRY_PATH}"
+[[ -d "${GBRAIN_PATH}" ]] || fail "mandatory gbrain repository is missing: ${GBRAIN_PATH}"
+[[ -n "$(find "${GBRAIN_PATH}" -type f -name '*.md' -print -quit)" ]] \
+  || fail "mandatory gbrain repository contains no Markdown"
+[[ -d "${PGLITE_PATH}" ]] || fail "mandatory PGlite directory is missing: ${PGLITE_PATH}"
+[[ -f "${ROOT_DIR}/knowledge-brain-export/test-queries.md" ]] \
+  || fail "benchmark suite is missing"
+[[ -f "${ROOT_DIR}/node_modules/@electric-sql/pglite/package.json" ]] \
+  || fail "@electric-sql/pglite is not installed; run npm ci on the checked-out branch"
+
+# A live filesystem copy of PGlite is not consistent. Refuse to continue while its
+# owner or any gbrain maintenance process is active. The operator must choose a
+# pre-existing maintenance window; this script does not stop anything.
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet gbrain-http; then
+  fail "gbrain-http is active; a consistent PGlite snapshot requires it already quiesced. No service was stopped."
+fi
+if pgrep -af '[g]brain (serve|sync|import|embed|dream|delete|init)' >/dev/null 2>&1; then
+  fail "a gbrain process is active; wait for an operator-approved quiescent window. No process was stopped."
+fi
+if lsof +D "${PGLITE_PATH}" >/dev/null 2>&1; then
+  fail "PGlite has open file handles; a consistent snapshot is not possible. No process was stopped."
+fi
+exec 8>/tmp/brain-write.lock
+flock -n 8 || fail "brain-write lock is held; no source was copied"
+echo "[COMPLETE] Mandatory sources exist and PGlite is quiescent"
+
+CURRENT_STEP="initial disk headroom"
+GBRAIN_BYTES="$(directory_bytes "${GBRAIN_PATH}")"
+PGLITE_BYTES="$(directory_bytes "${PGLITE_PATH}")"
+POSTGRES_BYTES="$(psql --no-psqlrc -X -A -t -v ON_ERROR_STOP=1 \
+  -c 'SELECT pg_database_size(current_database())')" \
+  || fail "could not read PostgreSQL database size"
+[[ "${POSTGRES_BYTES}" =~ ^[0-9]+$ ]] || fail "PostgreSQL size is not numeric"
+KNOWN_SOURCE_BYTES=$((GBRAIN_BYTES + PGLITE_BYTES + POSTGRES_BYTES))
+INITIAL_FREE_BYTES="$(df --output=avail -B1 /root | awk 'NR==2 {print $1}')"
+INITIAL_REQUIRED_BYTES=$((KNOWN_SOURCE_BYTES * 2 + KNOWN_SOURCE_BYTES / 5))
+echo "Disk preflight (known local sources): required=${INITIAL_REQUIRED_BYTES} free=${INITIAL_FREE_BYTES}"
+(( INITIAL_FREE_BYTES >= INITIAL_REQUIRED_BYTES )) \
+  || fail "insufficient disk before Notion: required=${INITIAL_REQUIRED_BYTES} free=${INITIAL_FREE_BYTES}"
+
+STAGING_DIR="$(mktemp -d /root/.production-brain-export.XXXXXX)"
+PAYLOAD="${STAGING_DIR}/payload"
+PRODUCTION="${PAYLOAD}/production"
+mkdir -p \
+  "${PRODUCTION}/notion-dump" \
+  "${PRODUCTION}/gbrain-brain" \
+  "${PRODUCTION}/pglite-snapshot" \
+  "${PRODUCTION}/postgres-dumps" \
+  "${PRODUCTION}/private-context" \
+  "${PRODUCTION}/openclaw-state"
+
+CURRENT_STEP="Notion export"
+python3 "${ROOT_DIR}/scripts/notion_dump.py" \
+  --registry "${REGISTRY_PATH}" \
+  --output-dir "${PRODUCTION}/notion-dump"
+python3 - "${PRODUCTION}/notion-dump/summary.json" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["status"] == "COMPLETE", data
+assert data["total_unique_pages_exported"] > 0, data
+assert not data["errors"], data["errors"]
+PY
+echo "[COMPLETE] Notion registry coverage, pages, and recursive blocks validated"
+
+CURRENT_STEP="exact disk headroom"
+NOTION_BYTES="$(directory_bytes "${PRODUCTION}/notion-dump")"
+PRIVATE_FILES=(
+  "/root/lyra-private/MEMORY.md"
+  "/root/lyra-private/config/SOUL.md"
+  "/root/lyra-private/config/MEMORY.md"
+  "/root/lyra-private/config/HEARTBEAT.md"
+  "/root/lyra-private/notion/notion.md"
+)
+PRIVATE_BYTES="$(selected_private_bytes "${PRIVATE_FILES[@]}")"
+OPENCLAW_BYTES="$(selected_private_bytes \
+  /root/.openclaw/cron/jobs.json \
+  /root/.openclaw/workspace/SOUL.md \
+  /root/.openclaw/workspace/MEMORY.md \
+  /root/.openclaw/workspace/HEARTBEAT.md \
+  /root/.openclaw/workspace/TOOLS.md)"
+SOURCE_BYTES=$((NOTION_BYTES + GBRAIN_BYTES + PGLITE_BYTES + POSTGRES_BYTES + PRIVATE_BYTES + OPENCLAW_BYTES))
+STAGING_BYTES="${SOURCE_BYTES}"
+CURRENT_STAGING_BYTES="${NOTION_BYTES}"
+REMAINING_STAGING_BYTES=$((STAGING_BYTES - CURRENT_STAGING_BYTES))
+PLAINTEXT_ARCHIVE_BYTES=0
+ENCRYPTED_ARCHIVE_BYTES=$((SOURCE_BYTES + SOURCE_BYTES / 100 + 1048576))
+SAFETY_MARGIN_BYTES=$((SOURCE_BYTES / 5))
+REQUIRED_BYTES=$((REMAINING_STAGING_BYTES + PLAINTEXT_ARCHIVE_BYTES + ENCRYPTED_ARCHIVE_BYTES + SAFETY_MARGIN_BYTES))
+FREE_BYTES="$(df --output=avail -B1 /root | awk 'NR==2 {print $1}')"
+cat > "${PRODUCTION}/disk-headroom.json" <<EOF
 {
-  "extraction_timestamp": "${TIMESTAMP}",
-  "host": "$(hostname)",
-  "stores": {
-    "gbrain_brain": {
-      "exists": ${GBRAIN_EXISTS},
-      "file_count": ${GBRAIN_FILES},
-      "size_bytes": ${GBRAIN_BYTES},
-      "latest_write": "${GBRAIN_LAST_WRITE}"
-    },
-    "lyra_private": {
-      "exists": ${PRIV_EXISTS},
-      "file_count": ${PRIV_FILES},
-      "size_bytes": ${PRIV_BYTES},
-      "latest_write": "${PRIV_LAST_WRITE}"
-    },
-    "pglite": {
-      "exists": ${PGLITE_EXISTS},
-      "path": "${PGLITE_PATH}",
-      "size_bytes": ${PGLITE_BYTES},
-      "latest_write": "${PGLITE_LAST_WRITE}"
-    }
-  }
+  "status": "COMPLETE",
+  "actual_source_bytes": ${SOURCE_BYTES},
+  "total_staging_bytes": ${STAGING_BYTES},
+  "current_staging_bytes": ${CURRENT_STAGING_BYTES},
+  "remaining_staging_bytes": ${REMAINING_STAGING_BYTES},
+  "plaintext_archive_bytes": ${PLAINTEXT_ARCHIVE_BYTES},
+  "plaintext_archive_reason": "tar is streamed directly into age; no plaintext archive is created",
+  "projected_encrypted_archive_bytes": ${ENCRYPTED_ARCHIVE_BYTES},
+  "safety_margin_bytes": ${SAFETY_MARGIN_BYTES},
+  "required_free_bytes": ${REQUIRED_BYTES},
+  "observed_free_bytes": ${FREE_BYTES}
 }
 EOF
+echo "Exact disk headroom: required=${REQUIRED_BYTES} free=${FREE_BYTES}"
+(( FREE_BYTES >= REQUIRED_BYTES )) \
+  || fail "insufficient disk: required=${REQUIRED_BYTES} free=${FREE_BYTES}"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 7: Packaging, Encryption & SHA-256 Checksum
-# ─────────────────────────────────────────────────────────────────────────────
-echo "[7/7] Packaging and encrypting export archive..."
-tar -czf "${RAW_ARCHIVE}" -C /root "production-brain-export-${TIMESTAMP}"
-RAW_SHA256=$(sha256sum "${RAW_ARCHIVE}" | awk '{print $1}')
-echo "  ✓ Raw tarball created: ${RAW_ARCHIVE} (SHA-256: ${RAW_SHA256})"
+CURRENT_STEP="gbrain and registry snapshot"
+rsync -a --delete-excluded \
+  --exclude='.git/' \
+  --exclude='.env' --exclude='.env.*' \
+  --exclude='*.pem' --exclude='*.key' --exclude='*.p12' --exclude='*.pfx' \
+  --exclude='credentials*' --exclude='*token*' --exclude='*secret*' \
+  "${GBRAIN_PATH}/" "${PRODUCTION}/gbrain-brain/"
+[[ -n "$(find "${PRODUCTION}/gbrain-brain" -type f -name '*.md' -print -quit)" ]] \
+  || fail "gbrain snapshot contains no Markdown"
+cp --preserve=mode,timestamps "${REGISTRY_PATH}" "${PRODUCTION}/registry.json"
+for path in "${PRIVATE_FILES[@]}"; do
+  if [[ -f "${path}" ]]; then
+    relative="${path#/root/lyra-private/}"
+    mkdir -p "${PRODUCTION}/private-context/$(dirname "${relative}")"
+    cp --preserve=mode,timestamps "${path}" "${PRODUCTION}/private-context/${relative}"
+  fi
+done
+echo "[COMPLETE] gbrain and explicit private knowledge files copied; no private tree copy used"
 
-FINAL_ARCHIVE="${RAW_ARCHIVE}"
-if command -v gpg >/dev/null 2>&1; then
-  echo "  Encrypting archive with GPG (AES-256)..."
-  if [ -n "${PASSPHRASE}" ]; then
-    gpg --batch --yes --symmetric --cipher-algo AES256 --passphrase "${PASSPHRASE}" -o "${ENCRYPTED_ARCHIVE}" "${RAW_ARCHIVE}"
-  else
-    gpg --batch --yes --symmetric --cipher-algo AES256 -o "${ENCRYPTED_ARCHIVE}" "${RAW_ARCHIVE}"
-  fi
-  rm -f "${RAW_ARCHIVE}"
-  FINAL_ARCHIVE="${ENCRYPTED_ARCHIVE}"
-elif command -v age >/dev/null 2>&1; then
-  echo "  Encrypting archive with age..."
-  if [ -n "${PASSPHRASE}" ]; then
-    printf "%s" "${PASSPHRASE}" | age -p -o "${ENCRYPTED_ARCHIVE}" "${RAW_ARCHIVE}"
-  else
-    age -p -o "${ENCRYPTED_ARCHIVE}" "${RAW_ARCHIVE}"
-  fi
-  rm -f "${RAW_ARCHIVE}"
-  FINAL_ARCHIVE="${ENCRYPTED_ARCHIVE}"
+CURRENT_STEP="consistent PGlite snapshot"
+node "${ROOT_DIR}/scripts/snapshot-pglite.mjs" \
+  "${PGLITE_PATH}" \
+  "${PRODUCTION}/pglite-snapshot/database" \
+  "${PRODUCTION}/pglite-snapshot/inventory.json"
+python3 - "${PRODUCTION}/pglite-snapshot/inventory.json" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["status"] == "COMPLETE" and data["table_count"] > 0
+PY
+echo "[COMPLETE] PGlite quiesced snapshot opened on disposable copy; table and row counts recorded"
+
+CURRENT_STEP="PostgreSQL consistent dump"
+python3 "${ROOT_DIR}/scripts/export-postgres.py" \
+  --output "${PRODUCTION}/postgres-dumps/lyra-app.dump" \
+  --inventory "${PRODUCTION}/postgres-dumps/inventory.json"
+echo "[COMPLETE] PostgreSQL dump, restore listing, row counts, sizes, and latest-write evidence validated"
+
+CURRENT_STEP="OpenClaw explicit state"
+if [[ -f /root/.openclaw/cron/jobs.json ]]; then
+  cp --preserve=mode,timestamps /root/.openclaw/cron/jobs.json \
+    "${PRODUCTION}/openclaw-state/cron-jobs.json"
+else
+  fail "mandatory live cron state is missing"
 fi
+for filename in SOUL.md MEMORY.md HEARTBEAT.md TOOLS.md; do
+  source_path="/root/.openclaw/workspace/${filename}"
+  [[ -f "${source_path}" ]] && cp --preserve=mode,timestamps \
+    "${source_path}" "${PRODUCTION}/openclaw-state/${filename}"
+done
+echo "[COMPLETE] Explicit OpenClaw state copied"
 
-FINAL_SHA256=$(sha256sum "${FINAL_ARCHIVE}" | awk '{print $1}')
-FINAL_SIZE=$(du -sh "${FINAL_ARCHIVE}" | awk '{print $1}')
+CURRENT_STEP="production reconciliation and benchmark validation"
+mkdir -p "${PAYLOAD}/knowledge-brain-export"
+python3 "${ROOT_DIR}/scripts/merge-production-corpus.py" \
+  --prod-dir "${PRODUCTION}" \
+  --baseline-dir "${ROOT_DIR}/knowledge-brain-export" \
+  --output-dir "${PAYLOAD}/knowledge-brain-export" \
+  --repo-root "${ROOT_DIR}"
+python3 - "${PAYLOAD}/knowledge-brain-export/reconciliation-report.json" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["status"] == "COMPLETE", data
+assert data["production_counts"]["durable_items"] > 0, data
+assert data["benchmark_validation"]["status"] == "COMPLETE", data
+assert data["benchmark_validation"]["failed"] == 0, data
+PY
+echo "[COMPLETE] All mandatory stores reconciled and all benchmark assertions passed"
 
-echo ""
-echo "=========================================================="
-echo "ONE-TIME HISTORICAL EXTRACTION COMPLETE"
-echo "Host Services Status: 100% Online (Zero interruptions)"
-echo "Archive File: ${FINAL_ARCHIVE}"
-echo "Archive Size: ${FINAL_SIZE}"
-echo "SHA-256:      ${FINAL_SHA256}"
-echo "Report:       ${REPORT_PATH}"
-echo "=========================================================="
+CURRENT_STEP="secret scanning"
+python3 "${ROOT_DIR}/scripts/scan-export-secrets.py" "${PAYLOAD}"
+gitleaks detect --source "${PAYLOAD}" --no-git --redact --exit-code 1 --no-banner >/dev/null \
+  || fail "gitleaks found a secret or could not complete"
+trufflehog filesystem "${PAYLOAD}" --no-update --no-verification --fail --json >/dev/null \
+  || fail "trufflehog found a verified/unverified secret or could not complete"
+echo "[COMPLETE] Built-in scanner, gitleaks, and trufflehog completed with zero findings"
+
+CURRENT_STEP="streaming encryption"
+tar --create --file=- --directory="${STAGING_DIR}" payload \
+  | age --encrypt --recipient "${AGE_RECIPIENT}" --output "${PARTIAL_ARCHIVE}"
+[[ -s "${PARTIAL_ARCHIVE}" ]] || fail "age produced no encrypted archive"
+age --decrypt --identity "${AGE_IDENTITY_FILE}" "${PARTIAL_ARCHIVE}" \
+  | tar --list --file=- >/dev/null \
+  || fail "encrypted archive could not be decrypted and listed"
+mv "${PARTIAL_ARCHIVE}" "${FINAL_ARCHIVE}"
+ARCHIVE_SHA256="$(sha256sum "${FINAL_ARCHIVE}" | awk '{print $1}')"
+ARCHIVE_BYTES="$(stat -c '%s' "${FINAL_ARCHIVE}")"
+
+RUN_STATUS="COMPLETE"
+CURRENT_STEP="complete"
+write_status "encrypted archive validated; sha256=${ARCHIVE_SHA256}; bytes=${ARCHIVE_BYTES}"
+echo "============================================================"
+echo "COMPLETE: one-time historical export"
+echo "Encrypted archive: ${FINAL_ARCHIVE}"
+echo "Encrypted bytes:   ${ARCHIVE_BYTES}"
+echo "SHA-256:           ${ARCHIVE_SHA256}"
+echo "Status report:     ${STATUS_PATH}"
+echo "No service was stopped or modified."
+echo "============================================================"

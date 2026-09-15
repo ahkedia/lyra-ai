@@ -4,6 +4,8 @@ Welcome to the portable knowledge brain corpus. This package represents the expo
 
 This guide provides the necessary operational and architectural context so that any capable AI reading this Google Drive corpus can understand its topology, provenance, update processes, retrieval mechanics, and inherent limitations without having direct access to the original server runtime.
 
+> **Status: INCOMPLETE.** This checked-in directory is the repository-derived seed corpus. No production extraction has been run or merged. Trust only an encrypted run whose reconciliation report and manifest both say `COMPLETE`.
+
 ---
 
 ## 1. System Topology & Origin Architecture
@@ -40,7 +42,7 @@ The original system on Hetzner operated on a core design philosophy: **"The AI i
 │  ├── relationships.csv & .json (Graph edges with valid-from/to)        │
 │  ├── sources.csv (Provenance catalog with stable IDs)                 │
 │  ├── test-queries.md (28 ground-truth benchmarks & edge cases)         │
-│  ├── gaps.md (Runtime features omitted & sync requirements)            │
+│  ├── gaps.md (Runtime portability gaps and completion gate)             │
 │  ├── manifest.json (SHA-256 integrity checksums & inventory)           │
 │  ├── entities/ (Normalized markdown profiles per entity)               │
 │  └── source-content/ (Verbatim source texts & voice transcripts)       │
@@ -111,7 +113,7 @@ To navigate this corpus effectively, follow this dependency and relationship mod
   - `retrieval-and-ranking.md` specifies the algorithm for retrieving and assembling facts when answering user queries.
   - `decisions-and-preferences.md` documents active choices, explicitly flagging older decisions that were superseded.
   - `test-queries.md` contains 28 reference questions to validate that an AI agent is interpreting the corpus accurately.
-  - `gaps.md` catalogs what was left behind on Hetzner and how to reconcile updates.
+  - `gaps.md` catalogs runtime portability limits and the one-time completion gate.
   - `manifest.json` provides cryptographic checksums ensuring file integrity.
 
 ---
@@ -127,7 +129,4 @@ Any AI operating on this corpus must recognize the following inherent boundaries
 
 ## 6. One-Time Historical Export & Extraction Instructions
 
-To finalize the full historical export before shutting down Hetzner:
-1. Run `scripts/extract-production-brain.sh` on the Hetzner host. It connects to the live Notion API, exports databases and blocks as Markdown/JSON, copies `/root/gbrain-brain`, snapshots PGLite, scans for secrets, and creates an encrypted archive without stopping any host services.
-2. Run `scripts/merge-production-corpus.py --prod-dir <path>` to import production-only items into `entities/`, `sources.csv`, and `source-content/`, and evaluate benchmark queries.
-3. The resulting corpus in Google Drive is completely self-contained and ready for downstream query agents.
+To finalize the historical export before shutting down Hetzner, follow `MIGRATION-EXECUTION-PLAN.md`. The extractor fails if any mandatory store, reconciliation, benchmark, scanner, or encryption check is incomplete. It refuses to copy PGLite while gbrain is active and never stops the service itself. A successful run produces one validated age-encrypted archive; it never creates a plaintext tarball.
