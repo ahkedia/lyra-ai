@@ -1,0 +1,23 @@
+source_id,original_system,title,timestamp,author,url_or_path,content_type,authority_level,entities_referenced
+SRC-WIKI-CAREER,Notion Personal Wiki,Personal Wiki — Career & Leadership History,2026-06-01,Akash Kedia,wiki/career/,markdown,canonical,person-akash-kedia;org-n26;org-flipkart;org-trade-republic;org-cheq;domain-fintech
+SRC-WIKI-META-BRAG,Notion Personal Wiki,Personal Wiki — Achievements & Brag Bank,2026-06-05,Akash Kedia,wiki/meta/achievements-brag-bank.md,markdown,canonical,person-akash-kedia;domain-payments;domain-credit-lending
+SRC-VOICE-CANON,Notion Personal Wiki,Personal Wiki — Voice Canon & Editorial Principles,2026-01-15,Akash Kedia,wiki/meta/voice-canon.md,markdown,authored,person-akash-kedia;frame-voice-canon
+SRC-BLOG-BUILDING-LYRA,Blog / Publication,Building Lyra: Field Report on Personal AI Chief of Staff,2026-05-15,Akash Kedia,blog/building-lyra-v2.md,markdown,authored,person-akash-kedia;person-abhigna;proj-lyra-ai
+SRC-SOUL-SPEC,OpenClaw Runtime,Lyra Personality Boundaries & Access Control (SOUL),2026-06-01,Akash Kedia,config/SOUL-template.md,markdown,boot,person-akash-kedia;person-abhigna;proj-lyra-ai;frame-voice-canon
+SRC-DOCS-ARCH,Architecture Docs,Lyra System Architecture & Topology,2026-03-20,Akash Kedia,docs/2-architecture.md,markdown,boot,proj-lyra-ai;person-akash-kedia;person-abhigna
+SRC-DOCS-SECOND-BRAIN,Architecture Docs,Second Brain Voice Capture & Weekly Synthesis,2026-03-25,Akash Kedia,docs/5-second-brain.md,markdown,reference,proj-lyra-ai;SRC-NOTION-SECOND-BRAIN
+SRC-DOCS-PUBLIC-PRIVATE,Architecture Docs,Public / Private Repository Split Runbook,2026-04-10,Akash Kedia,docs/12-public-private-split.md,markdown,boot,proj-lyra-ai
+SRC-DOCS-PWA-SPEC,Product Specification,Lyra PWA v2 Product & Technical Specification,2026-08-17,Akash Kedia,docs/16-lyra-pwa-v2-technical-spec.md,markdown,canonical,proj-lyra-ai;person-akash-kedia
+SRC-DOCS-ROUTING,Architecture Docs,Intelligent Task Classification & Model Routing,2026-04-01,Akash Kedia,docs/11-model-routing.md,markdown,boot,proj-lyra-ai
+SRC-CRUD-BRAIN-QUERY,Codebase CRUD,gbrain Tier 0 HTTP MCP Bridge & Provenance Filter,2026-06-20,Akash Kedia,crud/brain_query.py,python,canonical,proj-lyra-ai;proj-gbrain;person-akash-kedia
+SRC-NOTION-REGISTRY,Notion Registry,Lyra Notion Registry & Schema Definitions,2026-06-01,Akash Kedia,notion/database-schemas.md,markdown,canonical,proj-lyra-ai
+SRC-EVAL-TIER6,Eval Harness,Tier 6 Brain Retrieval & Provenance Test Cases,2026-06-07,Akash Kedia,evals/cases/tier6-brain.yaml,yaml,canonical,person-akash-kedia;org-n26;org-flipkart;org-trade-republic;org-cheq
+SRC-TOPIC-DOMAIN-MAP,Configuration,Topic Keyword to Personal Wiki Domain Mapping,2026-04-15,Akash Kedia,config/topic-to-domain.json,json,canonical,domain-fintech;domain-payments;domain-credit-lending
+SRC-TODOS-LOG,Engineering Log,Lyra Engineering & Deferred Work Log,2026-06-07,Akash Kedia,TODOS.md,markdown,boot,proj-lyra-ai
+SRC-START-HERE,Documentation,Lyra System Overview & Production Entry Point,2026-08-17,Akash Kedia,START-HERE.md,markdown,boot,proj-lyra-ai
+SRC-SCRIPTS-BRAIN-SYNC,Operational Script,Nightly Notion to Brain Sync Daemon,2026-06-20,Akash Kedia,scripts/brain-sync.sh,bash,boot,proj-gbrain;proj-lyra-ai
+SRC-SCRIPTS-BRAIN-DREAM,Operational Script,Nightly Dream Synthesis & Contradiction Cycle,2026-06-20,Akash Kedia,scripts/brain-dream.sh,bash,boot,proj-gbrain
+SRC-SCRIPTS-BRAIN-CAPTURE,Operational Script,Serialized gbrain Capture Path,2026-06-20,Akash Kedia,scripts/brain-capture.sh,bash,boot,proj-gbrain
+SRC-SCRIPTS-PII-SCAN,Security Script,Pre-push PII Scanner & Git Guard,2026-04-10,Akash Kedia,scripts/pii-scan.sh,bash,boot,proj-lyra-ai
+SRC-ROUTER-PLUGIN,OpenClaw Plugin,Lyra Model Router Plugin with Brain Injection,2026-06-20,Akash Kedia,plugins/lyra-model-router/index.js,javascript,boot,proj-lyra-ai;person-abhigna
+SRC-CRUD-WIKI-PROMOTE,Codebase CRUD,News Inbox to Second Brain Auto-Promotion,2026-06-01,Akash Kedia,crud/wiki_promote.py,python,canonical,person-akash-kedia;domain-fintech
