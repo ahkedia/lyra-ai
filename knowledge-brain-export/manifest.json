@@ -1,0 +1,154 @@
+{
+  "status": "INCOMPLETE",
+  "reason": "Seed corpus only; production extraction and reconciliation have not run.",
+  "generated_at": "2026-09-15T11:49:17.572694+00:00",
+  "total_files": 29,
+  "total_bytes": 97479,
+  "files": [
+    {
+      "path": "README.md",
+      "size_bytes": 10057,
+      "sha256": "3f5d0f8310c603a8532719b35a1e52f87ea3ced62942dcf65d6da5d54aacb804"
+    },
+    {
+      "path": "decisions-and-preferences.md",
+      "size_bytes": 6434,
+      "sha256": "d08e3ed2c11c89f57fe2e28c6cc12e6585bed62d9f3ba54e8c8aadb4650f80ee"
+    },
+    {
+      "path": "entities/domain-credit-lending.md",
+      "size_bytes": 736,
+      "sha256": "8361d473b4f062206001ffa84b0519557664580ec613f9c6d900a99557fd056b"
+    },
+    {
+      "path": "entities/domain-fintech.md",
+      "size_bytes": 568,
+      "sha256": "e40ce2a1b1da26cf58698c7dd2664746b39dba6208f5ab09097ca87569ba9c09"
+    },
+    {
+      "path": "entities/domain-payments.md",
+      "size_bytes": 598,
+      "sha256": "1f868bdc113106d83d0c48b1014e86297b30df4f1de5362af2c3cef5d8a86c06"
+    },
+    {
+      "path": "entities/frame-voice-canon.md",
+      "size_bytes": 1397,
+      "sha256": "ad574c2adc6d2f9806194e42af43e9753a0fe1a46094a092a462ba50e71962a2"
+    },
+    {
+      "path": "entities/org-cheq.md",
+      "size_bytes": 656,
+      "sha256": "33249e743f81f725e0a18954f1a56e54b7c0f6271163403513c3ecc6b522c9a0"
+    },
+    {
+      "path": "entities/org-flipkart.md",
+      "size_bytes": 988,
+      "sha256": "f07092d6dbe620c7104e0ee9c2a42437edb513e5d4238077d7ed1ef89d477e71"
+    },
+    {
+      "path": "entities/org-n26.md",
+      "size_bytes": 802,
+      "sha256": "71498d7a9e6566dcb43aff56d4758393455d6016386d5db46ef8489a8ea5230e"
+    },
+    {
+      "path": "entities/org-trade-republic.md",
+      "size_bytes": 798,
+      "sha256": "142d6193b96e58333db9b1abb8e60b0c87e138159a1a4737d8b004e89ef7ad33"
+    },
+    {
+      "path": "entities/person-abhigna.md",
+      "size_bytes": 1302,
+      "sha256": "f9e5ade32d4f4002a9ae7a4a93b78d52e1f7d2d857c515d13dcc6f0efde7a838"
+    },
+    {
+      "path": "entities/person-akash-kedia.md",
+      "size_bytes": 2183,
+      "sha256": "b274204030cbfc7db7ca80f670409b744ab9487e4fefc244d6fb3197e17eaf1a"
+    },
+    {
+      "path": "entities/proj-gbrain.md",
+      "size_bytes": 1018,
+      "sha256": "c4ee5e14e789c69d0b354c2ffc066d89cab10f7d1700f26bdf1aab31866bde02"
+    },
+    {
+      "path": "entities/proj-lyra-ai.md",
+      "size_bytes": 1616,
+      "sha256": "47a079fa3320733ba9e3f8c3e404fca31a0ad1b90823c4a2483e4639ce31dd68"
+    },
+    {
+      "path": "gaps.md",
+      "size_bytes": 3393,
+      "sha256": "a3a255db333a92bdcfb508af0513e49a8897992034d69a02862426f50e77cccd"
+    },
+    {
+      "path": "reconciliation-report.json",
+      "size_bytes": 783,
+      "sha256": "1fa605c865b15991dc2e1c5b93cae936318d34eafea5618a56b93799f00a44ac"
+    },
+    {
+      "path": "relationships.csv",
+      "size_bytes": 2904,
+      "sha256": "1a7d6c5fd7f5dfc830e04228cd9469f16cf2010b0576eeafc31f6bec9aae1b67"
+    },
+    {
+      "path": "relationships.json",
+      "size_bytes": 5863,
+      "sha256": "b20673c911f78dc32aa82ac028b02057ded3367b046b1c10a3108832b8400350"
+    },
+    {
+      "path": "retrieval-and-ranking.md",
+      "size_bytes": 7651,
+      "sha256": "fa788afd12ec47232c5b135aa024e1d92bc7c5b5346c6ca822e5dee20def26dc"
+    },
+    {
+      "path": "schema.md",
+      "size_bytes": 8854,
+      "sha256": "dbe22a5e0461fcf052fb1f266cc667ecb78f4305d647336d221dfc660d5a4fed"
+    },
+    {
+      "path": "semantic-rules.md",
+      "size_bytes": 10334,
+      "sha256": "42baaa0c643234f9d5fa6f37554fc0fc5499a70f76d387b9842430e18754d4ac"
+    },
+    {
+      "path": "source-content/SRC-BLOG-BUILDING-LYRA.md",
+      "size_bytes": 1684,
+      "sha256": "cdfbf023d2ea6c02400b19d5260c98a4bdf31b7176e049f4fc38484feb6d8391"
+    },
+    {
+      "path": "source-content/SRC-CRUD-BRAIN-QUERY.md",
+      "size_bytes": 1374,
+      "sha256": "f29b7ccff813b04669fb9b7c6c7ca04e13e9b701159f9163db6ef3c3daecc477"
+    },
+    {
+      "path": "source-content/SRC-DOCS-SECOND-BRAIN.md",
+      "size_bytes": 1254,
+      "sha256": "56e501564f9003d09ab2df12c54275a44c2898e13b2d7a2d4cf704778da270eb"
+    },
+    {
+      "path": "source-content/SRC-VOICE-CANON.md",
+      "size_bytes": 1243,
+      "sha256": "7a23f0b1c4fbfa3a0601a460f0350f4792e22015e667314fb31b1a6e5600b406"
+    },
+    {
+      "path": "source-content/SRC-WIKI-CAREER.md",
+      "size_bytes": 2312,
+      "sha256": "39a1aa728c9155e489878a85db16270a1035b5f5b635ae0282f7ccd3f943b129"
+    },
+    {
+      "path": "source-content/SRC-WIKI-META-BRAG.md",
+      "size_bytes": 1628,
+      "sha256": "534836e715322534ebbcb2a78f65a7981df056069064db63cbb635bb01dffd4e"
+    },
+    {
+      "path": "sources.csv",
+      "size_bytes": 4808,
+      "sha256": "6f5151f61671291b9e74e860a5384039bbde021ad8ae64a1d51cd29f8e636bc6"
+    },
+    {
+      "path": "test-queries.md",
+      "size_bytes": 14241,
+      "sha256": "404dee580674a17753b153bcf3eb788be014caa4e88fae5b7dff3f3eb53c047d"
+    }
+  ]
+}

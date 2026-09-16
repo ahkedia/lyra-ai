@@ -1,0 +1,17 @@
+subject_id,predicate,object_id,valid_from,valid_to,status,confidence,source_ids,notes
+person-akash-kedia,employed_at,org-flipkart,2017-06,2020-01,superseded,verified,SRC-WIKI-CAREER;SRC-WIKI-META-BRAG,Led Flipkart Pay Later and financial services payments rails.
+person-akash-kedia,employed_at,org-n26,2020-01,2022-06,superseded,verified,SRC-WIKI-CAREER;SRC-BLOG-BUILDING-LYRA,Senior product leadership in Berlin across core banking and EU expansion.
+person-akash-kedia,employed_at,org-trade-republic,2022-06,2023-12,superseded,verified,SRC-WIKI-CAREER;SRC-EVAL-TIER6,Product leadership in wealth management and neo-broker retail products.
+person-akash-kedia,employed_at,org-cheq,2024-01,2025-05,superseded,verified,SRC-WIKI-CAREER;SRC-EVAL-TIER6,Senior executive product leader for credit cards and bill payments ecosystem.
+person-akash-kedia,owns_project,proj-lyra-ai,2026-01-01,,active,verified,SRC-BLOG-BUILDING-LYRA;SRC-DOCS-ARCH,Architect and principal user of Lyra personal AI chief of staff.
+person-akash-kedia,owns_project,proj-gbrain,2026-05-01,,active,verified,SRC-CRUD-BRAIN-QUERY;SRC-SCRIPTS-BRAIN-DREAM,Creator and maintainer of gbrain local markdown retrieval system.
+person-akash-kedia,partner_of,person-abhigna,2020-01-01,,active,verified,SRC-SOUL-SPEC;SRC-DOCS-HOUSEHOLD,Spouses and household coordination partners.
+person-akash-kedia,domain_expertise,domain-fintech,2015-01-01,,active,verified,SRC-WIKI-CAREER;SRC-BLOG-BUILDING-LYRA,Over a decade of leadership in fintech and neo-banking.
+person-akash-kedia,domain_expertise,domain-payments,2017-01-01,,active,verified,SRC-WIKI-CAREER;SRC-TOPIC-DOMAIN-MAP,Expert in card issuing checkout rails and SEPA/UPI networks.
+person-akash-kedia,domain_expertise,domain-credit-lending,2018-01-01,,active,verified,SRC-WIKI-CAREER;SRC-TOPIC-DOMAIN-MAP,Deep background in BNPL underwriting and loan lifecycle management.
+person-akash-kedia,implements_framework,frame-voice-canon,2026-01-01,,active,verified,SRC-VOICE-CANON;SRC-SOUL-SPEC,Governs communication style in writing and assistant interactions.
+proj-lyra-ai,built_with,proj-gbrain,2026-06-01,,active,verified,SRC-CRUD-BRAIN-QUERY;SRC-ROUTER-PLUGIN,gbrain serves semantic brain retrieval into Lyra router via HTTP MCP.
+domain-payments,subdomain_of,domain-fintech,2015-01-01,,active,verified,SRC-TOPIC-DOMAIN-MAP,Categorical industry taxonomy.
+domain-credit-lending,subdomain_of,domain-fintech,2015-01-01,,active,verified,SRC-TOPIC-DOMAIN-MAP,Categorical industry taxonomy.
+dec-20260421-whatsapp-removal,supersedes,dec-20260115-whatsapp-channel,2026-04-21,,active,verified,SRC-TODOS-LOG;SRC-DOCS-PWA-SPEC,WhatsApp channel was decommissioned due to API costs and unreliability.
+dec-20260817-pwa-v2-primary,supersedes,dec-20260201-telegram-primary,2026-08-17,,active,verified,SRC-DOCS-PWA-SPEC;SRC-START-HERE,PWA v2 became primary installable iPhone interface; Telegram relegated to fallback.

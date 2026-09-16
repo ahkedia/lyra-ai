@@ -1,0 +1,178 @@
+[
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "employed_at",
+    "object_id": "org-flipkart",
+    "valid_from": "2017-06",
+    "valid_to": "2020-01",
+    "status": "superseded",
+    "confidence": "verified",
+    "source_ids": ["SRC-WIKI-CAREER", "SRC-WIKI-META-BRAG"],
+    "notes": "Led Flipkart Pay Later and financial services payments rails."
+  },
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "employed_at",
+    "object_id": "org-n26",
+    "valid_from": "2020-01",
+    "valid_to": "2022-06",
+    "status": "superseded",
+    "confidence": "verified",
+    "source_ids": ["SRC-WIKI-CAREER", "SRC-BLOG-BUILDING-LYRA"],
+    "notes": "Senior product leadership in Berlin across core banking and EU expansion."
+  },
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "employed_at",
+    "object_id": "org-trade-republic",
+    "valid_from": "2022-06",
+    "valid_to": "2023-12",
+    "status": "superseded",
+    "confidence": "verified",
+    "source_ids": ["SRC-WIKI-CAREER", "SRC-EVAL-TIER6"],
+    "notes": "Product leadership in wealth management and neo-broker retail products."
+  },
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "employed_at",
+    "object_id": "org-cheq",
+    "valid_from": "2024-01",
+    "valid_to": "2025-05",
+    "status": "superseded",
+    "confidence": "verified",
+    "source_ids": ["SRC-WIKI-CAREER", "SRC-EVAL-TIER6"],
+    "notes": "Senior executive product leader for credit cards and bill payments ecosystem."
+  },
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "owns_project",
+    "object_id": "proj-lyra-ai",
+    "valid_from": "2026-01-01",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-BLOG-BUILDING-LYRA", "SRC-DOCS-ARCH"],
+    "notes": "Architect and principal user of Lyra personal AI chief of staff."
+  },
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "owns_project",
+    "object_id": "proj-gbrain",
+    "valid_from": "2026-05-01",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-CRUD-BRAIN-QUERY", "SRC-SCRIPTS-BRAIN-DREAM"],
+    "notes": "Creator and maintainer of gbrain local markdown retrieval system."
+  },
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "partner_of",
+    "object_id": "person-abhigna",
+    "valid_from": "2020-01-01",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-SOUL-SPEC", "SRC-DOCS-HOUSEHOLD"],
+    "notes": "Spouses and household coordination partners."
+  },
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "domain_expertise",
+    "object_id": "domain-fintech",
+    "valid_from": "2015-01-01",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-WIKI-CAREER", "SRC-BLOG-BUILDING-LYRA"],
+    "notes": "Over a decade of leadership in fintech and neo-banking."
+  },
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "domain_expertise",
+    "object_id": "domain-payments",
+    "valid_from": "2017-01-01",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-WIKI-CAREER", "SRC-TOPIC-DOMAIN-MAP"],
+    "notes": "Expert in card issuing checkout rails and SEPA/UPI networks."
+  },
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "domain_expertise",
+    "object_id": "domain-credit-lending",
+    "valid_from": "2018-01-01",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-WIKI-CAREER", "SRC-TOPIC-DOMAIN-MAP"],
+    "notes": "Deep background in BNPL underwriting and loan lifecycle management."
+  },
+  {
+    "subject_id": "person-akash-kedia",
+    "predicate": "implements_framework",
+    "object_id": "frame-voice-canon",
+    "valid_from": "2026-01-01",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-VOICE-CANON", "SRC-SOUL-SPEC"],
+    "notes": "Governs communication style in writing and assistant interactions."
+  },
+  {
+    "subject_id": "proj-lyra-ai",
+    "predicate": "built_with",
+    "object_id": "proj-gbrain",
+    "valid_from": "2026-06-01",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-CRUD-BRAIN-QUERY", "SRC-ROUTER-PLUGIN"],
+    "notes": "gbrain serves semantic brain retrieval into Lyra router via HTTP MCP."
+  },
+  {
+    "subject_id": "domain-payments",
+    "predicate": "subdomain_of",
+    "object_id": "domain-fintech",
+    "valid_from": "2015-01-01",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-TOPIC-DOMAIN-MAP"],
+    "notes": "Categorical industry taxonomy."
+  },
+  {
+    "subject_id": "domain-credit-lending",
+    "predicate": "subdomain_of",
+    "object_id": "domain-fintech",
+    "valid_from": "2015-01-01",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-TOPIC-DOMAIN-MAP"],
+    "notes": "Categorical industry taxonomy."
+  },
+  {
+    "subject_id": "dec-20260421-whatsapp-removal",
+    "predicate": "supersedes",
+    "object_id": "dec-20260115-whatsapp-channel",
+    "valid_from": "2026-04-21",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-TODOS-LOG", "SRC-DOCS-PWA-SPEC"],
+    "notes": "WhatsApp channel was decommissioned due to API costs and unreliability."
+  },
+  {
+    "subject_id": "dec-20260817-pwa-v2-primary",
+    "predicate": "supersedes",
+    "object_id": "dec-20260201-telegram-primary",
+    "valid_from": "2026-08-17",
+    "valid_to": null,
+    "status": "active",
+    "confidence": "verified",
+    "source_ids": ["SRC-DOCS-PWA-SPEC", "SRC-START-HERE"],
+    "notes": "PWA v2 became primary installable iPhone interface; Telegram relegated to fallback."
+  }
+]

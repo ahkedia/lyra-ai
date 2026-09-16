@@ -1,0 +1,31 @@
+{
+  "status": "INCOMPLETE",
+  "timestamp": "2026-09-15T11:32:00Z",
+  "reason": "Checked-in placeholder only: no production extraction has been run or merged.",
+  "mandatory_store_counts": {
+    "notion": null,
+    "gbrain": null,
+    "registry": null,
+    "pglite": null,
+    "postgresql": null
+  },
+  "repository_counts": {
+    "entities": 12,
+    "sources": 27,
+    "relationships": 16
+  },
+  "production_counts": {
+    "durable_items": 0,
+    "duplicates": 0,
+    "production_only": 0,
+    "conflicting": 0
+  },
+  "merged_counts": null,
+  "benchmark_validation": {
+    "status": "NOT_RUN",
+    "reason": "Empty production is a fatal validation failure."
+  },
+  "errors": [
+    "Production extraction and reconciliation are mandatory before this report can become COMPLETE."
+  ]
+}
