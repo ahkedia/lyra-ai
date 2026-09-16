@@ -36,8 +36,10 @@ def run(command: list[str], *, capture: bool = True) -> str:
     return result.stdout or ""
 
 
-def query(sql: str) -> str:
-    return run(["psql", "--no-psqlrc", "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", sql]).strip()
+def query(sql: str, url: str) -> str:
+    return run(
+        ["psql", "--dbname", url, "--no-psqlrc", "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", sql]
+    ).strip()
 
 
 def ident(value: str) -> str:
@@ -58,7 +60,6 @@ def main() -> int:
     if not url:
         print("INCOMPLETE: LYRA_DATABASE_URL is not set in the process environment", file=sys.stderr)
         return 1
-    os.environ["PGDATABASE"] = url
     for command in ("psql", "pg_dump", "pg_restore"):
         if not shutil.which(command):
             print(f"INCOMPLETE: required command is missing: {command}", file=sys.stderr)
@@ -67,7 +68,7 @@ def main() -> int:
     try:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.inventory.parent.mkdir(parents=True, exist_ok=True)
-        database_size = int(query("SELECT pg_database_size(current_database())"))
+        database_size = int(query("SELECT pg_database_size(current_database())", url))
         rows = json.loads(
             query(
                 """
@@ -77,6 +78,7 @@ def main() -> int:
                 FROM pg_catalog.pg_tables
                 WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
                 """,
+                url,
             )
         )
         if not rows:
@@ -94,8 +96,10 @@ def main() -> int:
             schema = table["schema"]
             name = table["table"]
             qualified = f"{ident(schema)}.{ident(name)}"
-            row_count = int(query(f"SELECT count(*) FROM {qualified}"))
-            size_bytes = int(query(f"SELECT pg_total_relation_size({literal(qualified)}::regclass)"))
+            row_count = int(query(f"SELECT count(*) FROM {qualified}", url))
+            size_bytes = int(
+                query(f"SELECT pg_total_relation_size({literal(qualified)}::regclass)", url)
+            )
             columns = set(
                 json.loads(
                     query(
@@ -110,6 +114,7 @@ def main() -> int:
                             'date'
                           )
                         """,
+                        url,
                     )
                 )
             )
@@ -117,6 +122,7 @@ def main() -> int:
             if timestamp_column:
                 latest_write = query(
                     f"SELECT COALESCE(max({ident(timestamp_column)})::text, '') FROM {qualified}",
+                    url,
                 ) or None
                 latest_write_basis = f"max({timestamp_column})"
             else:
@@ -127,6 +133,7 @@ def main() -> int:
                     SELECT modification::text
                     FROM pg_stat_file(pg_relation_filepath({literal(qualified)}::regclass))
                     """,
+                    url,
                 ) or None
                 latest_write_basis = "relation_file_mtime (proxy; no application timestamp column)"
             if not latest_write:
@@ -145,6 +152,8 @@ def main() -> int:
         run(
             [
                 "pg_dump",
+                "--dbname",
+                url,
                 "--format=custom",
                 "--no-owner",
                 "--no-privileges",

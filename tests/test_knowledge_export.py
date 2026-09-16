@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -23,6 +25,14 @@ assert MERGE_SPEC and MERGE_SPEC.loader
 MERGE_MODULE = importlib.util.module_from_spec(MERGE_SPEC)
 sys.modules[MERGE_SPEC.name] = MERGE_MODULE
 MERGE_SPEC.loader.exec_module(MERGE_MODULE)
+
+EXPORT_POSTGRES_SPEC = importlib.util.spec_from_file_location(
+    "export_postgres", ROOT / "scripts" / "export-postgres.py"
+)
+assert EXPORT_POSTGRES_SPEC and EXPORT_POSTGRES_SPEC.loader
+EXPORT_POSTGRES_MODULE = importlib.util.module_from_spec(EXPORT_POSTGRES_SPEC)
+sys.modules[EXPORT_POSTGRES_SPEC.name] = EXPORT_POSTGRES_MODULE
+EXPORT_POSTGRES_SPEC.loader.exec_module(EXPORT_POSTGRES_MODULE)
 
 
 def case(number: int, required: list[str], query: str = "test query") -> dict:
@@ -351,6 +361,103 @@ class AgeIdentityPermissionGateTests(unittest.TestCase):
         result = self._run_guard(0o777)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("must not be group/world accessible", result.stderr)
+
+
+class PostgresUriHandlingTests(unittest.TestCase):
+    """Regression tests: LYRA_DATABASE_URL must reach psql/pg_dump via --dbname.
+
+    PGDATABASE expects a bare database name, not a connection URI; assigning
+    a URI to it makes psql/pg_dump silently fall back to the local Unix
+    socket instead of the intended remote database.
+    """
+
+    TEST_URL = "postgresql://user:pw@db.example.internal:5432/lyra?sslmode=require"
+
+    def test_extract_script_does_not_assign_pgdatabase(self) -> None:
+        script = (ROOT / "scripts" / "extract-production-brain.sh").read_text(encoding="utf-8")
+        self.assertNotIn("PGDATABASE", script)
+
+    def test_extract_script_psql_call_uses_dbname_with_uri(self) -> None:
+        script = (ROOT / "scripts" / "extract-production-brain.sh").read_text(encoding="utf-8")
+        psql_line = next(
+            line for line in script.splitlines() if line.strip().startswith("POSTGRES_BYTES=")
+        )
+        self.assertIn('--dbname="${LYRA_DATABASE_URL}"', psql_line)
+
+    def test_export_postgres_source_does_not_assign_pgdatabase(self) -> None:
+        source = (ROOT / "scripts" / "export-postgres.py").read_text(encoding="utf-8")
+        self.assertNotIn("PGDATABASE", source)
+
+    def _run_export_postgres(self, temporary: Path) -> tuple[list[list[str]], int, Path]:
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], *, capture: bool = True) -> str:
+            calls.append(command)
+            if command[0] == "psql":
+                sql = command[-1]
+                if "pg_database_size" in sql:
+                    return "12345"
+                if "json_agg(json_build_object" in sql:
+                    return json.dumps([{"schema": "public", "table": "fixture"}])
+                if sql.strip().startswith("SELECT count(*)"):
+                    return "3"
+                if "pg_total_relation_size" in sql:
+                    return "2048"
+                if "information_schema.columns" in sql:
+                    return "[]"
+                if "pg_stat_file" in sql:
+                    return "2024-01-01T00:00:00Z"
+                raise AssertionError(f"unexpected SQL: {sql}")
+            if command[0] == "pg_dump":
+                output_path = Path(command[command.index("--file") + 1])
+                output_path.write_bytes(b"fake-dump-bytes")
+                return ""
+            if command[0] == "pg_restore":
+                return "1234; 0 5678 TABLE DATA public fixture akash"
+            raise AssertionError(f"unexpected command: {command}")
+
+        output_path = temporary / "dump.pgcustom"
+        inventory_path = temporary / "inventory.json"
+        argv = [
+            "export-postgres.py",
+            "--output",
+            str(output_path),
+            "--inventory",
+            str(inventory_path),
+        ]
+        with patch.object(EXPORT_POSTGRES_MODULE, "run", fake_run), patch.object(
+            sys, "argv", argv
+        ), patch.dict(os.environ, {"LYRA_DATABASE_URL": self.TEST_URL}, clear=False):
+            os.environ.pop("PGDATABASE", None)
+            exit_code = EXPORT_POSTGRES_MODULE.main()
+        return calls, exit_code, output_path
+
+    def test_export_postgres_passes_dbname_uri_to_every_psql_and_pg_dump_call(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            calls, exit_code, output_path = self._run_export_postgres(Path(temporary))
+
+        self.assertEqual(exit_code, 0)
+        self.assertNotIn("PGDATABASE", os.environ)
+
+        psql_calls = [call for call in calls if call[0] == "psql"]
+        pg_dump_calls = [call for call in calls if call[0] == "pg_dump"]
+        pg_restore_calls = [call for call in calls if call[0] == "pg_restore"]
+
+        self.assertTrue(psql_calls, "expected at least one psql call")
+        for call in psql_calls:
+            self.assertIn("--dbname", call)
+            self.assertEqual(call[call.index("--dbname") + 1], self.TEST_URL)
+
+        self.assertEqual(len(pg_dump_calls), 1)
+        self.assertIn("--dbname", pg_dump_calls[0])
+        self.assertEqual(
+            pg_dump_calls[0][pg_dump_calls[0].index("--dbname") + 1], self.TEST_URL
+        )
+
+        # pg_restore --list operates on the dump file, not a live connection,
+        # and must stay untouched.
+        self.assertEqual(len(pg_restore_calls), 1)
+        self.assertEqual(pg_restore_calls[0], ["pg_restore", "--list", str(output_path)])
 
 
 if __name__ == "__main__":

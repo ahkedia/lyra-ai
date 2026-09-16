@@ -102,7 +102,6 @@ echo "[COMPLETE] Encryption recipient and protected identity validated"
 CURRENT_STEP="mandatory source preflight"
 [[ -n "${NOTION_API_KEY:-}" ]] || fail "NOTION_API_KEY must be set in the process environment"
 [[ -n "${LYRA_DATABASE_URL:-}" ]] || fail "LYRA_DATABASE_URL must be set in the process environment"
-export PGDATABASE="${LYRA_DATABASE_URL}"
 REGISTRY_PATH="${NOTION_REGISTRY_PATH:-/root/lyra-private/notion/registry.json}"
 GBRAIN_PATH="${GBRAIN_BRAIN_REPO:-/root/gbrain-brain}"
 PGLITE_PATH="${PGLITE_PATH:-/root/.gbrain/brain.pglite}"
@@ -135,7 +134,7 @@ echo "[COMPLETE] Mandatory sources exist and PGlite is quiescent"
 CURRENT_STEP="initial disk headroom"
 GBRAIN_BYTES="$(directory_bytes "${GBRAIN_PATH}")"
 PGLITE_BYTES="$(directory_bytes "${PGLITE_PATH}")"
-POSTGRES_BYTES="$(psql --no-psqlrc -X -A -t -v ON_ERROR_STOP=1 \
+POSTGRES_BYTES="$(psql --dbname="${LYRA_DATABASE_URL}" --no-psqlrc -X -A -t -v ON_ERROR_STOP=1 \
   -c 'SELECT pg_database_size(current_database())')" \
   || fail "could not read PostgreSQL database size"
 [[ "${POSTGRES_BYTES}" =~ ^[0-9]+$ ]] || fail "PostgreSQL size is not numeric"
