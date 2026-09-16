@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,7 +18,14 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from corpus_benchmark import Document, evaluate_case  # noqa: E402
-from notion_dump import NotionClient, NotionExporter, NotionReadError  # noqa: E402
+from notion_dump import (  # noqa: E402
+    NotionClient,
+    NotionExporter,
+    NotionReadError,
+    distinct_sanitized_reasons,
+    error_message,
+    redact,
+)
 
 MERGE_SPEC = importlib.util.spec_from_file_location(
     "merge_production_corpus", ROOT / "scripts" / "merge-production-corpus.py"
@@ -458,6 +467,276 @@ class PostgresUriHandlingTests(unittest.TestCase):
         # and must stay untouched.
         self.assertEqual(len(pg_restore_calls), 1)
         self.assertEqual(pg_restore_calls[0], ["pg_restore", "--list", str(output_path)])
+
+
+class NotionRedactionTests(unittest.TestCase):
+    """redact() must strip tokens and object identifiers from arbitrary text."""
+
+    def test_bearer_token_is_redacted(self) -> None:
+        text = "Authorization failed for Bearer secret-token-abc123XYZ"
+        self.assertNotIn("secret-token-abc123XYZ", redact(text))
+        self.assertIn("Bearer [REDACTED]", redact(text))
+
+    def test_dashed_uuid_is_redacted(self) -> None:
+        text = "object 550e8400-e29b-41d4-a716-446655440000 not found"
+        result = redact(text)
+        self.assertNotIn("550e8400-e29b-41d4-a716-446655440000", result)
+        self.assertIn("[REDACTED-ID]", result)
+
+    def test_bare_32_hex_object_id_is_redacted(self) -> None:
+        text = "object 550e8400e29b41d4a716446655440000 not found"
+        result = redact(text)
+        self.assertNotIn("550e8400e29b41d4a716446655440000", result)
+        self.assertIn("[REDACTED-ID]", result)
+
+    def test_text_without_secrets_is_unchanged(self) -> None:
+        self.assertEqual(redact("HTTP 404 (object_not_found)"), "HTTP 404 (object_not_found)")
+
+
+class NotionErrorMessageTests(unittest.TestCase):
+    """error_message(): NotionReadError text passes through (redacted); anything
+    else collapses to just the exception type name."""
+
+    def test_notion_read_error_keeps_sanitized_text(self) -> None:
+        exc = NotionReadError("HTTP 404 (object_not_found)")
+        self.assertEqual(error_message(exc), "HTTP 404 (object_not_found)")
+
+    def test_notion_read_error_is_still_redacted_defensively(self) -> None:
+        exc = NotionReadError("leaked Bearer sk-live-abcdef123456")
+        result = error_message(exc)
+        self.assertNotIn("sk-live-abcdef123456", result)
+
+    def test_unexpected_exception_exposes_only_type_name(self) -> None:
+        exc = KeyError("private-page-title-with-corpus-text")
+        result = error_message(exc)
+        self.assertEqual(result, "KeyError")
+        self.assertNotIn("private-page-title-with-corpus-text", result)
+
+    def test_unexpected_value_error_exposes_only_type_name(self) -> None:
+        exc = ValueError("dumped raw response body with secret content")
+        self.assertEqual(error_message(exc), "ValueError")
+
+
+class NotionApiErrorSanitizationTests(unittest.TestCase):
+    """NotionClient.request() must reduce API errors to HTTP status + Notion
+    error code only -- never the request path, response message, or token."""
+
+    def _http_error(self, code: int, body: dict) -> urllib.error.HTTPError:
+        payload = json.dumps(body).encode("utf-8")
+        return urllib.error.HTTPError(
+            url="https://api.notion.com/v1/pages/550e8400-e29b-41d4-a716-446655440000",
+            code=code,
+            msg="error",
+            hdrs=None,  # type: ignore[arg-type]
+            fp=io.BytesIO(payload),
+        )
+
+    def test_http_error_reduces_to_status_and_notion_code(self) -> None:
+        error = self._http_error(
+            401,
+            {
+                "object": "error",
+                "status": 401,
+                "code": "unauthorized",
+                "message": (
+                    "API token is invalid: Bearer secret-token-abc123 for page "
+                    "550e8400-e29b-41d4-a716-446655440000 titled 'Private Career Notes'"
+                ),
+            },
+        )
+
+        def fake_urlopen(request, timeout=60):
+            raise error
+
+        client = NotionClient("secret-token-abc123")
+        with patch("notion_dump.urllib.request.urlopen", fake_urlopen):
+            with self.assertRaises(NotionReadError) as ctx:
+                client.request("GET", "/pages/550e8400-e29b-41d4-a716-446655440000", retries=1)
+
+        message = str(ctx.exception)
+        self.assertEqual(message, "HTTP 401 (unauthorized)")
+        self.assertNotIn("secret-token-abc123", message)
+        self.assertNotIn("550e8400-e29b-41d4-a716-446655440000", message)
+        self.assertNotIn("Private Career Notes", message)
+        self.assertNotIn("/pages/", message)
+
+    def test_http_error_without_notion_code_still_drops_message_body(self) -> None:
+        error = self._http_error(400, {"message": "corpus text leaked here"})
+
+        def fake_urlopen(request, timeout=60):
+            raise error
+
+        client = NotionClient("secret-token-abc123")
+        with patch("notion_dump.urllib.request.urlopen", fake_urlopen):
+            with self.assertRaises(NotionReadError) as ctx:
+                client.request("GET", "/pages/x", retries=1)
+
+        message = str(ctx.exception)
+        self.assertEqual(message, "HTTP 400")
+        self.assertNotIn("corpus text leaked here", message)
+
+    def test_transport_failure_exposes_only_exception_type(self) -> None:
+        def fake_urlopen(request, timeout=60):
+            raise OSError("connect to db.internal.example failed: secret-token-abc123")
+
+        client = NotionClient("secret-token-abc123")
+        with patch("notion_dump.urllib.request.urlopen", fake_urlopen):
+            with self.assertRaises(NotionReadError) as ctx:
+                client.request("GET", "/pages/x", retries=1)
+
+        message = str(ctx.exception)
+        self.assertEqual(message, "OSError")
+        self.assertNotIn("secret-token-abc123", message)
+
+
+class NotionIncompleteReasonsTests(unittest.TestCase):
+    """distinct_sanitized_reasons(): bounded to 10, deduplicated, never
+    surfaces scope or object_id."""
+
+    def test_deduplicates_and_caps_at_ten(self) -> None:
+        errors = [
+            {"scope": "page", "object_id": f"obj-{i}", "error": f"HTTP 404 (reason-{i % 3})"}
+            for i in range(30)
+        ]
+        reasons = distinct_sanitized_reasons(errors, limit=10)
+        self.assertLessEqual(len(reasons), 10)
+        self.assertEqual(len(reasons), len(set(reasons)))
+
+    def test_output_never_contains_scope_or_object_id_keys(self) -> None:
+        errors = [
+            {"scope": "database", "object_id": "super-secret-registry-key", "error": "HTTP 404"},
+        ]
+        reasons = distinct_sanitized_reasons(errors)
+        for reason in reasons:
+            self.assertNotIn("super-secret-registry-key", reason)
+        self.assertEqual(reasons, ["HTTP 404"])
+
+    def test_empty_errors_yields_no_reasons(self) -> None:
+        self.assertEqual(distinct_sanitized_reasons([]), [])
+
+
+class NotionExportDiagnosticsBashTests(unittest.TestCase):
+    """Regression tests against the literal Notion-export phase lifted from
+    extract-production-brain.sh: [RUNNING] marker, mode-0600 diagnostics,
+    bounded 40-line tail on failure, and fail-closed diagnostic cleanup."""
+
+    SCRIPT_PATH = ROOT / "scripts" / "extract-production-brain.sh"
+
+    @classmethod
+    def _script_lines(cls) -> list[str]:
+        return cls.SCRIPT_PATH.read_text(encoding="utf-8").splitlines()
+
+    @classmethod
+    def _extract_between(cls, start_marker: str, end_marker: str) -> str:
+        lines = cls._script_lines()
+        start = next(i for i, line in enumerate(lines) if start_marker in line)
+        end = next(i for i, line in enumerate(lines) if end_marker in line and i >= start)
+        return "\n".join(lines[start : end + 1])
+
+    @classmethod
+    def _notion_phase_snippet(cls) -> str:
+        return cls._extract_between(
+            'CURRENT_STEP="Notion export"',
+            '[COMPLETE] Notion registry coverage',
+        )
+
+    @classmethod
+    def _diag_cleanup_snippet(cls) -> str:
+        return cls._extract_between(
+            'NOTION_DIAG_FILE}" && -f',
+            "rm -f \"${NOTION_DIAG_FILE}\"",
+        ) + "\n  fi"
+
+    def test_mktemp_and_chmod_produce_a_mode_0600_diagnostic_file(self) -> None:
+        snippet = self._extract_between(
+            'NOTION_DIAG_FILE="$(mktemp', 'chmod 600 "${NOTION_DIAG_FILE}"'
+        )
+        result = subprocess.run(
+            ["bash", "-c", f'{snippet}\necho "${{NOTION_DIAG_FILE}}"'],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        diag_path = Path(result.stdout.strip())
+        try:
+            self.assertTrue(diag_path.is_file())
+            self.assertEqual(oct(diag_path.stat().st_mode & 0o777), "0o600")
+        finally:
+            diag_path.unlink(missing_ok=True)
+
+    def _run_notion_phase(self, stub_body: str) -> subprocess.CompletedProcess:
+        with tempfile.TemporaryDirectory() as temporary:
+            root_dir = Path(temporary)
+            (root_dir / "scripts").mkdir()
+            (root_dir / "scripts" / "notion_dump.py").write_text(stub_body, encoding="utf-8")
+            production = root_dir / "production"
+            (production / "notion-dump").mkdir(parents=True)
+
+            harness = f"""
+set -Eeuo pipefail
+ROOT_DIR={root_dir}
+REGISTRY_PATH=/dev/null
+PRODUCTION={production}
+NOTION_DIAG_FILE=""
+CURRENT_STEP="Notion export"
+fail() {{ echo "INCOMPLETE [${{CURRENT_STEP}}]: $*" >&2; exit 1; }}
+cleanup() {{
+{self._diag_cleanup_snippet()}
+}}
+trap cleanup EXIT
+{self._notion_phase_snippet()}
+"""
+            return subprocess.run(
+                ["bash", "-c", harness], capture_output=True, text=True, check=False
+            )
+
+    def test_running_marker_is_printed_before_the_quiet_phase(self) -> None:
+        result = self._run_notion_phase("import sys\nprint('ok')\nsys.exit(0)\n")
+        self.assertIn("[RUNNING] Notion export...", result.stdout)
+
+    def test_failure_shows_only_bounded_40_line_sanitized_tail(self) -> None:
+        stub = "\n".join(
+            ["import sys"] + [f"print('diagnostic line {i}')" for i in range(1, 61)] + ["sys.exit(1)"]
+        )
+        result = self._run_notion_phase(stub)
+        self.assertNotEqual(result.returncode, 0)
+        combined = result.stdout + result.stderr
+        # Bounded: only the last 40 of 60 lines should appear.
+        self.assertNotIn("diagnostic line 1\n", combined)
+        self.assertNotIn("diagnostic line 20\n", combined)
+        self.assertIn("diagnostic line 21", combined)
+        self.assertIn("diagnostic line 60", combined)
+        self.assertIn("INCOMPLETE [Notion export]: Notion export failed", combined)
+
+    def test_diagnostic_file_is_removed_after_failure(self) -> None:
+        script = self._notion_phase_snippet()
+        with tempfile.TemporaryDirectory() as temporary:
+            root_dir = Path(temporary)
+            (root_dir / "scripts").mkdir()
+            (root_dir / "scripts" / "notion_dump.py").write_text(
+                "import sys\nsys.exit(1)\n", encoding="utf-8"
+            )
+            production = root_dir / "production"
+            (production / "notion-dump").mkdir(parents=True)
+            capture_path = root_dir / "diag-file-path.txt"
+            harness = f"""
+set -Eeuo pipefail
+ROOT_DIR={root_dir}
+REGISTRY_PATH=/dev/null
+PRODUCTION={production}
+NOTION_DIAG_FILE=""
+CURRENT_STEP="Notion export"
+fail() {{ echo "INCOMPLETE [${{CURRENT_STEP}}]: $*" >&2; exit 1; }}
+cleanup() {{
+  echo "${{NOTION_DIAG_FILE}}" > {capture_path}
+{self._diag_cleanup_snippet()}
+}}
+trap cleanup EXIT
+{script}
+"""
+            subprocess.run(["bash", "-c", harness], capture_output=True, text=True, check=False)
+            diag_path = Path(capture_path.read_text(encoding="utf-8").strip())
+            self.assertFalse(diag_path.exists(), "diagnostic file must be removed on failure")
 
 
 if __name__ == "__main__":

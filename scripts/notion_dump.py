@@ -18,6 +18,51 @@ from typing import Any
 
 NOTION_VERSION = "2025-09-03"
 
+_BEARER_PATTERN = re.compile(r"Bearer\s+\S+", re.IGNORECASE)
+_UUID_PATTERN = re.compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+)
+_HEX32_PATTERN = re.compile(r"\b[0-9a-fA-F]{32}\b")
+
+
+def redact(text: str) -> str:
+    """Strip bearer tokens and Notion object identifiers from diagnostic text."""
+    text = _BEARER_PATTERN.sub("Bearer [REDACTED]", text)
+    text = _UUID_PATTERN.sub("[REDACTED-ID]", text)
+    text = _HEX32_PATTERN.sub("[REDACTED-ID]", text)
+    return text
+
+
+def distinct_sanitized_reasons(errors: list[dict[str, str]], limit: int = 10) -> list[str]:
+    """Up to `limit` distinct sanitized error reasons, never scope or object_id.
+
+    Each entry's "error" field is already sanitized at the point it was
+    recorded (see error_message()); this only deduplicates and bounds count.
+    """
+    seen: set[str] = set()
+    reasons: list[str] = []
+    for entry in errors:
+        reason = entry.get("error") or ""
+        if not reason or reason in seen:
+            continue
+        seen.add(reason)
+        reasons.append(reason)
+        if len(reasons) >= limit:
+            break
+    return reasons
+
+
+def error_message(exc: Exception) -> str:
+    """Sanitized text for any exception surfaced in diagnostics or summary.json.
+
+    A NotionReadError is raised only with pre-sanitized text (HTTP status and
+    Notion error code, never a message body, path, or token). Anything else is
+    an unexpected exception and must expose only its type name.
+    """
+    if isinstance(exc, NotionReadError):
+        return redact(str(exc))
+    return type(exc).__name__
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -84,17 +129,26 @@ class NotionClient:
                         retry_after = float(exc.headers.get("Retry-After", 2**attempt))
                         time.sleep(max(1.0, retry_after))
                         continue
+                notion_code = None
                 try:
-                    detail = json.loads(payload).get("message", payload)
+                    notion_code = json.loads(payload).get("code")
                 except json.JSONDecodeError:
-                    detail = payload
-                raise NotionReadError(f"{method} {path}: HTTP {exc.code}: {detail}") from exc
+                    notion_code = None
+                # Sanitized by design: HTTP status and Notion's machine error code
+                # only. Never the request path (carries object IDs), the response
+                # message body (may echo request content), or the auth header.
+                sanitized = f"HTTP {exc.code}"
+                if notion_code:
+                    sanitized += f" ({notion_code})"
+                raise NotionReadError(sanitized) from exc
             except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
                 if attempt + 1 < retries:
                     time.sleep(2**attempt)
                     continue
-                raise NotionReadError(f"{method} {path}: {exc}") from exc
-        raise NotionReadError(f"{method} {path}: exhausted retries")
+                # Transport-level failure, not a structured API error: expose only
+                # the exception type, never the path, URL, or underlying message.
+                raise NotionReadError(type(exc).__name__) from exc
+        raise NotionReadError("exhausted retries")
 
     def paginated_post(self, path: str, body: dict[str, Any]) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
@@ -109,7 +163,7 @@ class NotionClient:
                 return results
             cursor = response.get("next_cursor")
             if not cursor:
-                raise NotionReadError(f"{path}: has_more=true without next_cursor")
+                raise NotionReadError("has_more=true without next_cursor")
 
     def search_all(self) -> list[dict[str, Any]]:
         return self.paginated_post("/search", {"sort": {"direction": "ascending", "timestamp": "last_edited_time"}})
@@ -149,7 +203,7 @@ class NotionClient:
                 return results
             cursor = response.get("next_cursor")
             if not cursor:
-                raise NotionReadError(f"{path}: has_more=true without next_cursor")
+                raise NotionReadError("has_more=true without next_cursor")
 
     def block_tree(self, root_id: str) -> tuple[list[dict[str, Any]], int]:
         """Return the complete recursive block tree and total descendant count."""
@@ -210,7 +264,7 @@ class NotionExporter:
         self.exported_page_ids: set[str] = set()
 
     def record_error(self, scope: str, object_id: str, error: Exception) -> None:
-        self.errors.append({"scope": scope, "object_id": object_id, "error": str(error)})
+        self.errors.append({"scope": scope, "object_id": object_id, "error": error_message(error)})
 
     def export_page(self, page: dict[str, Any], destination: Path, origin: str) -> None:
         page_id = page["id"]
@@ -251,7 +305,7 @@ class NotionExporter:
             report.update({"status": "COMPLETE", "block_count": block_count})
             self.exported_page_ids.add(page_id)
         except Exception as exc:  # continue solely to produce a complete error report
-            report["error"] = str(exc)
+            report["error"] = error_message(exc)
             self.record_error("page", page_id, exc)
         self.page_reports[page_id] = report
 
@@ -329,7 +383,7 @@ class NotionExporter:
                     }
                 )
             except Exception as exc:
-                report["error"] = str(exc)
+                report["error"] = error_message(exc)
                 self.record_error("database", key, exc)
             database_reports[key] = report
 
@@ -434,12 +488,13 @@ def main() -> int:
         registry = json.loads(args.registry.read_text(encoding="utf-8"))
         summary = NotionExporter(NotionClient(token), registry, args.output_dir).run()
     except Exception as exc:
+        sanitized = error_message(exc)
         args.output_dir.mkdir(parents=True, exist_ok=True)
-        failure = {"status": "INCOMPLETE", "timestamp": utc_now(), "fatal_error": str(exc)}
+        failure = {"status": "INCOMPLETE", "timestamp": utc_now(), "fatal_error": sanitized}
         (args.output_dir / "summary.json").write_text(
             json.dumps(failure, indent=2) + "\n", encoding="utf-8"
         )
-        print(f"INCOMPLETE: Notion export failed: {exc}", file=sys.stderr)
+        print(f"INCOMPLETE: Notion export failed: {sanitized}", file=sys.stderr)
         return 1
 
     print(
@@ -449,6 +504,15 @@ def main() -> int:
         f"{summary['total_blocks_exported']} blocks, "
         f"{len(summary['errors'])} errors"
     )
+    if summary["status"] != "COMPLETE" and summary["errors"]:
+        reasons = distinct_sanitized_reasons(summary["errors"], limit=10)
+        print(
+            "INCOMPLETE reasons (sanitized, deduplicated, max 10, "
+            "no registry keys or object IDs):",
+            file=sys.stderr,
+        )
+        for reason in reasons:
+            print(f"  - {reason}", file=sys.stderr)
     return 0 if summary["status"] == "COMPLETE" else 1
 
 

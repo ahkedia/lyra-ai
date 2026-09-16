@@ -9,6 +9,7 @@ STATUS_PATH="${EXPORT_STATUS_PATH:-/root/production-brain-export-${TIMESTAMP}.st
 FINAL_ARCHIVE="${EXPORT_ARCHIVE_PATH:-/root/production-brain-export-${TIMESTAMP}.tar.age}"
 PARTIAL_ARCHIVE="${FINAL_ARCHIVE}.partial"
 STAGING_DIR=""
+NOTION_DIAG_FILE=""
 CURRENT_STEP="preflight"
 RUN_STATUS="INCOMPLETE"
 
@@ -49,6 +50,9 @@ from pathlib import Path
 import sys
 Path(sys.argv[1]).unlink(missing_ok=True)
 PY
+  fi
+  if [[ -n "${NOTION_DIAG_FILE}" && -f "${NOTION_DIAG_FILE}" ]]; then
+    rm -f "${NOTION_DIAG_FILE}"
   fi
   exit "${exit_code}"
 }
@@ -157,16 +161,26 @@ mkdir -p \
   "${PRODUCTION}/openclaw-state"
 
 CURRENT_STEP="Notion export"
-python3 "${ROOT_DIR}/scripts/notion_dump.py" \
+echo "[RUNNING] Notion export..."
+NOTION_DIAG_FILE="$(mktemp /root/.notion-export-diagnostics.XXXXXX)"
+chmod 600 "${NOTION_DIAG_FILE}"
+if ! python3 "${ROOT_DIR}/scripts/notion_dump.py" \
   --registry "${REGISTRY_PATH}" \
-  --output-dir "${PRODUCTION}/notion-dump"
+  --output-dir "${PRODUCTION}/notion-dump" \
+  >"${NOTION_DIAG_FILE}" 2>&1; then
+  echo "INCOMPLETE [Notion export]: notion_dump.py failed. Last 40 lines of sanitized diagnostics:" >&2
+  tail -n 40 "${NOTION_DIAG_FILE}" >&2
+  fail "Notion export failed"
+fi
 python3 - "${PRODUCTION}/notion-dump/summary.json" <<'PY'
 import json, sys
 data = json.load(open(sys.argv[1], encoding="utf-8"))
-assert data["status"] == "COMPLETE", data
-assert data["total_unique_pages_exported"] > 0, data
-assert not data["errors"], data["errors"]
+assert data["status"] == "COMPLETE", f"status={data.get('status')!r}"
+assert data["total_unique_pages_exported"] > 0, "no pages exported"
+assert not data["errors"], f"{len(data['errors'])} unresolved errors"
 PY
+rm -f "${NOTION_DIAG_FILE}"
+NOTION_DIAG_FILE=""
 echo "[COMPLETE] Notion registry coverage, pages, and recursive blocks validated"
 
 CURRENT_STEP="exact disk headroom"
