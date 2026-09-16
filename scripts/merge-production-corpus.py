@@ -22,6 +22,19 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# Stores are now captured sequentially instead of from one quiesced snapshot;
+# this is the accepted upper bound on how far apart their capture times may be.
+ACCEPTED_DRIFT_SECONDS = 7 * 24 * 3600
+
+
+def cross_store_drift_seconds(captured_at: dict[str, str]) -> float | None:
+    """Max spread between per-store capture timestamps, or None if <2 stores."""
+    if len(captured_at) < 2:
+        return None
+    timestamps = [datetime.fromisoformat(value) for value in captured_at.values()]
+    return (max(timestamps) - min(timestamps)).total_seconds()
+
+
 def hash_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
@@ -574,11 +587,23 @@ class Reconciler:
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
         )
 
+    def read_capture_metadata(self) -> tuple[dict[str, str], str | None]:
+        path = self.production / "captured-at.json"
+        if not path.is_file():
+            return {}, None
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data.get("captured_at") or {}, data.get("gbrain_git_head")
+
     def write_report(self, status: str, benchmark: dict[str, Any] | None = None) -> None:
         benchmark = benchmark if benchmark is not None else self.benchmark
+        captured_at, gbrain_git_head = self.read_capture_metadata()
         report = {
             "status": status,
             "timestamp": utc_now(),
+            "captured_at": captured_at,
+            "gbrain_git_head": gbrain_git_head,
+            "max_cross_store_drift_seconds": cross_store_drift_seconds(captured_at),
+            "accepted_drift_seconds": ACCEPTED_DRIFT_SECONDS,
             "mandatory_store_counts": self.store_counts,
             "repository_counts": {
                 "entities": len(list((self.baseline / "entities").glob("*.md"))),

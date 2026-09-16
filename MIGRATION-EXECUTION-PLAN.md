@@ -3,7 +3,7 @@
 **Target Environment:** Portable Google Drive Knowledge Corpus  
 **Source System:** Lyra Knowledge Brain & Second Brain Ecosystem (Hetzner VPS / OpenClaw / Notion / gbrain / PGLite)  
 **Date of Generation:** 2026-09-15  
-**Version:** 1.1
+**Version:** 1.2
 **Classification:** Portable Knowledge Migration Document
 **Current Status:** **INCOMPLETE — no production extraction has been run or merged**
 
@@ -67,8 +67,10 @@ To operationalize this export inside a new environment:
    - Direct the target AI (e.g., Claude, GPT-4, or a custom RAG agent) to read `README.md`, `schema.md`, `semantic-rules.md`, and `retrieval-and-ranking.md` as its primary system prompt / context layer.
    - For semantic search, ingest `entities/` and `source-content/` into the target model's retrieval engine (vector database, local chunk index, or full-context memory).
 3. **One-Time Historical Production Extraction & Merge**:
-   - Execute `scripts/extract-production-brain.sh` only after its mandatory preconditions are met. It exports Notion, gbrain, a quiesced PGLite snapshot, PostgreSQL, registry data, explicit private context, and OpenClaw state; merges all stores; validates benchmarks; scans for secrets; and streams directly into age encryption.
-   - The script fails before copying PGLite if `gbrain-http`, a gbrain process, or the brain lock is active. It never stops a service. An operator must choose whether and when a quiescent window is acceptable.
+   - Execute `scripts/extract-production-brain.sh` once its mandatory preconditions are met. `gbrain-http` stays live for every store except PGLite: the script exports Notion, then the PostgreSQL dump, then gbrain (with the registry and explicit private context), then explicit OpenClaw state — all while the brain keeps running.
+   - Immediately before the PGLite snapshot, the script waits up to 30 minutes, polling every 15 seconds, for `gbrain-http` to be inactive, no gbrain maintenance process running, and no open PGLite file handles. It prints the exact operator command (`systemctl stop gbrain-http`) and never stops the service itself. Once quiesced, it acquires the brain-write lock, snapshots and validates PGLite, releases the lock, and immediately prints the restart command (`systemctl start gbrain-http`) for the operator to run right away.
+   - Merge, reconciliation, the 28 benchmark queries, the built-in scanner, gitleaks, trufflehog, age encryption, and decrypt/list validation all run afterward with the brain live again.
+   - Because stores are now captured sequentially instead of from one consistent snapshot, per-store `captured_at` UTC timestamps and the gbrain git HEAD are recorded in the status report and `reconciliation-report.json`, which also surfaces the observed cross-store drift. Drift of up to 7 days is accepted.
    - The corpus is self-contained after one successful run. There is no recurring migration process.
 
 ---
@@ -120,11 +122,17 @@ apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
   age golang-go postgresql-client rsync lsof util-linux
 
-GOBIN=/usr/local/bin go install github.com/gitleaks/gitleaks/v8@latest
-GOBIN=/usr/local/bin go install github.com/trufflesecurity/trufflehog/v3@latest
+# The gitleaks Go module path is zricethezav/gitleaks, not gitleaks/gitleaks;
+# the repo lives under the gitleaks org but the go.mod identity did not move.
+GOBIN=/usr/local/bin go install github.com/zricethezav/gitleaks/v8@latest
+
+# trufflehog's go.mod carries replace directives, which `go install @latest`
+# rejects for a non-main module; use its official prebuilt-binary installer.
+curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
+  | sh -s -- -b /usr/local/bin
 
 age --version
-gitleaks version
+gitleaks version   # prints "version is set by build process"; that is expected for `go install @latest`, not a failure
 trufflehog --version
 ```
 
@@ -149,23 +157,36 @@ read -rsp "Notion token: " NOTION_API_KEY; echo; export NOTION_API_KEY
 read -rsp "PostgreSQL URL: " LYRA_DATABASE_URL; echo; export LYRA_DATABASE_URL
 ```
 
-### Preflight and extraction
+### Extraction
+
+Do **not** stop `gbrain-http` before starting. The script needs it live to export Notion, the PostgreSQL dump, gbrain, private context, and OpenClaw state first — only the PGLite step needs it quiesced.
 
 ```bash
-systemctl is-active gbrain-http
-pgrep -af '[g]brain (serve|sync|import|embed|dream|delete|init)' || true
 bash scripts/extract-production-brain.sh
 ```
 
-If `gbrain-http` or another gbrain process is active, the expected result is:
+The run proceeds automatically through every store except PGLite. Immediately before the PGLite snapshot it prints:
 
 ```text
-INCOMPLETE [mandatory source preflight]: gbrain-http is active; a consistent PGlite snapshot requires it already quiesced. No service was stopped.
+[RUNNING] Waiting up to 30 minutes for gbrain-http to quiesce before the PGlite snapshot...
+Operator action required now: systemctl stop gbrain-http
 ```
 
-That is a deliberate safe stop. The script must not be changed to copy the live PGLite directory and must not stop the service automatically.
+Run that command in another session as soon as you see it. The script polls every 15 seconds and proceeds the moment `gbrain-http` is inactive, no gbrain maintenance process is running, and no PGLite file handles are open — it never stops the service itself. If 30 minutes pass without quiescence, the run fails closed:
 
-On a naturally quiescent or separately operator-approved window, successful output ends with:
+```text
+INCOMPLETE [PGlite quiescence wait]: gbrain-http did not quiesce within 30 minutes. Operator action required: systemctl stop gbrain-http
+```
+
+As soon as the PGLite snapshot is copied and validated, the script prints:
+
+```text
+Operator action required now: systemctl start gbrain-http
+```
+
+Run that command immediately. Merge, reconciliation, benchmarks, secret scanning, and encryption all still have to run, but none of them need the brain quiesced, so there is no reason to leave it stopped.
+
+Successful output ends with:
 
 ```text
 COMPLETE: one-time historical export
@@ -173,7 +194,7 @@ Encrypted archive: /root/production-brain-export-<UTC>.tar.age
 Encrypted bytes:   <bytes>
 SHA-256:           <64 hexadecimal characters>
 Status report:     /root/production-brain-export-<UTC>.status.json
-No service was stopped or modified.
+No service was stopped or modified by this script.
 ```
 
 ### Retrieval and integrity verification
@@ -188,4 +209,4 @@ age --decrypt -i /secure/path/knowledge-export.key \
 
 ### Fatal failure modes
 
-Every condition below exits non-zero and writes status `INCOMPLETE`: missing credentials or dependencies; insufficient exact disk headroom; active/locked PGLite; Notion discovery, pagination, recursive block, registry-coverage, or page error; missing gbrain content; PGLite copy/open/table-count failure; PostgreSQL inventory/dump/restore-listing failure; zero production items; reconciliation collision; failed expected fact, provenance, negative assertion, or ACL benchmark; scanner error or finding; age encryption or decrypt/list validation failure.
+Every condition below exits non-zero and writes status `INCOMPLETE`: missing credentials or dependencies; insufficient exact disk headroom; PGLite quiescence wait timeout (30 minutes) or lock contention; Notion discovery, pagination, recursive block, registry-coverage, or page error; missing gbrain content; PGLite copy/open/table-count failure; PostgreSQL inventory/dump/restore-listing failure; zero production items; reconciliation collision; failed expected fact, provenance, negative assertion, or ACL benchmark; scanner error or finding; age encryption or decrypt/list validation failure.
