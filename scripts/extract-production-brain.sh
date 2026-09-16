@@ -87,7 +87,7 @@ CURRENT_STEP="encryption preflight"
 [[ -n "${AGE_IDENTITY_FILE:-}" ]] || fail "AGE_IDENTITY_FILE must be set in the environment"
 [[ -f "${AGE_IDENTITY_FILE}" ]] || fail "AGE_IDENTITY_FILE does not exist"
 IDENTITY_MODE="$(stat -c '%a' "${AGE_IDENTITY_FILE}")"
-(( 8#${IDENTITY_MODE} & 8#077 == 0 )) || fail "AGE_IDENTITY_FILE must not be group/world accessible"
+(( (8#${IDENTITY_MODE} & 8#077) == 0 )) || fail "AGE_IDENTITY_FILE must not be group/world accessible"
 
 for command in age gitleaks trufflehog rsync flock lsof node npm python3 psql pg_dump pg_restore tar sha256sum; do
   require_command "${command}"

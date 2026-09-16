@@ -287,5 +287,71 @@ class NotionCompletenessTests(unittest.TestCase):
             self.assertEqual(summary["page_summaries"]["page-id"]["status"], "INCOMPLETE")
 
 
+class AgeIdentityPermissionGateTests(unittest.TestCase):
+    """Regression tests for the AGE_IDENTITY_FILE group/world-permission gate.
+
+    These exercise the literal guard lines lifted from
+    scripts/extract-production-brain.sh (not a re-typed copy), so a
+    reintroduced Bash arithmetic-precedence bug fails these tests.
+    """
+
+    SCRIPT = ROOT / "scripts" / "extract-production-brain.sh"
+
+    @classmethod
+    def _extract_guard_snippet(cls) -> str:
+        lines = cls.SCRIPT.read_text(encoding="utf-8").splitlines()
+        stat_line = next(
+            line for line in lines if line.strip().startswith('IDENTITY_MODE="$(stat')
+        )
+        check_line = next(
+            line for line in lines if "IDENTITY_MODE}" in line and "fail " in line
+        )
+        return f"{stat_line}\n{check_line}"
+
+    def _run_guard(self, mode: int) -> subprocess.CompletedProcess:
+        snippet = self._extract_guard_snippet()
+        with tempfile.NamedTemporaryFile(delete=False) as handle:
+            identity_path = Path(handle.name)
+        try:
+            identity_path.chmod(mode)
+            script = (
+                "set -euo pipefail\n"
+                f'AGE_IDENTITY_FILE="{identity_path}"\n'
+                'fail() { echo "FAIL: $*" >&2; exit 1; }\n'
+                f"{snippet}\n"
+                "echo GUARD_PASSED\n"
+            )
+            return subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=False
+            )
+        finally:
+            identity_path.unlink(missing_ok=True)
+
+    def test_0600_passes(self) -> None:
+        result = self._run_guard(0o600)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("GUARD_PASSED", result.stdout)
+
+    def test_0640_fails(self) -> None:
+        result = self._run_guard(0o640)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must not be group/world accessible", result.stderr)
+
+    def test_0604_fails(self) -> None:
+        result = self._run_guard(0o604)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must not be group/world accessible", result.stderr)
+
+    def test_0660_fails(self) -> None:
+        result = self._run_guard(0o660)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must not be group/world accessible", result.stderr)
+
+    def test_0777_fails(self) -> None:
+        result = self._run_guard(0o777)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must not be group/world accessible", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
