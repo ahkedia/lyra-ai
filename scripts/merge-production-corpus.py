@@ -26,6 +26,17 @@ def utc_now() -> str:
 # this is the accepted upper bound on how far apart their capture times may be.
 ACCEPTED_DRIFT_SECONDS = 7 * 24 * 3600
 
+# Every store the extraction script calls record_captured_at() for. All six
+# must have a present, parseable timestamp or reconciliation fails closed.
+MANDATORY_CAPTURE_STORES = (
+    "notion",
+    "postgresql",
+    "gbrain",
+    "private_context",
+    "openclaw_state",
+    "pglite",
+)
+
 
 def cross_store_drift_seconds(captured_at: dict[str, str]) -> float | None:
     """Max spread between per-store capture timestamps, or None if <2 stores."""
@@ -191,6 +202,34 @@ class Reconciler:
                 "sha256": hash_file(registry),
             },
         }
+        self.validate_capture_drift()
+
+    def validate_capture_drift(self) -> None:
+        """Fail closed unless every mandatory store's captured_at timestamp
+        is present and parseable, and the oldest-to-newest spread is within
+        the accepted 7-day (604800s) window. Recording the drift is not
+        enough on its own -- this is what actually enforces it."""
+        captured_at, _ = self.read_capture_metadata()
+        missing = [store for store in MANDATORY_CAPTURE_STORES if not captured_at.get(store)]
+        if missing:
+            raise ReconciliationError(
+                "captured_at is missing mandatory store timestamps: " + ", ".join(sorted(missing))
+            )
+        parsed: dict[str, datetime] = {}
+        for store in MANDATORY_CAPTURE_STORES:
+            raw = captured_at[store]
+            try:
+                parsed[store] = datetime.fromisoformat(raw)
+            except (TypeError, ValueError) as exc:
+                raise ReconciliationError(
+                    f"captured_at[{store}] is not a valid ISO-8601 timestamp: {raw!r}"
+                ) from exc
+        drift_seconds = (max(parsed.values()) - min(parsed.values())).total_seconds()
+        if drift_seconds > ACCEPTED_DRIFT_SECONDS:
+            raise ReconciliationError(
+                f"cross-store capture drift {drift_seconds:.0f}s exceeds the accepted "
+                f"{ACCEPTED_DRIFT_SECONDS}s (7 days)"
+            )
 
     def collect_items(self) -> None:
         # Notion page JSON is authoritative and carries durable page IDs.

@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 import urllib.error
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -648,38 +649,75 @@ class NotionExportDiagnosticsBashTests(unittest.TestCase):
         ) + "\n  fi"
 
     def test_mktemp_and_chmod_produce_a_mode_0600_diagnostic_file(self) -> None:
+        # Proves the diagnostics path is testable entirely outside /root: the
+        # snippet below never hardcodes /root, only NOTION_DIAG_DIR, which the
+        # real script defaults to /root but a caller (this test, or an
+        # operator) can override.
         snippet = self._extract_between(
             'NOTION_DIAG_FILE="$(mktemp', 'chmod 600 "${NOTION_DIAG_FILE}"'
         )
-        result = subprocess.run(
-            ["bash", "-c", f'{snippet}\necho "${{NOTION_DIAG_FILE}}"'],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        diag_path = Path(result.stdout.strip())
-        try:
-            self.assertTrue(diag_path.is_file())
-            self.assertEqual(oct(diag_path.stat().st_mode & 0o777), "0o600")
-        finally:
-            diag_path.unlink(missing_ok=True)
+        with tempfile.TemporaryDirectory() as temporary:
+            diag_dir = Path(temporary) / "diagnostics-home"
+            diag_dir.mkdir()
+            harness = f"""
+set -Eeuo pipefail
+NOTION_DIAG_DIR={diag_dir}
+CURRENT_STEP="Notion export"
+fail() {{ echo "INCOMPLETE [${{CURRENT_STEP}}]: $*" >&2; exit 1; }}
+{snippet}
+echo "${{NOTION_DIAG_FILE}}"
+"""
+            result = subprocess.run(
+                ["bash", "-c", harness], capture_output=True, text=True, check=True
+            )
+            diag_path = Path(result.stdout.strip())
+            try:
+                self.assertTrue(diag_path.is_file())
+                self.assertEqual(oct(diag_path.stat().st_mode & 0o777), "0o600")
+                self.assertEqual(diag_path.parent, diag_dir)
+            finally:
+                diag_path.unlink(missing_ok=True)
 
-    def _run_notion_phase(self, stub_body: str) -> subprocess.CompletedProcess:
+    def test_empty_notion_diag_dir_fails_closed(self) -> None:
+        snippet = self._extract_between(
+            'NOTION_DIAG_DIR must not be empty',
+            'chmod 600 "${NOTION_DIAG_FILE}"',
+        )
+        harness = f"""
+set -Eeuo pipefail
+NOTION_DIAG_DIR=""
+CURRENT_STEP="Notion export"
+fail() {{ echo "INCOMPLETE [${{CURRENT_STEP}}]: $*" >&2; exit 1; }}
+{snippet}
+"""
+        result = subprocess.run(["bash", "-c", harness], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("NOTION_DIAG_DIR must not be empty", result.stderr)
+
+    def _run_notion_phase(
+        self, stub_body: str, extra_env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess:
         with tempfile.TemporaryDirectory() as temporary:
             root_dir = Path(temporary)
             (root_dir / "scripts").mkdir()
             (root_dir / "scripts" / "notion_dump.py").write_text(stub_body, encoding="utf-8")
             production = root_dir / "production"
             (production / "notion-dump").mkdir(parents=True)
+            diag_dir = root_dir / "diagnostics-home"
+            diag_dir.mkdir()
 
+            env_lines = "\n".join(f"{key}={value}" for key, value in (extra_env or {}).items())
             harness = f"""
 set -Eeuo pipefail
 ROOT_DIR={root_dir}
 REGISTRY_PATH=/dev/null
 PRODUCTION={production}
 NOTION_DIAG_FILE=""
+NOTION_DIAG_DIR={diag_dir}
 CURRENT_STEP="Notion export"
+{env_lines}
 fail() {{ echo "INCOMPLETE [${{CURRENT_STEP}}]: $*" >&2; exit 1; }}
+record_captured_at() {{ :; }}
 cleanup() {{
 {self._diag_cleanup_snippet()}
 }}
@@ -718,6 +756,8 @@ trap cleanup EXIT
             )
             production = root_dir / "production"
             (production / "notion-dump").mkdir(parents=True)
+            diag_dir = root_dir / "diagnostics-home"
+            diag_dir.mkdir()
             capture_path = root_dir / "diag-file-path.txt"
             harness = f"""
 set -Eeuo pipefail
@@ -725,6 +765,7 @@ ROOT_DIR={root_dir}
 REGISTRY_PATH=/dev/null
 PRODUCTION={production}
 NOTION_DIAG_FILE=""
+NOTION_DIAG_DIR={diag_dir}
 CURRENT_STEP="Notion export"
 fail() {{ echo "INCOMPLETE [${{CURRENT_STEP}}]: $*" >&2; exit 1; }}
 cleanup() {{
@@ -737,6 +778,413 @@ trap cleanup EXIT
             subprocess.run(["bash", "-c", harness], capture_output=True, text=True, check=False)
             diag_path = Path(capture_path.read_text(encoding="utf-8").strip())
             self.assertFalse(diag_path.exists(), "diagnostic file must be removed on failure")
+
+    def test_notion_export_completes_with_gbrain_http_reported_active(self) -> None:
+        # No fake systemctl/pgrep/lsof needed: the Notion phase must never
+        # call any of them at all, so "gbrain-http would report active" is
+        # simulated simply by not quiescing anything -- if the phase checked,
+        # a real live gbrain-http on this very host would also make it fail.
+        stub = (
+            "import json, sys\n"
+            "output_dir = sys.argv[sys.argv.index('--output-dir') + 1]\n"
+            "summary = {'status': 'COMPLETE', 'total_unique_pages_exported': 1, 'errors': []}\n"
+            "with open(output_dir + '/summary.json', 'w', encoding='utf-8') as handle:\n"
+            "    json.dump(summary, handle)\n"
+            "print('Notion export COMPLETE: 1 registered databases, 1 pages, 0 blocks, 0 errors')\n"
+        )
+        result = self._run_notion_phase(stub)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("[COMPLETE] Notion registry coverage", result.stdout)
+
+
+class GbrainLiveScopeTests(unittest.TestCase):
+    """Regression tests: gbrain-http quiescence and the brain-write lock must
+    be scoped to the PGlite step only -- absent from preflight and from every
+    other store's copy (Notion, PostgreSQL, gbrain, private-context,
+    OpenClaw), present only around the PGlite snapshot."""
+
+    SCRIPT_PATH = ROOT / "scripts" / "extract-production-brain.sh"
+    QUIESCENCE_TOKENS = ("systemctl", "pgrep", "lsof", "flock", "brain-write.lock")
+
+    @classmethod
+    def _script_lines(cls) -> list[str]:
+        return cls.SCRIPT_PATH.read_text(encoding="utf-8").splitlines()
+
+    @classmethod
+    def _region(cls, start_marker: str, end_marker: str) -> str:
+        lines = cls._script_lines()
+        start = next(i for i, line in enumerate(lines) if start_marker in line)
+        end = next(i for i, line in enumerate(lines) if end_marker in line and i >= start)
+        return "\n".join(lines[start : end + 1])
+
+    def test_notion_export_region_never_references_gbrain_quiescence(self) -> None:
+        region = self._region(
+            'CURRENT_STEP="Notion export"', '[COMPLETE] Notion registry coverage'
+        )
+        for token in self.QUIESCENCE_TOKENS:
+            self.assertNotIn(token, region)
+
+    def test_every_live_store_region_never_references_gbrain_quiescence(self) -> None:
+        # mandatory-source-preflight through the end of the OpenClaw copy
+        # covers every store except PGlite.
+        region = self._region(
+            'CURRENT_STEP="mandatory source preflight"',
+            '[COMPLETE] Explicit OpenClaw state copied',
+        )
+        for token in self.QUIESCENCE_TOKENS:
+            self.assertNotIn(token, region)
+
+    def test_quiescence_and_lock_are_present_only_around_pglite(self) -> None:
+        region = self._region(
+            'CURRENT_STEP="PGlite quiescence wait"',
+            '[COMPLETE] PGlite quiesced snapshot',
+        )
+        # systemctl appears directly (the stop-prompt echo); pgrep/lsof live
+        # inside pglite_is_quiescent()'s own definition, checked separately
+        # below -- what must appear at the call site is the call itself, the
+        # lock, and the flag that scopes the restart reminder.
+        for token in ("systemctl", "flock", "pglite_is_quiescent", "GBRAIN_STOP_PROMPTED"):
+            self.assertIn(token, region)
+
+    def test_pglite_is_quiescent_checks_systemctl_pgrep_and_lsof(self) -> None:
+        lines = self._script_lines()
+        start = next(i for i, line in enumerate(lines) if line.strip() == "pglite_is_quiescent() {")
+        end = next(i for i, line in enumerate(lines) if i > start and line.strip() == "}")
+        body = "\n".join(lines[start : end + 1])
+        for token in ("systemctl", "pgrep", "lsof"):
+            self.assertIn(token, body)
+
+    def test_pglite_step_is_the_last_step_before_reconciliation(self) -> None:
+        # Confirms Notion/Postgres/gbrain/private-context/OpenClaw all run
+        # strictly before the quiescence wait, not interleaved with it.
+        lines = self._script_lines()
+        notion_index = next(i for i, l in enumerate(lines) if 'CURRENT_STEP="Notion export"' in l)
+        postgres_index = next(
+            i for i, l in enumerate(lines) if 'CURRENT_STEP="PostgreSQL consistent dump"' in l
+        )
+        gbrain_index = next(
+            i for i, l in enumerate(lines) if 'CURRENT_STEP="gbrain and registry snapshot"' in l
+        )
+        openclaw_index = next(
+            i for i, l in enumerate(lines) if 'CURRENT_STEP="OpenClaw explicit state"' in l
+        )
+        quiescence_index = next(
+            i for i, l in enumerate(lines) if 'CURRENT_STEP="PGlite quiescence wait"' in l
+        )
+        pglite_index = next(
+            i for i, l in enumerate(lines) if 'CURRENT_STEP="consistent PGlite snapshot"' in l
+        )
+        reconciliation_index = next(
+            i
+            for i, l in enumerate(lines)
+            if 'CURRENT_STEP="production reconciliation and benchmark validation"' in l
+        )
+        self.assertLess(notion_index, postgres_index)
+        self.assertLess(postgres_index, gbrain_index)
+        self.assertLess(gbrain_index, openclaw_index)
+        self.assertLess(openclaw_index, quiescence_index)
+        self.assertLess(quiescence_index, pglite_index)
+        self.assertLess(pglite_index, reconciliation_index)
+
+
+class GbrainRestartReminderTests(unittest.TestCase):
+    """Regression tests against the literal restart-reminder mechanism: once
+    the stop prompt has been issued, every later EXIT path -- success or
+    failure -- must print the exact restart command exactly once; nothing
+    before the stop prompt may print it at all."""
+
+    SCRIPT_PATH = ROOT / "scripts" / "extract-production-brain.sh"
+
+    @classmethod
+    def _script_lines(cls) -> list[str]:
+        return cls.SCRIPT_PATH.read_text(encoding="utf-8").splitlines()
+
+    @classmethod
+    def _extract_between(cls, start_marker: str, end_marker: str) -> str:
+        lines = cls._script_lines()
+        start = next(i for i, line in enumerate(lines) if start_marker in line)
+        end = next(i for i, line in enumerate(lines) if end_marker in line and i >= start)
+        return "\n".join(lines[start : end + 1])
+
+    @classmethod
+    def _fixed_block(cls, start_marker: str, length: int, expect_last: str) -> str:
+        lines = cls._script_lines()
+        start = next(i for i, line in enumerate(lines) if start_marker in line)
+        block = lines[start : start + length]
+        assert block[-1].strip() == expect_last, (
+            f"shape of the block starting {start_marker!r} changed; update this test"
+        )
+        return "\n".join(block)
+
+    @classmethod
+    def _remind_function_snippet(cls) -> str:
+        return cls._fixed_block("remind_gbrain_restart() {", 6, "}")
+
+    @classmethod
+    def _cleanup_integration_snippet(cls) -> str:
+        return cls._fixed_block("GBRAIN_STOP_PROMPTED == 1", 3, "fi")
+
+    @classmethod
+    def _stop_prompt_snippet(cls) -> str:
+        return cls._extract_between(
+            "Operator action required now: systemctl stop gbrain-http",
+            "GBRAIN_STOP_PROMPTED=1",
+        )
+
+    @classmethod
+    def _pglite_success_reminder_snippet(cls) -> str:
+        return cls._extract_between(
+            "[COMPLETE] PGlite quiesced snapshot",
+            "remind_gbrain_restart",
+        )
+
+    def _harness(self, body: str) -> str:
+        return f"""
+set -Eeuo pipefail
+CURRENT_STEP="test"
+GBRAIN_STOP_PROMPTED=0
+GBRAIN_RESTART_PRINTED=0
+fail() {{ echo "INCOMPLETE [${{CURRENT_STEP}}]: $*" >&2; exit 1; }}
+{self._remind_function_snippet()}
+cleanup() {{
+  local exit_code=$?
+{self._cleanup_integration_snippet()}
+  exit "$exit_code"
+}}
+trap cleanup EXIT
+{body}
+"""
+
+    def test_restart_command_printed_immediately_after_successful_pglite_copy(self) -> None:
+        body = f"{self._stop_prompt_snippet()}\n{self._pglite_success_reminder_snippet()}"
+        result = subprocess.run(
+            ["bash", "-c", self._harness(body)], capture_output=True, text=True
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = [line for line in result.stdout.splitlines() if line.strip()]
+        complete_index = next(
+            i for i, line in enumerate(lines) if "PGlite quiesced snapshot" in line
+        )
+        self.assertEqual(
+            lines[complete_index + 1],
+            "Operator action required now: systemctl start gbrain-http",
+        )
+        self.assertEqual(result.stdout.count("systemctl start gbrain-http"), 1)
+
+    def test_restart_command_printed_on_failure_during_quiescence_wait(self) -> None:
+        body = f'{self._stop_prompt_snippet()}\nfail "gbrain-http did not quiesce"'
+        result = subprocess.run(
+            ["bash", "-c", self._harness(body)], capture_output=True, text=True
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("systemctl start gbrain-http", result.stdout)
+
+    def test_restart_command_printed_exactly_once_on_failure_after_pglite_copy(self) -> None:
+        body = (
+            f"{self._stop_prompt_snippet()}\n"
+            f"{self._pglite_success_reminder_snippet()}\n"
+            'fail "reconciliation failed"'
+        )
+        result = subprocess.run(
+            ["bash", "-c", self._harness(body)], capture_output=True, text=True
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.count("systemctl start gbrain-http"), 1)
+
+    def test_restart_command_not_printed_before_stop_prompt_issued(self) -> None:
+        result = subprocess.run(
+            ["bash", "-c", self._harness('fail "Notion export failed"')],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("systemctl start gbrain-http", result.stdout)
+
+
+class CapturedAtRecordingTests(unittest.TestCase):
+    """Regression tests against the literal record_captured_at() /
+    record_gbrain_git_head() functions: per-store UTC timestamps and the
+    gbrain git HEAD land in captured-at.json exactly as the real script
+    writes it."""
+
+    SCRIPT_PATH = ROOT / "scripts" / "extract-production-brain.sh"
+    MANDATORY_STORES = (
+        "notion",
+        "postgresql",
+        "gbrain",
+        "private_context",
+        "openclaw_state",
+        "pglite",
+    )
+
+    @classmethod
+    def _script_lines(cls) -> list[str]:
+        return cls.SCRIPT_PATH.read_text(encoding="utf-8").splitlines()
+
+    @classmethod
+    def _extract_between(cls, start_marker: str, end_marker: str) -> str:
+        lines = cls._script_lines()
+        start = next(i for i, line in enumerate(lines) if start_marker in line)
+        end = next(i for i, line in enumerate(lines) if end_marker in line and i >= start)
+        return "\n".join(lines[start : end + 1])
+
+    @classmethod
+    def _fixed_block(cls, start_marker: str, length: int, expect_last: str) -> str:
+        lines = cls._script_lines()
+        start = next(i for i, line in enumerate(lines) if start_marker in line)
+        block = lines[start : start + length]
+        assert block[-1].strip() == expect_last, (
+            f"shape of the block starting {start_marker!r} changed; update this test"
+        )
+        return "\n".join(block)
+
+    @classmethod
+    def _init_snippet(cls) -> str:
+        return cls._extract_between(
+            'CAPTURED_AT_FILE="${PRODUCTION}/captured-at.json"',
+            'echo \'{"captured_at": {}, "gbrain_git_head": null}\'',
+        )
+
+    @classmethod
+    def _record_captured_at_snippet(cls) -> str:
+        return cls._fixed_block("record_captured_at() {", 16, "}")
+
+    @classmethod
+    def _record_gbrain_git_head_snippet(cls) -> str:
+        return cls._fixed_block("record_gbrain_git_head() {", 14, "}")
+
+    def test_all_mandatory_stores_and_gbrain_head_are_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            production = Path(temporary)
+            body = "\n".join(
+                [
+                    f'PRODUCTION="{production}"',
+                    self._init_snippet(),
+                    self._record_captured_at_snippet(),
+                    self._record_gbrain_git_head_snippet(),
+                    *[f'record_captured_at "{store}"' for store in self.MANDATORY_STORES],
+                    'record_gbrain_git_head "66b08dd93c4483738f4e43fb5b9b592aa7337d7a"',
+                ]
+            )
+            result = subprocess.run(
+                ["bash", "-c", body], capture_output=True, text=True, check=True
+            )
+            data = json.loads((production / "captured-at.json").read_text(encoding="utf-8"))
+            self.assertEqual(set(data["captured_at"]), set(self.MANDATORY_STORES))
+            for store, value in data["captured_at"].items():
+                # Must be a real, parseable UTC timestamp.
+                datetime.fromisoformat(value)
+            self.assertEqual(data["gbrain_git_head"], "66b08dd93c4483738f4e43fb5b9b592aa7337d7a")
+
+    def test_missing_gbrain_head_records_null(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            production = Path(temporary)
+            body = "\n".join(
+                [
+                    f'PRODUCTION="{production}"',
+                    self._init_snippet(),
+                    self._record_gbrain_git_head_snippet(),
+                    'record_gbrain_git_head ""',
+                ]
+            )
+            subprocess.run(["bash", "-c", body], capture_output=True, text=True, check=True)
+            data = json.loads((production / "captured-at.json").read_text(encoding="utf-8"))
+            self.assertIsNone(data["gbrain_git_head"])
+
+
+class CaptureDriftEnforcementTests(unittest.TestCase):
+    """Fail-closed enforcement of the 7-day cross-store drift limit: every
+    mandatory store timestamp must exist and parse, and the oldest-to-newest
+    spread must be <= 604800 seconds. Recording the drift is not enough on
+    its own -- validate_capture_drift() must actually raise."""
+
+    def _reconciler(self, root: Path):
+        production = root / "production"
+        production.mkdir(parents=True, exist_ok=True)
+        return MERGE_MODULE.Reconciler(production, root / "baseline", root / "output", ROOT)
+
+    def _write_captured_at(
+        self, production: Path, captured_at: dict[str, str], gbrain_git_head: str = "deadbeef"
+    ) -> None:
+        (production / "captured-at.json").write_text(
+            json.dumps({"captured_at": captured_at, "gbrain_git_head": gbrain_git_head}),
+            encoding="utf-8",
+        )
+
+    def _all_stores_at(self, base: datetime) -> dict[str, str]:
+        return {store: base.isoformat() for store in MERGE_MODULE.MANDATORY_CAPTURE_STORES}
+
+    def test_missing_store_timestamp_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            reconciler = self._reconciler(Path(temporary))
+            captured_at = self._all_stores_at(datetime.now(timezone.utc))
+            del captured_at["pglite"]
+            self._write_captured_at(reconciler.production, captured_at)
+            with self.assertRaises(MERGE_MODULE.ReconciliationError) as ctx:
+                reconciler.validate_capture_drift()
+            self.assertIn("pglite", str(ctx.exception))
+
+    def test_invalid_timestamp_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            reconciler = self._reconciler(Path(temporary))
+            captured_at = self._all_stores_at(datetime.now(timezone.utc))
+            captured_at["gbrain"] = "not-a-timestamp"
+            self._write_captured_at(reconciler.production, captured_at)
+            with self.assertRaises(MERGE_MODULE.ReconciliationError) as ctx:
+                reconciler.validate_capture_drift()
+            self.assertIn("gbrain", str(ctx.exception))
+
+    def test_exactly_seven_days_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            reconciler = self._reconciler(Path(temporary))
+            base = datetime.now(timezone.utc)
+            captured_at = self._all_stores_at(base)
+            captured_at["pglite"] = (
+                base + timedelta(seconds=MERGE_MODULE.ACCEPTED_DRIFT_SECONDS)
+            ).isoformat()
+            self._write_captured_at(reconciler.production, captured_at)
+            reconciler.validate_capture_drift()  # must not raise
+
+    def test_over_seven_days_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            reconciler = self._reconciler(Path(temporary))
+            base = datetime.now(timezone.utc)
+            captured_at = self._all_stores_at(base)
+            captured_at["pglite"] = (
+                base + timedelta(seconds=MERGE_MODULE.ACCEPTED_DRIFT_SECONDS + 1)
+            ).isoformat()
+            self._write_captured_at(reconciler.production, captured_at)
+            with self.assertRaises(MERGE_MODULE.ReconciliationError) as ctx:
+                reconciler.validate_capture_drift()
+            self.assertIn("exceeds the accepted", str(ctx.exception))
+
+    def test_within_seven_days_but_not_exact_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            reconciler = self._reconciler(Path(temporary))
+            base = datetime.now(timezone.utc)
+            captured_at = self._all_stores_at(base)
+            captured_at["notion"] = (base - timedelta(days=3)).isoformat()
+            captured_at["pglite"] = (base + timedelta(days=2)).isoformat()
+            self._write_captured_at(reconciler.production, captured_at)
+            reconciler.validate_capture_drift()  # must not raise
+
+    def test_no_mandatory_store_may_be_omitted(self) -> None:
+        # Every one of the 6 mandatory stores must independently be
+        # required -- not merely "most of them".
+        for store in MERGE_MODULE.MANDATORY_CAPTURE_STORES:
+            with self.subTest(store=store), tempfile.TemporaryDirectory() as temporary:
+                reconciler = self._reconciler(Path(temporary))
+                captured_at = self._all_stores_at(datetime.now(timezone.utc))
+                del captured_at[store]
+                self._write_captured_at(reconciler.production, captured_at)
+                with self.assertRaises(MERGE_MODULE.ReconciliationError):
+                    reconciler.validate_capture_drift()
+
+    def test_missing_captured_at_file_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            reconciler = self._reconciler(Path(temporary))
+            with self.assertRaises(MERGE_MODULE.ReconciliationError):
+                reconciler.validate_capture_drift()
 
 
 if __name__ == "__main__":

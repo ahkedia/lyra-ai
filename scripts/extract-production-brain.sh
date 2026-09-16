@@ -16,9 +16,15 @@ NOTION_DIAG_FILE=""
 CAPTURED_AT_FILE=""
 CURRENT_STEP="preflight"
 RUN_STATUS="INCOMPLETE"
-# Overridable only for tests; production always uses the 1800s/15s defaults.
+# GBRAIN_STOP_PROMPTED is set the moment the operator is told to stop
+# gbrain-http; from that point on, cleanup() guarantees a restart reminder
+# on every exit path, success or failure.
+GBRAIN_STOP_PROMPTED=0
+GBRAIN_RESTART_PRINTED=0
+# Overridable only for tests; production always uses the 1800s/15s/root defaults.
 QUIESCE_TIMEOUT_SECONDS="${QUIESCE_TIMEOUT_SECONDS:-1800}"
 QUIESCE_POLL_SECONDS="${QUIESCE_POLL_SECONDS:-15}"
+NOTION_DIAG_DIR="${NOTION_DIAG_DIR:-/root}"
 
 write_status() {
   local detail="${1:-run has not completed}"
@@ -71,6 +77,12 @@ PY
   if [[ -n "${NOTION_DIAG_FILE}" && -f "${NOTION_DIAG_FILE}" ]]; then
     rm -f "${NOTION_DIAG_FILE}"
   fi
+  # Once the operator has been told to stop gbrain-http, every exit path from
+  # here on -- success, later failure, or an early failure during the
+  # quiescence wait itself -- must remind them to start it back up.
+  if (( GBRAIN_STOP_PROMPTED == 1 )); then
+    remind_gbrain_restart
+  fi
   exit "${exit_code}"
 }
 trap cleanup EXIT
@@ -83,6 +95,13 @@ fail() {
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "required command is missing: $1"
+}
+
+remind_gbrain_restart() {
+  if (( GBRAIN_RESTART_PRINTED == 0 )); then
+    echo "Operator action required now: systemctl start gbrain-http"
+    GBRAIN_RESTART_PRINTED=1
+  fi
 }
 
 directory_bytes() {
@@ -201,6 +220,8 @@ echo "Disk preflight (known local sources): required=${INITIAL_REQUIRED_BYTES} f
   || fail "insufficient disk before Notion: required=${INITIAL_REQUIRED_BYTES} free=${INITIAL_FREE_BYTES}"
 
 STAGING_DIR="$(mktemp -d /root/.production-brain-export.XXXXXX)"
+[[ -n "${STAGING_DIR}" && "${STAGING_DIR}" != "." && "${STAGING_DIR}" != "/" ]] \
+  || fail "mktemp did not return a safe staging directory"
 PAYLOAD="${STAGING_DIR}/payload"
 PRODUCTION="${PAYLOAD}/production"
 mkdir -p \
@@ -215,7 +236,10 @@ echo '{"captured_at": {}, "gbrain_git_head": null}' > "${CAPTURED_AT_FILE}"
 
 CURRENT_STEP="Notion export"
 echo "[RUNNING] Notion export..."
-NOTION_DIAG_FILE="$(mktemp /root/.notion-export-diagnostics.XXXXXX)"
+[[ -n "${NOTION_DIAG_DIR}" ]] || fail "NOTION_DIAG_DIR must not be empty"
+NOTION_DIAG_FILE="$(mktemp "${NOTION_DIAG_DIR}/.notion-export-diagnostics.XXXXXX")"
+[[ -n "${NOTION_DIAG_FILE}" && "${NOTION_DIAG_FILE}" != "." ]] \
+  || fail "mktemp did not return a safe diagnostics path"
 chmod 600 "${NOTION_DIAG_FILE}"
 if ! python3 "${ROOT_DIR}/scripts/notion_dump.py" \
   --registry "${REGISTRY_PATH}" \
@@ -333,6 +357,7 @@ echo "[COMPLETE] Explicit OpenClaw state copied"
 CURRENT_STEP="PGlite quiescence wait"
 echo "[RUNNING] Waiting up to $((QUIESCE_TIMEOUT_SECONDS / 60)) minutes for gbrain-http to quiesce before the PGlite snapshot..."
 echo "Operator action required now: systemctl stop gbrain-http"
+GBRAIN_STOP_PROMPTED=1
 QUIESCE_DEADLINE_EPOCH=$(( $(date +%s) + QUIESCE_TIMEOUT_SECONDS ))
 QUIESCED=0
 while (( $(date +%s) <= QUIESCE_DEADLINE_EPOCH )); do
@@ -362,7 +387,7 @@ record_captured_at "pglite"
 flock -u 8
 exec 8>&-
 echo "[COMPLETE] PGlite quiesced snapshot opened on disposable copy; table and row counts recorded"
-echo "Operator action required now: systemctl start gbrain-http"
+remind_gbrain_restart
 
 CURRENT_STEP="production reconciliation and benchmark validation"
 mkdir -p "${PAYLOAD}/knowledge-brain-export"

@@ -1,8 +1,8 @@
 # Knowledge Brain Migration: Execution Plan & Corpus Portability Guide
 
-**Target Environment:** Portable Google Drive Knowledge Corpus  
-**Source System:** Lyra Knowledge Brain & Second Brain Ecosystem (Hetzner VPS / OpenClaw / Notion / gbrain / PGLite)  
-**Date of Generation:** 2026-09-15  
+**Target Environment:** Portable Google Drive Knowledge Corpus<br>
+**Source System:** Lyra Knowledge Brain & Second Brain Ecosystem (Hetzner VPS / OpenClaw / Notion / gbrain / PGLite)<br>
+**Date of Generation:** 2026-09-15<br>
 **Version:** 1.2
 **Classification:** Portable Knowledge Migration Document
 **Current Status:** **INCOMPLETE — no production extraction has been run or merged**
@@ -70,7 +70,7 @@ To operationalize this export inside a new environment:
    - Execute `scripts/extract-production-brain.sh` once its mandatory preconditions are met. `gbrain-http` stays live for every store except PGLite: the script exports Notion, then the PostgreSQL dump, then gbrain (with the registry and explicit private context), then explicit OpenClaw state — all while the brain keeps running.
    - Immediately before the PGLite snapshot, the script waits up to 30 minutes, polling every 15 seconds, for `gbrain-http` to be inactive, no gbrain maintenance process running, and no open PGLite file handles. It prints the exact operator command (`systemctl stop gbrain-http`) and never stops the service itself. Once quiesced, it acquires the brain-write lock, snapshots and validates PGLite, releases the lock, and immediately prints the restart command (`systemctl start gbrain-http`) for the operator to run right away.
    - Merge, reconciliation, the 28 benchmark queries, the built-in scanner, gitleaks, trufflehog, age encryption, and decrypt/list validation all run afterward with the brain live again.
-   - Because stores are now captured sequentially instead of from one consistent snapshot, per-store `captured_at` UTC timestamps and the gbrain git HEAD are recorded in the status report and `reconciliation-report.json`, which also surfaces the observed cross-store drift. Drift of up to 7 days is accepted.
+   - Because stores are now captured sequentially instead of from one consistent snapshot, per-store `captured_at` UTC timestamps and the gbrain git HEAD are recorded in the status report and `reconciliation-report.json`. Drift of up to 7 days (604800 seconds) is accepted, and reconciliation enforces this fail-closed: it is not merely reported. Every mandatory store's timestamp must be present and parse as a valid UTC timestamp, and the oldest-to-newest spread across all of them must be at most 604800 seconds, or reconciliation raises and the run ends `INCOMPLETE`.
    - The corpus is self-contained after one successful run. There is no recurring migration process.
 
 ---
@@ -186,6 +186,8 @@ Operator action required now: systemctl start gbrain-http
 
 Run that command immediately. Merge, reconciliation, benchmarks, secret scanning, and encryption all still have to run, but none of them need the brain quiesced, so there is no reason to leave it stopped.
 
+That reminder is not only printed on success. Once the stop prompt above has been shown, the script guarantees it on every exit path from that point on — a quiescence-wait timeout, a PGLite copy failure, or a later failure during reconciliation, scanning, or encryption all still print `Operator action required now: systemctl start gbrain-http` before exiting. If you see the stop prompt, expect the restart prompt no matter how the run ends.
+
 Successful output ends with:
 
 ```text
@@ -209,4 +211,4 @@ age --decrypt -i /secure/path/knowledge-export.key \
 
 ### Fatal failure modes
 
-Every condition below exits non-zero and writes status `INCOMPLETE`: missing credentials or dependencies; insufficient exact disk headroom; PGLite quiescence wait timeout (30 minutes) or lock contention; Notion discovery, pagination, recursive block, registry-coverage, or page error; missing gbrain content; PGLite copy/open/table-count failure; PostgreSQL inventory/dump/restore-listing failure; zero production items; reconciliation collision; failed expected fact, provenance, negative assertion, or ACL benchmark; scanner error or finding; age encryption or decrypt/list validation failure.
+Every condition below exits non-zero and writes status `INCOMPLETE`: missing credentials or dependencies; insufficient exact disk headroom; PGLite quiescence wait timeout (30 minutes) or lock contention; Notion discovery, pagination, recursive block, registry-coverage, or page error; missing gbrain content; PGLite copy/open/table-count failure; PostgreSQL inventory/dump/restore-listing failure; zero production items; a missing, unparseable, or >7-day-spread `captured_at` timestamp for any mandatory store; reconciliation collision; failed expected fact, provenance, negative assertion, or ACL benchmark; scanner error or finding; age encryption or decrypt/list validation failure.
